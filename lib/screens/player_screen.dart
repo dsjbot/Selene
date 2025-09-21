@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import '../widgets/video_player_widget.dart';
 import '../widgets/video_card.dart';
 import '../services/api_service.dart';
@@ -366,6 +367,8 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
   void _onBackPressed() {
     // 关闭页面前保存进度
     _saveProgress(force: true);
+    // 返回时禁用 wakelock
+    _disableWakelock();
     Navigator.of(context).pop();
   }
 
@@ -561,6 +564,9 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
     // 重置最后保存时间，允许立即保存
     _lastSaveTime = null;
     
+    // 视频准备就绪时启用 wakelock
+    _enableWakelock();
+    
     // 添加视频播放状态监听器来触发保存检查
     _addVideoProgressListener();
   }
@@ -585,6 +591,16 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
   void _onVideoProgressUpdate() {
     // 检查并保存进度（基于时间间隔）
     _checkAndSaveProgress();
+  }
+
+  /// 启用 Wakelock 防止息屏
+  Future<void> _enableWakelock() async {
+    await WakelockPlus.enable();
+  }
+
+  /// 禁用 Wakelock 允许息屏
+  Future<void> _disableWakelock() async {
+    await WakelockPlus.disable();
   }
 
   /// 处理下一集按钮点击
@@ -622,6 +638,8 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
     // 检查是否为最后一集
     if (currentEpisodeIndex >= currentDetail!.episodes.length - 1) {
       _showToast('播放完成');
+      // 播放完成时禁用 wakelock
+      _disableWakelock();
       return;
     }
     
@@ -2039,6 +2057,8 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
     WidgetsBinding.instance.removeObserver(this);
     // 恢复原始的系统UI样式
     SystemChrome.setSystemUIOverlayStyle(_originalStyle);
+    // 禁用 wakelock
+    _disableWakelock();
     // 销毁播放器
     _videoPlayerController?.dispose();
     // 释放滚动控制器
@@ -2112,6 +2132,12 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
                       onPause: () {
                         // 暂停时保存进度
                         _saveProgress(force: true);
+                        // 暂停时禁用 wakelock
+                        _disableWakelock();
+                      },
+                      onPlay: () {
+                        // 播放时启用 wakelock
+                        _enableWakelock();
                       },
                     ),
                     // 切换播放源/集数时的加载蒙版（只遮挡播放器）

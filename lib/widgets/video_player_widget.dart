@@ -14,6 +14,7 @@ class VideoPlayerWidget extends StatefulWidget {
   final VoidCallback? onNextEpisode;
   final VoidCallback? onVideoCompleted;
   final VoidCallback? onPause;
+  final VoidCallback? onPlay;
 
   const VideoPlayerWidget({
     super.key,
@@ -26,6 +27,7 @@ class VideoPlayerWidget extends StatefulWidget {
     this.onNextEpisode,
     this.onVideoCompleted,
     this.onPause,
+    this.onPlay,
   });
 
   @override
@@ -157,6 +159,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
               onFullscreenChange: _handleFullscreenChange,
               onNextEpisode: widget.onNextEpisode,
               onPause: widget.onPause,
+              onPlay: widget.onPlay,
             ),
           );
           
@@ -227,6 +230,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
             onFullscreenChange: _handleFullscreenChange,
             onNextEpisode: widget.onNextEpisode,
             onPause: widget.onPause,
+            onPlay: widget.onPlay,
           ),
         );
         
@@ -370,6 +374,7 @@ class CustomChewieControls extends StatefulWidget {
   final Function(bool) onFullscreenChange;
   final VoidCallback? onNextEpisode;
   final VoidCallback? onPause;
+  final VoidCallback? onPlay;
 
   const CustomChewieControls({
     super.key,
@@ -377,6 +382,7 @@ class CustomChewieControls extends StatefulWidget {
     required this.onFullscreenChange,
     this.onNextEpisode,
     this.onPause,
+    this.onPlay,
   });
 
   @override
@@ -681,6 +687,7 @@ class _CustomChewieControlsState extends State<CustomChewieControls> {
                             widget.onPause?.call();
                           } else {
                             chewieController.play();
+                            widget.onPlay?.call();
                           }
                         },
                         child: AnimatedBuilder(
@@ -773,6 +780,7 @@ class _CustomChewieControlsState extends State<CustomChewieControls> {
                               widget.onPause?.call();
                             } else {
                               chewieController.play();
+                              widget.onPlay?.call();
                             }
                           },
                           behavior: HitTestBehavior.opaque,
