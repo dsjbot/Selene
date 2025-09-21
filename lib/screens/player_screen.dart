@@ -881,7 +881,7 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
           
           // 源名称、年份和分类信息行
           Padding(
-            padding: const EdgeInsets.only(left: 14, right: 16, top: 12, bottom: 16),
+            padding: const EdgeInsets.only(left: 16, right: 16, top: 12, bottom: 16),
             child: Row(
               children: [
                 // 源名称（带边框样式）
@@ -932,7 +932,6 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
                 // 详情按钮
                 GestureDetector(
                   onTap: () {
-                    // TODO: 实现详情页面跳转
                     _showDetailsPanel();
                   },
                   child: Stack(
@@ -1028,11 +1027,9 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
           ),
         ),
         
+        const SizedBox(height: 16),
         // 推荐卡片网格
-        Transform.translate(
-          offset: const Offset(0, -8),
-          child: _buildRecommendsGrid(theme),
-        ),
+        _buildRecommendsGrid(theme)
       ],
     );
   }
@@ -1055,6 +1052,7 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
         return Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           child: GridView.builder(
+            padding: EdgeInsets.zero,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
