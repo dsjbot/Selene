@@ -8,6 +8,7 @@ import '../services/m3u8_service.dart';
 import '../services/douban_service.dart';
 import '../models/search_result.dart';
 import '../models/douban_movie.dart';
+import '../models/play_record.dart';
 import '../services/page_cache_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../utils/image_url.dart';
@@ -48,7 +49,7 @@ class SourceSpeed {
   });
 }
 
-class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMixin {
+class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMixin, WidgetsBindingObserver {
   late SystemUiOverlayStyle _originalStyle;
   bool _isInitialized = false;
   bool _isFullscreen = false;
@@ -57,6 +58,7 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
 
   // 播放信息
   SearchResult? currentDetail;
+  String searchTitle = '';
   String videoTitle = '';
   String videoDesc = '';
   String videoYear = '';
@@ -98,6 +100,10 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
   // 刷新相关状态
   bool _isRefreshing = false;
   late AnimationController _refreshAnimationController;
+  
+  // 保存进度相关状态
+  DateTime? _lastSaveTime;
+  static const Duration _saveProgressInterval = Duration(seconds: 10);
 
   @override
   void initState() {
@@ -106,6 +112,8 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
       duration: const Duration(milliseconds: 1000),
       vsync: this,
     );
+    // 添加应用生命周期监听器
+    WidgetsBinding.instance.addObserver(this);
     initVideoData();
   }
 
@@ -115,6 +123,7 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
     videoTitle = widget.title;
     videoYear = widget.year ?? '';
     needPrefer = widget.prefer != null && widget.prefer == 'true';
+    searchTitle = widget.stitle ?? '';
 
     print('=== PlayerScreen 初始化参数 ===');
     print('currentSource: $currentSource');
@@ -137,8 +146,8 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
     initParam();
     
     // 执行查询
-    allSources = await fetchSourcesData((widget.stitle != null && widget.stitle!.isNotEmpty) 
-        ? widget.stitle! 
+    allSources = await fetchSourcesData((searchTitle.isNotEmpty) 
+        ? searchTitle 
         : videoTitle);
     if (currentSource.isNotEmpty && currentID.isNotEmpty && !allSources.any((source) => source.source == currentSource && source.id == currentID)) {
       allSources = await fetchSourceDetail(currentSource, currentID);
@@ -297,7 +306,102 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
 
   // 处理返回按钮点击
   void _onBackPressed() {
+    // 关闭页面前保存进度
+    _saveProgress(force: true);
     Navigator.of(context).pop();
+  }
+
+  /// 保存播放进度（同步函数，提前获取参数避免异步问题）
+  void _saveProgress({bool force = false}) {
+    try {
+      if (currentDetail == null || _videoPlayerController == null) return;
+      
+      // 如果不是强制保存，检查时间间隔
+      if (!force) {
+        final now = DateTime.now();
+        if (_lastSaveTime != null && 
+            now.difference(_lastSaveTime!) < _saveProgressInterval) {
+          return; // 时间间隔不够，跳过保存
+        }
+      }
+
+      // 更新最后保存时间
+      _lastSaveTime = DateTime.now();
+      
+      // 提前获取所有需要的参数，避免异步执行时参数被改变
+      final currentPosition = _videoPlayerController!.currentPosition;
+      final duration = _videoPlayerController!.duration;
+      final currentIDSnapshot = currentID;
+      final currentSourceSnapshot = currentSource;
+      final videoTitleSnapshot = videoTitle;
+      final videoYearSnapshot = videoYear;
+      final videoCoverSnapshot = videoCover;
+      final currentEpisodeIndexSnapshot = currentEpisodeIndex;
+      final totalEpisodesSnapshot = totalEpisodes;
+      final searchTitleSnapshot = searchTitle;
+      final sourceNameSnapshot = currentDetail?.sourceName ?? currentSource;
+      
+      if (currentPosition == null || duration == null) return;
+
+      // 如果播放进度小于 1 s，则不保存
+      if (currentPosition.inSeconds < 1) {
+        return;
+      }
+      
+      final playTime = currentPosition.inSeconds;
+      final totalTime = duration.inSeconds;
+      
+      // 创建播放记录对象
+      final playRecord = PlayRecord(
+        id: currentIDSnapshot,
+        source: currentSourceSnapshot,
+        title: videoTitleSnapshot,
+        sourceName: sourceNameSnapshot,
+        year: videoYearSnapshot,
+        cover: videoCoverSnapshot,
+        index: currentEpisodeIndexSnapshot + 1, // 转换为1开始的索引
+        totalEpisodes: totalEpisodesSnapshot,
+        playTime: playTime,
+        totalTime: totalTime,
+        saveTime: DateTime.now().millisecondsSinceEpoch ~/ 1000, // 当前时间戳（秒）
+        searchTitle: searchTitleSnapshot,
+      );
+      
+      // 异步保存播放记录（不等待结果）
+      PageCacheService().savePlayRecord(playRecord, context).then((_) {
+        debugPrint('保存播放进度: source: $currentSourceSnapshot, id: $currentIDSnapshot, 第${currentEpisodeIndexSnapshot + 1}集, 时间: ${playTime}秒');
+      }).catchError((e) {
+        debugPrint('保存播放进度失败: $e');
+      });
+    } catch (e) {
+      debugPrint('保存播放进度失败: $e');
+    }
+  }
+
+  /// 检查并保存进度（基于时间间隔）
+  void _checkAndSaveProgress() {
+    _saveProgress();
+  }
+
+  /// 应用生命周期状态变化
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    
+    switch (state) {
+      case AppLifecycleState.paused:
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.detached:
+        // 应用进入后台前保存进度
+        _saveProgress(force: true);
+        break;
+      case AppLifecycleState.resumed:
+        // 应用回到前台时重置最后保存时间，允许立即保存
+        _lastSaveTime = null;
+        break;
+      case AppLifecycleState.hidden:
+        break;
+    }
   }
 
   /// 显示错误信息
@@ -369,6 +473,34 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
         resumeTime = 0;
       });
     }
+    
+    // 重置最后保存时间，允许立即保存
+    _lastSaveTime = null;
+    
+    // 添加视频播放状态监听器来触发保存检查
+    _addVideoProgressListener();
+  }
+
+  /// 添加视频播放进度监听器
+  void _addVideoProgressListener() {
+    if (_videoPlayerController != null) {
+      // 添加进度监听器
+      _videoPlayerController!.addProgressListener(_onVideoProgressUpdate);
+    }
+  }
+
+  /// 移除视频播放进度监听器
+  void _removeVideoProgressListener() {
+    if (_videoPlayerController != null) {
+      // 移除进度监听器
+      _videoPlayerController!.removeProgressListener(_onVideoProgressUpdate);
+    }
+  }
+
+  /// 视频播放进度更新回调
+  void _onVideoProgressUpdate() {
+    // 检查并保存进度（基于时间间隔）
+    _checkAndSaveProgress();
   }
 
   /// 处理下一集按钮点击
@@ -380,6 +512,9 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
       _showToast('已经是最后一集了');
       return;
     }
+    
+    // 集数切换前保存进度
+    _saveProgress(force: true);
     
     // 播放下一集
     final nextIndex = currentEpisodeIndex + 1;
@@ -399,6 +534,9 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
       _showToast('播放完成');
       return;
     }
+    
+    // 集数切换前保存进度
+    _saveProgress(force: true);
     
     // 自动播放下一集
     final nextIndex = currentEpisodeIndex + 1;
@@ -518,10 +656,14 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
   }
 
   /// 切换视频源
-  void _switchSource(SearchResult newSource) {
+  void _switchSource(SearchResult newSource) async {
     // 保存当前播放进度
     final currentProgress = currentPosition?.inSeconds ?? 0;
     final currentEpisode = currentEpisodeIndex;
+    
+    // 记录旧的源信息，用于删除播放记录
+    final oldSource = currentSource;
+    final oldID = currentID;
     
     setState(() {
       currentDetail = newSource;
@@ -531,6 +673,17 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
       totalEpisodes = newSource.episodes.length;
       _isEpisodesReversed = false;
     });
+    
+    // 删除之前的播放记录（如果源发生了变化）
+    if (oldSource.isNotEmpty && oldID.isNotEmpty && 
+        (oldSource != newSource.source || oldID != newSource.id)) {
+      try {
+        await PageCacheService().deletePlayRecord(oldSource, oldID, context);
+        debugPrint('删除旧源播放记录: $oldSource+$oldID');
+      } catch (e) {
+        debugPrint('删除旧源播放记录失败: $e');
+      }
+    }
     
     // 更新视频信息
     setInfosByDetail(newSource);
@@ -1007,6 +1160,9 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
                         aspectRatio: 3 / 2, // 严格保持3:2宽高比
                         child: GestureDetector(
                           onTap: () {
+                            // 集数切换前保存进度
+                            _saveProgress(force: true);
+                            
                             setState(() {
                               currentEpisodeIndex = episodeIndex;
                             });
@@ -1097,6 +1253,9 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
                 currentEpisodeIndex: currentEpisodeIndex,
                 isReversed: _isEpisodesReversed,
                 onEpisodeTap: (index) {
+                  // 集数切换前保存进度
+                  _saveProgress(force: true);
+                  
                   this.setState(() {
                     currentEpisodeIndex = index;
                   });
@@ -1420,7 +1579,11 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
           },
         );
       },
-    );
+    ).then((_) {
+      // 面板关闭后强制更新主界面的源卡片显示
+      // 这样测速信息就能立即显示在主界面的源卡片上
+      setState(() {});
+    });
   }
 
   /// 刷新所有源的测速结果
@@ -1751,6 +1914,12 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
 
   @override
   void dispose() {
+    // 保存进度
+    _saveProgress(force: true);
+    // 移除视频进度监听器
+    _removeVideoProgressListener();
+    // 移除应用生命周期监听器
+    WidgetsBinding.instance.removeObserver(this);
     // 恢复原始的系统UI样式
     SystemChrome.setSystemUIOverlayStyle(_originalStyle);
     // 销毁播放器
@@ -1818,6 +1987,10 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
                   onReady: _onVideoPlayerReady,
                   onNextEpisode: _onNextEpisode,
                   onVideoCompleted: _onVideoCompleted,
+                  onPause: () {
+                    // 暂停时保存进度
+                    _saveProgress(force: true);
+                  },
                 ),
                 Expanded(
                   child: _buildVideoDetailSection(theme),

@@ -5,6 +5,7 @@ import 'user_data_service.dart';
 import '../screens/login_screen.dart';
 import '../models/favorite_item.dart';
 import '../models/search_result.dart';
+import '../models/play_record.dart';
 
 /// API响应结果类
 class ApiResponse<T> {
@@ -416,6 +417,28 @@ class ApiService {
       return response;
     } catch (e) {
       return ApiResponse.error('删除搜索历史异常: ${e.toString()}');
+    }
+  }
+
+  /// 保存播放记录
+  static Future<ApiResponse<void>> savePlayRecord(PlayRecord playRecord, BuildContext context) async {
+    try {
+      // 构建正确的请求体格式
+      final key = '${playRecord.source}+${playRecord.id}';
+      final body = {
+        'key': key,
+        'record': playRecord.toJson(),
+      };
+      
+      final response = await post<void>(
+        '/api/playrecords',
+        body: body,
+        context: context,
+      );
+      
+      return response;
+    } catch (e) {
+      return ApiResponse.error('保存播放记录异常: ${e.toString()}');
     }
   }
 

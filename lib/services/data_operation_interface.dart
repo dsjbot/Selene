@@ -45,6 +45,9 @@ abstract class PlayRecordOperationInterface {
   /// 获取播放记录（优先从缓存，缓存未命中则从API获取）
   Future<DataOperationResult<List<PlayRecord>>> getPlayRecords(BuildContext context);
   
+  /// 保存播放记录（先添加到缓存，再调用POST接口保存）
+  Future<DataOperationResult<void>> savePlayRecord(PlayRecord playRecord, BuildContext context);
+  
   /// 根据 source+id 删除播放记录
   Future<DataOperationResult<void>> deletePlayRecord(String source, String id, BuildContext context);
   

@@ -121,6 +121,23 @@ class PageCacheService implements PlayRecordOperationInterface, FavoriteOperatio
   }
 
   @override
+  Future<DataOperationResult<void>> savePlayRecord(PlayRecord playRecord, BuildContext context) async {
+    // 优先操作缓存
+    _addPlayRecordToCache(playRecord);
+    
+    try {
+      final response = await ApiService.savePlayRecord(playRecord, context);
+      if (response.success) {
+        return DataOperationResult.success(null);
+      } else {
+        return DataOperationResult.error(response.message ?? '保存播放记录失败');
+      }
+    } catch (e) {
+      return DataOperationResult.error('保存播放记录异常: ${e.toString()}');
+    }
+  }
+
+  @override
   Future<DataOperationResult<void>> deletePlayRecord(String source, String id, BuildContext context) async {
     // 优先操作缓存
     _removePlayRecordFromCache(source, id);
@@ -137,6 +154,30 @@ class PageCacheService implements PlayRecordOperationInterface, FavoriteOperatio
     }
   }
 
+
+  void _addPlayRecordToCache(PlayRecord playRecord) {
+    const cacheKey = 'play_records';
+    final cachedData = getCache<List<PlayRecord>>(cacheKey);
+    
+    List<PlayRecord> records;
+    if (cachedData != null) {
+      // 移除相同source+id的记录
+      records = cachedData.where((record) => 
+        !(record.source == playRecord.source && record.id == playRecord.id)
+      ).toList();
+      
+      // 添加新记录
+      records.add(playRecord);
+    } else {
+      records = [playRecord];
+    }
+    
+    // 按save_time降序排列
+    records.sort((a, b) => b.saveTime.compareTo(a.saveTime));
+    
+    // 更新缓存
+    setCache(cacheKey, records);
+  }
 
   void _removePlayRecordFromCache(String source, String id) {
     const cacheKey = 'play_records';

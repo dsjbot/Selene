@@ -13,6 +13,7 @@ class VideoPlayerWidget extends StatefulWidget {
   final VoidCallback? onReady;
   final VoidCallback? onNextEpisode;
   final VoidCallback? onVideoCompleted;
+  final VoidCallback? onPause;
 
   const VideoPlayerWidget({
     super.key,
@@ -24,6 +25,7 @@ class VideoPlayerWidget extends StatefulWidget {
     this.onReady,
     this.onNextEpisode,
     this.onVideoCompleted,
+    this.onPause,
   });
 
   @override
@@ -67,6 +69,16 @@ class VideoPlayerWidgetController {
     _state._chewieController?.pause();
   }
 
+  /// 添加视频播放进度监听器
+  void addProgressListener(VoidCallback listener) {
+    _state._addProgressListener(listener);
+  }
+
+  /// 移除视频播放进度监听器
+  void removeProgressListener(VoidCallback listener) {
+    _state._removeProgressListener(listener);
+  }
+
   /// 销毁播放器资源
   void dispose() {
     _state._videoController?.dispose();
@@ -80,6 +92,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
   ChewieController? _chewieController;
   bool _isFullscreen = false;
   bool _hasCompleted = false; // 防止重复触发完成事件
+  final List<VoidCallback> _progressListeners = []; // 进度监听器列表
 
   @override
   void initState() {
@@ -143,6 +156,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
               onBackPressed: widget.onBackPressed,
               onFullscreenChange: _handleFullscreenChange,
               onNextEpisode: widget.onNextEpisode,
+              onPause: widget.onPause,
             ),
           );
           
@@ -212,6 +226,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
             onBackPressed: widget.onBackPressed,
             onFullscreenChange: _handleFullscreenChange,
             onNextEpisode: widget.onNextEpisode,
+            onPause: widget.onPause,
           ),
         );
         
@@ -268,6 +283,15 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
     
     final value = _videoController!.value;
     
+    // 触发进度监听器
+    for (final listener in _progressListeners) {
+      try {
+        listener();
+      } catch (e) {
+        debugPrint('Progress listener error: $e');
+      }
+    }
+    
     // 检查视频是否播放完成
     if (value.position >= value.duration && value.duration.inMilliseconds > 0) {
       if (!_hasCompleted) {
@@ -275,6 +299,18 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
         widget.onVideoCompleted?.call();
       }
     }
+  }
+
+  /// 添加进度监听器
+  void _addProgressListener(VoidCallback listener) {
+    if (!_progressListeners.contains(listener)) {
+      _progressListeners.add(listener);
+    }
+  }
+
+  /// 移除进度监听器
+  void _removeProgressListener(VoidCallback listener) {
+    _progressListeners.remove(listener);
   }
 
   // 处理全屏状态变化
@@ -302,6 +338,8 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
   void dispose() {
     // 恢复屏幕方向为自动
     _restoreOrientation();
+    // 清理进度监听器
+    _progressListeners.clear();
     // 移除监听器
     _videoController?.removeListener(_onVideoStateChanged);
     _videoController?.dispose();
@@ -331,12 +369,14 @@ class CustomChewieControls extends StatefulWidget {
   final VoidCallback? onBackPressed;
   final Function(bool) onFullscreenChange;
   final VoidCallback? onNextEpisode;
+  final VoidCallback? onPause;
 
   const CustomChewieControls({
     super.key,
     this.onBackPressed,
     required this.onFullscreenChange,
     this.onNextEpisode,
+    this.onPause,
   });
 
   @override
@@ -374,8 +414,6 @@ class _CustomChewieControlsState extends State<CustomChewieControls> {
     }
     
     _chewieController = chewieController;
-    // 监听视频播放状态变化
-    _chewieController!.videoPlayerController.addListener(_onVideoStateChanged);
   }
 
   void _onVideoStateChanged() {
@@ -444,7 +482,7 @@ class _CustomChewieControlsState extends State<CustomChewieControls> {
   @override
   void dispose() {
     _hideTimer?.cancel();
-    _chewieController?.videoPlayerController.removeListener(_onVideoStateChanged);
+    // 注意：不再需要移除监听器，因为我们没有在这里添加监听器
     super.dispose();
   }
 
@@ -640,6 +678,7 @@ class _CustomChewieControlsState extends State<CustomChewieControls> {
                           if (chewieController
                               .videoPlayerController.value.isPlaying) {
                             chewieController.pause();
+                            widget.onPause?.call();
                           } else {
                             chewieController.play();
                           }
@@ -731,6 +770,7 @@ class _CustomChewieControlsState extends State<CustomChewieControls> {
                             _onUserInteraction();
                             if (chewieController.videoPlayerController.value.isPlaying) {
                               chewieController.pause();
+                              widget.onPause?.call();
                             } else {
                               chewieController.play();
                             }
