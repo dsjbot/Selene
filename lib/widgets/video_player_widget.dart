@@ -703,21 +703,15 @@ class _CustomChewieControlsState extends State<CustomChewieControls> {
           ),
           // 全屏渐变效果
           if (_controlsVisible)
-            Positioned.fill(
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
               child: GestureDetector(
                 onTap: _onBlankAreaTap,
                 child: Container(
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.black.withValues(alpha: 0.5), // 顶部黑色
-                        Colors.transparent, // 中间无色
-                        Colors.black.withValues(alpha: 0.1), // 底部黑色
-                      ],
-                      stops: const [0.0, 0.5, 1.0], // 控制渐变位置
-                    ),
                   ),
                 ),
               ),
@@ -842,16 +836,6 @@ class _CustomChewieControlsState extends State<CustomChewieControls> {
                 },
                 behavior: HitTestBehavior.opaque,
                 child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.transparent,
-                        Colors.black.withValues(alpha: 0.7),
-                      ],
-                    ),
-                  ),
                   child: Padding(
                     padding: EdgeInsets.only(
                       left: isFullscreen ? 16.0 : 8.0,
