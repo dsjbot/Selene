@@ -63,6 +63,7 @@ class _CustomBetterPlayerControlsState
   double _swipeStartX = 0;
   Duration _swipeStartPosition = Duration.zero;
   bool _isInPipMode = false;
+  bool _isShowingDLNADialog = false;
 
   @override
   void initState() {
@@ -104,6 +105,14 @@ class _CustomBetterPlayerControlsState
       // 触发重建以更新UI
       if (mounted) {
         setState(() {});
+        // 如果是因为要显示 DLNA 对话框而退出全屏，在重建完成后显示对话框
+        if (_isShowingDLNADialog) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              _showDLNADialogInternal();
+            }
+          });
+        }
       }
     }
     // 监听 PiP 状态变化
@@ -353,19 +362,21 @@ class _CustomBetterPlayerControlsState
 
     final isCurrentlyFullscreen = widget.controller.isFullScreen ?? false;
     if (isCurrentlyFullscreen) {
+      // 设置标记位，表示正在显示 DLNA 对话框
+      _isShowingDLNADialog = true;
       _exitFullscreen();
-
-      int attempts = 0;
-      const maxAttempts = 20;
-      while (mounted &&
-          (widget.controller.isFullScreen ?? false) &&
-          attempts < maxAttempts) {
-        await Future.delayed(const Duration(milliseconds: 100));
-        attempts++;
-      }
+      // 退出全屏后会触发重建，在重建完成后会调用 _showDLNADialogInternal
+    } else {
+      // 非全屏状态，直接显示对话框
+      await _showDLNADialogInternal();
     }
+  }
 
-    if (mounted && !(widget.controller.isFullScreen ?? false)) {
+  Future<void> _showDLNADialogInternal() async {
+    // 获取当前播放位置
+    final resumePos = widget.controller.videoPlayerController?.value.position;
+
+    if (mounted) {
       await showDialog(
         context: context,
         builder: (context) => DLNADeviceDialog(
@@ -378,6 +389,8 @@ class _CustomBetterPlayerControlsState
           onCastStarted: widget.onCastStarted,
         ),
       );
+      // 对话框关闭后，重置标记位
+      _isShowingDLNADialog = false;
     }
   }
 
@@ -872,7 +885,7 @@ class _CustomVideoProgressBarState extends State<CustomVideoProgressBar> {
           final seekPosition = Duration(
               milliseconds: (_dragValue * duration.inMilliseconds).round());
           widget.controller.seekTo(seekPosition);
-          
+
           setState(() {
             _isDragging = false;
           });

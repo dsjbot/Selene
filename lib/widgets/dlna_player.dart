@@ -140,8 +140,7 @@ class _DLNAPlayerState extends State<DLNAPlayer> {
 
         // 检查视频是否播放完成（当前位置 >= 总时长 - 1秒）
         if (!_isLoading && _duration.inSeconds > 0 &&
-            _position.inSeconds >= _duration.inSeconds - 1 &&
-            !_isPlaying) {
+            _position.inSeconds >= _duration.inSeconds - 1 && _isPlaying) {
           debugPrint('DLNA视频播放完成');
           widget.device.pause();
           widget.onVideoCompleted?.call();
