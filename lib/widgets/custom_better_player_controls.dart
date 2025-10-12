@@ -352,15 +352,12 @@ class _CustomBetterPlayerControlsState
   }
 
   Future<void> _showDLNADialog() async {
-    // 获取当前播放位置
-    final resumePos = widget.controller.videoPlayerController?.value.position;
-
     if (widget.controller.isPlaying() == true) {
       widget.controller.pause();
       widget.onPause?.call();
     }
 
-    final isCurrentlyFullscreen = widget.controller.isFullScreen ?? false;
+    final isCurrentlyFullscreen = widget.controller.isFullScreen;
     if (isCurrentlyFullscreen) {
       // 设置标记位，表示正在显示 DLNA 对话框
       _isShowingDLNADialog = true;
@@ -396,7 +393,7 @@ class _CustomBetterPlayerControlsState
 
   @override
   Widget build(BuildContext context) {
-    final isFullscreen = widget.controller.isFullScreen ?? false;
+    final isFullscreen = widget.controller.isFullScreen;
 
     // 在 PIP 模式下不显示任何控件 - 使用 VideoPlayerValue 的 isPip 方法
     final isPipMode =

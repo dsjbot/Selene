@@ -1,4 +1,3 @@
-import 'play_record.dart';
 import 'video_info.dart';
 
 /// 豆瓣推荐项目数据模型

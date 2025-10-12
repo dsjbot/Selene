@@ -218,11 +218,11 @@ class DoubanService {
       if (summaryMatch1 != null) {
         summary1 = summaryMatch1.group(1)
             ?.replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '|||LINEBREAK|||') // 先用特殊标记替换<br>
-            ?.replaceAll(RegExp(r'<[^>]*>'), '') // 移除所有HTML标签
-            ?.replaceAll(RegExp(r'\s+'), ' ') // 去除重复空格，将所有空白字符（包括HTML中的\n）合并为单个空格
-            ?.replaceAll('|||LINEBREAK|||', '\n') // 将特殊标记恢复为换行符
-            ?.trim()
-            ?.split('\n') // 按换行符分割
+            .replaceAll(RegExp(r'<[^>]*>'), '') // 移除所有HTML标签
+            .replaceAll(RegExp(r'\s+'), ' ') // 去除重复空格，将所有空白字符（包括HTML中的\n）合并为单个空格
+            .replaceAll('|||LINEBREAK|||', '\n') // 将特殊标记恢复为换行符
+            .trim()
+            .split('\n') // 按换行符分割
             .join('\n'); // 重新组合
       }
       
@@ -232,11 +232,11 @@ class DoubanService {
       if (summaryMatch2 != null) {
         summary2 = summaryMatch2.group(1)
             ?.replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '|||LINEBREAK|||') // 先用特殊标记替换<br>
-            ?.replaceAll(RegExp(r'<[^>]*>'), '') // 移除所有HTML标签
-            ?.replaceAll(RegExp(r'\s+'), ' ') // 去除重复空格，将所有空白字符（包括HTML中的\n）合并为单个空格
-            ?.replaceAll('|||LINEBREAK|||', '\n') // 将特殊标记恢复为换行符
-            ?.trim()
-            ?.split('\n') // 按换行符分割
+            .replaceAll(RegExp(r'<[^>]*>'), '') // 移除所有HTML标签
+            .replaceAll(RegExp(r'\s+'), ' ') // 去除重复空格，将所有空白字符（包括HTML中的\n）合并为单个空格
+            .replaceAll('|||LINEBREAK|||', '\n') // 将特殊标记恢复为换行符
+            .trim()
+            .split('\n') // 按换行符分割
             .join('\n'); // 重新组合
       }
       
