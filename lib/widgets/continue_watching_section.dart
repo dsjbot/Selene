@@ -27,11 +27,13 @@ class ContinueWatchingSection extends StatefulWidget {
   });
 
   @override
-  State<ContinueWatchingSection> createState() => _ContinueWatchingSectionState();
+  State<ContinueWatchingSection> createState() =>
+      _ContinueWatchingSectionState();
 
   /// 静态方法：从外部移除播放记录
   static void removePlayRecordFromUI(String source, String id) {
-    _ContinueWatchingSectionState._currentInstance?.removePlayRecordFromUI(source, id);
+    _ContinueWatchingSectionState._currentInstance
+        ?.removePlayRecordFromUI(source, id);
   }
 
   /// 静态方法：刷新播放记录
@@ -46,21 +48,31 @@ class _ContinueWatchingSectionState extends State<ContinueWatchingSection>
   bool _isLoading = true;
   bool _hasError = false;
   final PageCacheService _cacheService = PageCacheService();
-  
+
   // 静态变量存储当前实例
   static _ContinueWatchingSectionState? _currentInstance;
+
+  // 滚动控制相关
+  final ScrollController _scrollController = ScrollController();
+  bool _showLeftScroll = false;
+  bool _showRightScroll = false;
+  bool _isHovered = false;
 
   @override
   void initState() {
     super.initState();
-    
+
     // 设置当前实例
     _currentInstance = this;
-    
+
+    // 添加滚动监听
+    _scrollController.addListener(_checkScroll);
+
     // 延迟执行异步操作，确保 initState 完成后再访问 context
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _loadPlayRecords();
+        _checkScroll();
       }
     });
   }
@@ -71,13 +83,57 @@ class _ContinueWatchingSectionState extends State<ContinueWatchingSection>
     if (_currentInstance == this) {
       _currentInstance = null;
     }
+    _scrollController.removeListener(_checkScroll);
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  void _checkScroll() {
+    if (!mounted) return;
+
+    if (!_scrollController.hasClients) {
+      // 如果还没有客户端，但有播放记录数据，显示右侧按钮
+      if (_playRecords.isNotEmpty && _playRecords.length > 3) {
+        setState(() {
+          _showLeftScroll = false;
+          _showRightScroll = true;
+        });
+      }
+      return;
+    }
+
+    final position = _scrollController.position;
+    const threshold = 1.0; // 容差值，避免浮点误差
+
+    setState(() {
+      _showLeftScroll = position.pixels > threshold;
+      _showRightScroll = position.pixels < position.maxScrollExtent - threshold;
+    });
+  }
+
+  void _scrollLeft() {
+    _scrollController.animateTo(
+      math.max(0, _scrollController.offset - 1000),
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  void _scrollRight() {
+    _scrollController.animateTo(
+      math.min(
+        _scrollController.position.maxScrollExtent,
+        _scrollController.offset + 1000,
+      ),
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
   }
 
   /// 加载播放记录
   Future<void> _loadPlayRecords() async {
     if (!mounted) return;
-    
+
     try {
       if (mounted) {
         setState(() {
@@ -87,8 +143,9 @@ class _ContinueWatchingSectionState extends State<ContinueWatchingSection>
       }
 
       // 先尝试从缓存获取数据
-      final cachedRecords = _cacheService.getCache<List<PlayRecord>>('play_records');
-      
+      final cachedRecords =
+          _cacheService.getCache<List<PlayRecord>>('play_records');
+
       if (cachedRecords != null) {
         // 有缓存数据，立即显示
         if (mounted) {
@@ -97,12 +154,12 @@ class _ContinueWatchingSectionState extends State<ContinueWatchingSection>
             _isLoading = false;
           });
         }
-        
+
         // 预加载图片
         if (mounted) {
           _preloadImages(cachedRecords);
         }
-        
+
         // 异步获取最新数据
         _refreshDataInBackground();
       } else {
@@ -115,7 +172,7 @@ class _ContinueWatchingSectionState extends State<ContinueWatchingSection>
               _playRecords = result.data!;
               _isLoading = false;
             });
-            
+
             // 预加载图片
             _preloadImages(result.data!);
           } else {
@@ -136,27 +193,27 @@ class _ContinueWatchingSectionState extends State<ContinueWatchingSection>
     }
   }
 
-
   /// 后台刷新数据
   Future<void> _refreshDataInBackground() async {
     if (!mounted) return;
-    
+
     try {
       // 只刷新播放记录数据
       await _cacheService.refreshPlayRecords(context);
-      
+
       // 刷新成功后，从缓存获取最新数据
       if (mounted) {
-        final cachedRecords = _cacheService.getCache<List<PlayRecord>>('play_records');
+        final cachedRecords =
+            _cacheService.getCache<List<PlayRecord>>('play_records');
         if (cachedRecords != null) {
           // 只有当新数据与当前数据不同时才更新UI
-          if (_playRecords.length != cachedRecords.length || 
+          if (_playRecords.length != cachedRecords.length ||
               !_isSamePlayRecords(_playRecords, cachedRecords)) {
             if (mounted) {
               setState(() {
                 _playRecords = cachedRecords;
               });
-              
+
               // 预加载新图片
               _preloadImages(cachedRecords);
             }
@@ -171,9 +228,9 @@ class _ContinueWatchingSectionState extends State<ContinueWatchingSection>
   /// 比较两个播放记录列表是否相同
   bool _isSamePlayRecords(List<PlayRecord> list1, List<PlayRecord> list2) {
     if (list1.length != list2.length) return false;
-    
+
     for (int i = 0; i < list1.length; i++) {
-      if (list1[i].id != list2[i].id || 
+      if (list1[i].id != list2[i].id ||
           list1[i].source != list2[i].source ||
           list1[i].saveTime != list2[i].saveTime) {
         return false;
@@ -185,12 +242,12 @@ class _ContinueWatchingSectionState extends State<ContinueWatchingSection>
   /// 预加载图片
   Future<void> _preloadImages(List<PlayRecord> records) async {
     if (!mounted) return;
-    
+
     // 只预加载前几个图片，避免过度预加载
     final int preloadCount = math.min(records.length, 5);
     for (int i = 0; i < preloadCount; i++) {
       if (!mounted) break;
-      
+
       final record = records[i];
       final imageUrl = await getImageUrl(record.cover, record.source);
       if (imageUrl.isNotEmpty) {
@@ -201,8 +258,6 @@ class _ContinueWatchingSectionState extends State<ContinueWatchingSection>
     }
   }
 
-  
-
   /// 显示清空确认弹窗
   void _showClearConfirmation() {
     showDialog(
@@ -211,110 +266,110 @@ class _ContinueWatchingSectionState extends State<ContinueWatchingSection>
         return Consumer<ThemeService>(
           builder: (context, themeService, child) {
             return AlertDialog(
-              backgroundColor: themeService.isDarkMode 
+              backgroundColor: themeService.isDarkMode
                   ? const Color(0xFF1e1e1e)
                   : Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
               contentPadding: const EdgeInsets.all(24),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // 图标
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFe74c3c).withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.delete_outline,
-                  color: Color(0xFFe74c3c),
-                  size: 32,
-                ),
-              ),
-              const SizedBox(height: 20),
-              // 标题
-              Text(
-                '清空播放记录',
-                style: GoogleFonts.poppins(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: themeService.isDarkMode 
-                      ? const Color(0xFFffffff)
-                      : const Color(0xFF2c3e50),
-                ),
-              ),
-              const SizedBox(height: 12),
-              // 描述
-              Text(
-                '确定要清空所有播放记录吗？此操作无法撤销。',
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  color: themeService.isDarkMode 
-                      ? const Color(0xFFb0b0b0)
-                      : const Color(0xFF7f8c8d),
-                  height: 1.4,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-              // 按钮
-              Row(
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: Text(
-                        '取消',
-                        style: GoogleFonts.poppins(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: themeService.isDarkMode 
-                              ? const Color(0xFFb0b0b0)
-                              : const Color(0xFF7f8c8d),
-                        ),
-                      ),
+                  // 图标
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFe74c3c).withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.delete_outline,
+                      color: Color(0xFFe74c3c),
+                      size: 32,
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                        _clearPlayRecords();
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFe74c3c),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: Text(
-                        '清空',
-                        style: GoogleFonts.poppins(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                  const SizedBox(height: 20),
+                  // 标题
+                  Text(
+                    '清空播放记录',
+                    style: GoogleFonts.poppins(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: themeService.isDarkMode
+                          ? const Color(0xFFffffff)
+                          : const Color(0xFF2c3e50),
                     ),
+                  ),
+                  const SizedBox(height: 12),
+                  // 描述
+                  Text(
+                    '确定要清空所有播放记录吗？此操作无法撤销。',
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      color: themeService.isDarkMode
+                          ? const Color(0xFFb0b0b0)
+                          : const Color(0xFF7f8c8d),
+                      height: 1.4,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  // 按钮
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: Text(
+                            '取消',
+                            style: GoogleFonts.poppins(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: themeService.isDarkMode
+                                  ? const Color(0xFFb0b0b0)
+                                  : const Color(0xFF7f8c8d),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            _clearPlayRecords();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFe74c3c),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: Text(
+                            '清空',
+                            style: GoogleFonts.poppins(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
-          ),
-        );
+            );
           },
         );
       },
@@ -397,6 +452,8 @@ class _ContinueWatchingSectionState extends State<ContinueWatchingSection>
       return const SizedBox.shrink();
     }
 
+    final isPC = DeviceUtils.isPC();
+
     return Container(
       margin: const EdgeInsets.only(bottom: 24),
       child: Column(
@@ -415,7 +472,7 @@ class _ContinueWatchingSectionState extends State<ContinueWatchingSection>
                       style: GoogleFonts.poppins(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
-                        color: themeService.isDarkMode 
+                        color: themeService.isDarkMode
                             ? const Color(0xFFffffff)
                             : const Color(0xFF2c3e50),
                       ),
@@ -426,7 +483,8 @@ class _ContinueWatchingSectionState extends State<ContinueWatchingSection>
                   TextButton(
                     onPressed: _showClearConfirmation,
                     style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
                       minimumSize: Size.zero,
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
@@ -448,52 +506,180 @@ class _ContinueWatchingSectionState extends State<ContinueWatchingSection>
           else if (_hasError)
             _buildErrorState()
           else
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final isTablet = DeviceUtils.isTablet(context);
-                // 平板模式显示 5.75个卡片，手机模式显示2.75个卡片
-                final double visibleCards = isTablet ? 5.75 : 2.75;
-                
-                // 计算卡片宽度
-                final double screenWidth = constraints.maxWidth;
-                const double padding = 32.0; // 左右padding (16 * 2)
-                const double spacing = 12.0; // 卡片间距
-                final double availableWidth = screenWidth - padding;
-                // 确保最小宽度，防止负宽度约束
-                const double minCardWidth = 120.0; // 最小卡片宽度
-                final double calculatedCardWidth = (availableWidth - (spacing * (visibleCards - 1))) / visibleCards;
-                final double cardWidth = math.max(calculatedCardWidth, minCardWidth);
-                final double cardHeight = (cardWidth * 1.5) + 50; // 缓存高度计算
-                
-                return SizedBox(
-                  height: cardHeight, // 使用缓存的高度
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: _playRecords.length,
-                    itemBuilder: (context, index) {
-                      final playRecord = _playRecords[index];
-                      return Container(
-                        width: cardWidth,
-                        margin: EdgeInsets.only(
-                          right: index < _playRecords.length - 1 ? spacing : 0,
+            isPC ? _buildContentWithScrollButtons() : _buildContent(),
+        ],
+      ),
+    );
+  }
+
+  /// 构建带滚动按钮的内容区域（PC端）
+  Widget _buildContentWithScrollButtons() {
+    return MouseRegion(
+      onEnter: (_) {
+        setState(() => _isHovered = true);
+        // 延迟检查以确保滚动控制器已初始化
+        Future.delayed(const Duration(milliseconds: 50), _checkScroll);
+      },
+      onExit: (_) => setState(() => _isHovered = false),
+      child: Stack(
+        children: [
+          _buildContent(),
+          // 左侧滚动按钮 - 定位在可视区域内
+          if (_showLeftScroll)
+            Positioned(
+              left: 0,
+              top: 0,
+              bottom: 60,
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: Container(
+                  width: 80,
+                  color: Colors.transparent,
+                  child: IgnorePointer(
+                    ignoring: !_isHovered,
+                    child: AnimatedOpacity(
+                      opacity: _isHovered ? 1.0 : 0.0,
+                      duration: const Duration(milliseconds: 200),
+                      child: Center(
+                        child: _buildScrollButton(
+                          icon: Icons.chevron_left,
+                          onPressed: _scrollLeft,
                         ),
-                        child: VideoCard(
-                          videoInfo: VideoInfo.fromPlayRecord(playRecord),
-                          onTap: () => widget.onVideoTap?.call(playRecord),
-                          from: 'playrecord',
-                          cardWidth: cardWidth, // 使用动态计算的宽度
-                          onGlobalMenuAction: (action) => widget.onGlobalMenuAction?.call(playRecord, action),
-                          isFavorited: _cacheService.isFavoritedSync(playRecord.source, playRecord.id), // 同步检测收藏状态
-                        ),
-                      );
-                    },
+                      ),
+                    ),
                   ),
-                );
-              },
+                ),
+              ),
+            ),
+          // 右侧滚动按钮 - 定位在可视区域内
+          if (_showRightScroll)
+            Positioned(
+              right: 0,
+              top: 0,
+              bottom: 60,
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: Container(
+                  width: 80,
+                  color: Colors.transparent,
+                  child: IgnorePointer(
+                    ignoring: !_isHovered,
+                    child: AnimatedOpacity(
+                      opacity: _isHovered ? 1.0 : 0.0,
+                      duration: const Duration(milliseconds: 200),
+                      child: Center(
+                        child: _buildScrollButton(
+                          icon: Icons.chevron_right,
+                          onPressed: _scrollRight,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             ),
         ],
       ),
+    );
+  }
+
+  /// 构建滚动按钮
+  Widget _buildScrollButton({
+    required IconData icon,
+    required VoidCallback onPressed,
+  }) {
+    return Consumer<ThemeService>(
+      builder: (context, themeService, child) {
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onPressed,
+            customBorder: const CircleBorder(),
+            child: Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: themeService.isDarkMode
+                    ? const Color(0xE61F2937)
+                    : const Color(0xF2FFFFFF),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: themeService.isDarkMode
+                      ? const Color(0xFF4B5563)
+                      : const Color(0xFFE5E7EB),
+                  width: 1,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Icon(
+                icon,
+                size: 32,
+                color: themeService.isDarkMode
+                    ? const Color(0xFFD1D5DB)
+                    : const Color(0xFF4B5563),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// 构建内容区域
+  Widget _buildContent() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isTablet = DeviceUtils.isTablet(context);
+        // 平板模式显示 5.75个卡片，手机模式显示2.75个卡片
+        final double visibleCards = isTablet ? 5.75 : 2.75;
+
+        // 计算卡片宽度
+        final double screenWidth = constraints.maxWidth;
+        const double padding = 32.0; // 左右padding (16 * 2)
+        const double spacing = 12.0; // 卡片间距
+        final double availableWidth = screenWidth - padding;
+        // 确保最小宽度，防止负宽度约束
+        const double minCardWidth = 120.0; // 最小卡片宽度
+        final double calculatedCardWidth =
+            (availableWidth - (spacing * (visibleCards - 1))) / visibleCards;
+        final double cardWidth = math.max(calculatedCardWidth, minCardWidth);
+        final double cardHeight = (cardWidth * 1.5) + 50; // 缓存高度计算
+
+        return SizedBox(
+          height: cardHeight, // 使用缓存的高度
+          child: ListView.builder(
+            controller: _scrollController,
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: _playRecords.length,
+            itemBuilder: (context, index) {
+              final playRecord = _playRecords[index];
+              return Container(
+                width: cardWidth,
+                margin: EdgeInsets.only(
+                  right: index < _playRecords.length - 1 ? spacing : 0,
+                ),
+                child: VideoCard(
+                  videoInfo: VideoInfo.fromPlayRecord(playRecord),
+                  onTap: () => widget.onVideoTap?.call(playRecord),
+                  from: 'playrecord',
+                  cardWidth: cardWidth, // 使用动态计算的宽度
+                  onGlobalMenuAction: (action) =>
+                      widget.onGlobalMenuAction?.call(playRecord, action),
+                  isFavorited: _cacheService.isFavoritedSync(
+                      playRecord.source, playRecord.id), // 同步检测收藏状态
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 
@@ -505,7 +691,7 @@ class _ContinueWatchingSectionState extends State<ContinueWatchingSection>
         // 平板模式显示5.75个卡片，手机模式显示2.75个卡片
         final double visibleCards = isTablet ? 5.75 : 2.75;
         final int skeletonCount = isTablet ? 6 : 3; // 骨架卡片数量
-        
+
         // 计算卡片宽度
         final double screenWidth = constraints.maxWidth;
         const double padding = 32.0; // 左右padding (16 * 2)
@@ -513,10 +699,11 @@ class _ContinueWatchingSectionState extends State<ContinueWatchingSection>
         final double availableWidth = screenWidth - padding;
         // 确保最小宽度，防止负宽度约束
         const double minCardWidth = 120.0; // 最小卡片宽度
-        final double calculatedCardWidth = (availableWidth - (spacing * (visibleCards - 1))) / visibleCards;
+        final double calculatedCardWidth =
+            (availableWidth - (spacing * (visibleCards - 1))) / visibleCards;
         final double cardWidth = math.max(calculatedCardWidth, minCardWidth);
         final double cardHeight = (cardWidth * 1.5) + 50; // 缓存高度计算
-        
+
         return Container(
           height: cardHeight, // 使用缓存的高度
           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -541,7 +728,7 @@ class _ContinueWatchingSectionState extends State<ContinueWatchingSection>
   /// 构建骨架卡片
   Widget _buildSkeletonCard(double width) {
     final double height = width * 1.4; // 保持与VideoCard相同的比例
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -615,19 +802,20 @@ class _ContinueWatchingSectionState extends State<ContinueWatchingSection>
   /// 刷新播放记录列表（供外部调用）
   Future<void> refreshPlayRecords() async {
     if (!mounted) return;
-    
+
     try {
       // 强制从API获取最新数据并更新缓存
       await _cacheService.refreshPlayRecords(context);
-      
+
       // 刷新成功后，从缓存获取最新数据
       if (mounted) {
-        final cachedRecords = _cacheService.getCache<List<PlayRecord>>('play_records');
+        final cachedRecords =
+            _cacheService.getCache<List<PlayRecord>>('play_records');
         if (cachedRecords != null) {
           setState(() {
             _playRecords = cachedRecords;
           });
-          
+
           // 预加载新图片
           _preloadImages(cachedRecords);
         }
@@ -640,13 +828,10 @@ class _ContinueWatchingSectionState extends State<ContinueWatchingSection>
   /// 从UI中移除指定的播放记录（供外部调用）
   void removePlayRecordFromUI(String source, String id) {
     if (!mounted) return;
-    
+
     setState(() {
-      _playRecords.removeWhere((record) => 
-        record.source == source && record.id == id
-      );
+      _playRecords
+          .removeWhere((record) => record.source == source && record.id == id);
     });
   }
-
-
 }
