@@ -42,7 +42,7 @@ class RecommendationSection extends StatelessWidget {
   Widget build(BuildContext context) {
     // 获取当前使用的数据列表
     final currentItems = videoInfos ?? [];
-    
+
     // 如果没有数据且不在加载中，隐藏组件
     if (!isLoading && currentItems.isEmpty) {
       return const SizedBox.shrink();
@@ -66,7 +66,7 @@ class RecommendationSection extends StatelessWidget {
                       style: GoogleFonts.poppins(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
-                        color: themeService.isDarkMode 
+                        color: themeService.isDarkMode
                             ? const Color(0xFFffffff)
                             : const Color(0xFF2c3e50),
                       ),
@@ -77,7 +77,8 @@ class RecommendationSection extends StatelessWidget {
                   TextButton(
                     onPressed: onMoreTap,
                     style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
                       minimumSize: Size.zero,
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
@@ -112,7 +113,7 @@ class RecommendationSection extends StatelessWidget {
         final isTablet = DeviceUtils.isTablet(context);
         // 平板模式显示5.75个卡片，手机模式使用传入的cardCount
         final double visibleCards = isTablet ? 5.75 : cardCount;
-        
+
         // 计算卡片宽度
         final double screenWidth = constraints.maxWidth;
         const double padding = 32.0; // 左右padding (16 * 2)
@@ -120,14 +121,16 @@ class RecommendationSection extends StatelessWidget {
         final double availableWidth = screenWidth - padding;
         // 确保最小宽度，防止负宽度约束
         const double minCardWidth = 120.0; // 最小卡片宽度
-        final double calculatedCardWidth = (availableWidth - (spacing * (visibleCards - 1))) / visibleCards;
+        final double calculatedCardWidth =
+            (availableWidth - (spacing * (visibleCards - 1))) / visibleCards;
         final double cardWidth = math.max(calculatedCardWidth, minCardWidth);
-        
+
         return SizedBox(
-          height: (cardWidth * 1.5) + 50, // 动态计算高度
+          height: (cardWidth * 1.5) + 60, // 增加高度以容纳放大效果
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
+            clipBehavior: Clip.none, // 允许内容溢出，不裁剪放大的卡片
             itemCount: videoInfos?.length ?? 0,
             itemBuilder: (context, index) {
               final videoInfo = videoInfos![index];
@@ -138,9 +141,15 @@ class RecommendationSection extends StatelessWidget {
                 child: VideoCard(
                   videoInfo: videoInfo,
                   onTap: () => onItemTap?.call(videoInfo),
-                  from: videoInfo.source == 'douban' ? 'douban' : (videoInfo.source == 'bangumi' ? 'bangumi' : 'playrecord'),
+                  from: videoInfo.source == 'douban'
+                      ? 'douban'
+                      : (videoInfo.source == 'bangumi'
+                          ? 'bangumi'
+                          : 'playrecord'),
                   cardWidth: cardWidth,
-                  onGlobalMenuAction: onGlobalMenuAction != null ? (action) => onGlobalMenuAction!(videoInfo, action) : null,
+                  onGlobalMenuAction: onGlobalMenuAction != null
+                      ? (action) => onGlobalMenuAction!(videoInfo, action)
+                      : null,
                   isFavorited: false, // 推荐页面默认未收藏
                 ),
               );
@@ -159,7 +168,7 @@ class RecommendationSection extends StatelessWidget {
         // 平板模式显示5.75个卡片，手机模式使用传入的cardCount
         final double visibleCards = isTablet ? 5.75 : cardCount;
         final int skeletonCount = isTablet ? 6 : 3; // 骨架卡片数量
-        
+
         // 计算卡片宽度
         final double screenWidth = constraints.maxWidth;
         const double padding = 32.0; // 左右padding (16 * 2)
@@ -167,9 +176,10 @@ class RecommendationSection extends StatelessWidget {
         final double availableWidth = screenWidth - padding;
         // 确保最小宽度，防止负宽度约束
         const double minCardWidth = 120.0; // 最小卡片宽度
-        final double calculatedCardWidth = (availableWidth - (spacing * (visibleCards - 1))) / visibleCards;
+        final double calculatedCardWidth =
+            (availableWidth - (spacing * (visibleCards - 1))) / visibleCards;
         final double cardWidth = math.max(calculatedCardWidth, minCardWidth);
-        
+
         return Container(
           height: (cardWidth * 1.5) + 50,
           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -196,7 +206,7 @@ class RecommendationSection extends StatelessWidget {
     return Consumer<ThemeService>(
       builder: (context, themeService, child) {
         final double height = width * 1.5;
-        
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
