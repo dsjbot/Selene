@@ -407,12 +407,12 @@ class _PlayerScreenState extends State<PlayerScreen>
     }
 
     // 关闭页面前保存进度
-    _saveProgress(force: true);
+    _saveProgress(force: true, scene: '返回按钮');
     Navigator.of(context).pop();
   }
 
   /// 保存播放进度（同步函数，提前获取参数避免异步问题）
-  void _saveProgress({bool force = false}) {
+  void _saveProgress({bool force = false, required String scene}) {
     try {
       if (currentDetail == null) return;
 
@@ -489,9 +489,9 @@ class _PlayerScreenState extends State<PlayerScreen>
       // 异步保存播放记录（不等待结果）
       PageCacheService().savePlayRecord(playRecord, context).then((_) {
         debugPrint(
-            '保存播放进度: source: $currentSourceSnapshot, id: $currentIDSnapshot, 第${currentEpisodeIndexSnapshot + 1}集, 时间: ${playTime}秒');
+            '保存播放进度 [场景: $scene]: source: $currentSourceSnapshot, id: $currentIDSnapshot, 第${currentEpisodeIndexSnapshot + 1}集, 时间: ${playTime}秒');
       }).catchError((e) {
-        debugPrint('保存播放进度失败: $e');
+        debugPrint('保存播放进度失败 [场景: $scene]: $e');
       });
     } catch (e) {
       debugPrint('保存播放进度失败: $e');
@@ -500,7 +500,7 @@ class _PlayerScreenState extends State<PlayerScreen>
 
   /// 检查并保存进度（基于时间间隔）
   void _checkAndSaveProgress() {
-    _saveProgress();
+    _saveProgress(scene: '定时保存');
   }
 
   /// 应用生命周期状态变化
@@ -512,11 +512,16 @@ class _PlayerScreenState extends State<PlayerScreen>
       case AppLifecycleState.paused:
       case AppLifecycleState.inactive:
       case AppLifecycleState.detached:
+        if(DeviceUtils.isPC()) {
+          break;
+        }
         // 应用进入后台前保存进度
-        _saveProgress(force: true);
+        _saveProgress(force: true, scene: '应用进入后台');
         break;
       case AppLifecycleState.resumed:
-        // 应用回到前台时重置最后保存时间，允许立即保存
+        if(DeviceUtils.isPC()) {
+          break;
+        }
         _lastSaveTime = null;
         break;
       case AppLifecycleState.hidden:
@@ -709,7 +714,7 @@ class _PlayerScreenState extends State<PlayerScreen>
     });
 
     // 集数切换前保存进度
-    _saveProgress(force: true);
+    _saveProgress(force: true, scene: '下一集按钮');
 
     // 播放下一集
     final nextIndex = currentEpisodeIndex + 1;
@@ -737,7 +742,7 @@ class _PlayerScreenState extends State<PlayerScreen>
     });
 
     // 集数切换前保存进度
-    _saveProgress(force: true);
+    _saveProgress(force: true, scene: '自动播放下一集');
 
     // 自动播放下一集
     final nextIndex = currentEpisodeIndex + 1;
@@ -985,7 +990,7 @@ class _PlayerScreenState extends State<PlayerScreen>
             onVideoCompleted: _onVideoCompleted,
             onPause: () {
               // 暂停时保存进度
-              _saveProgress(force: true);
+              _saveProgress(force: true, scene: '移动端暂停');
             },
             isLastEpisode: currentDetail != null &&
                 currentEpisodeIndex >= currentDetail!.episodes.length - 1,
@@ -1007,7 +1012,7 @@ class _PlayerScreenState extends State<PlayerScreen>
             onVideoCompleted: _onVideoCompleted,
             onPause: () {
               // 暂停时保存进度
-              _saveProgress(force: true);
+              _saveProgress(force: true, scene: 'PC端暂停');
             },
             isLastEpisode: currentDetail != null &&
                 currentEpisodeIndex >= currentDetail!.episodes.length - 1,
@@ -1031,7 +1036,7 @@ class _PlayerScreenState extends State<PlayerScreen>
             onProgressUpdate: _onDLNAProgressUpdate,
             onPause: () {
               // 暂停时保存进度
-              _saveProgress(force: true);
+              _saveProgress(force: true, scene: 'DLNA暂停');
             },
             onReady: _onVideoPlayerReady,
             onControllerCreated: (controller) {
@@ -1594,7 +1599,7 @@ class _PlayerScreenState extends State<PlayerScreen>
                             });
 
                             // 集数切换前保存进度
-                            _saveProgress(force: true);
+                            _saveProgress(force: true, scene: '选集列表点击');
 
                             setState(() {
                               currentEpisodeIndex = episodeIndex;
@@ -1731,7 +1736,7 @@ class _PlayerScreenState extends State<PlayerScreen>
                               _switchLoadingMessage = '切换选集...';
                             });
                           });
-                          _saveProgress(force: true);
+                          _saveProgress(force: true, scene: '选集面板点击');
                           this.setState(() {
                             currentEpisodeIndex = index;
                           });
@@ -1786,7 +1791,7 @@ class _PlayerScreenState extends State<PlayerScreen>
                       _switchLoadingMessage = '切换选集...';
                     });
                   });
-                  _saveProgress(force: true);
+                  _saveProgress(force: true, scene: '选集面板点击');
                   this.setState(() {
                     currentEpisodeIndex = index;
                   });
@@ -2610,7 +2615,7 @@ class _PlayerScreenState extends State<PlayerScreen>
   @override
   void dispose() {
     // 保存进度
-    _saveProgress(force: true);
+    _saveProgress(force: true, scene: '页面销毁');
     // 移除视频进度监听器
     _removeVideoProgressListener();
     // 移除应用生命周期监听器
