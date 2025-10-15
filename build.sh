@@ -121,7 +121,7 @@ build_macos_arm64() {
     # 备份 ARM64 构建产物
     if [ -d "build/macos/Build/Products/Release/selene.app" ]; then
         mkdir -p ../build/macos-arm64
-        cp -r build/macos/Build/Products/Release/selene.app ../build/macos-arm64/
+        ditto build/macos/Build/Products/Release/selene.app ../build/macos-arm64/selene.app
         log_success "macOS ARM64 构建完成"
     fi
     
@@ -152,7 +152,7 @@ build_macos_x86_64() {
     # 备份 x86_64 构建产物
     if [ -d "build/macos/Build/Products/Release/selene.app" ]; then
         mkdir -p ../build/macos-x86_64
-        cp -r build/macos/Build/Products/Release/selene.app ../build/macos-x86_64/
+        ditto build/macos/Build/Products/Release/selene.app ../build/macos-x86_64/selene.app
         log_success "macOS x86_64 构建完成"
     fi
     
@@ -268,52 +268,28 @@ copy_artifacts() {
         log_warning "iOS .ipa 文件未找到"
     fi
     
-    # 创建 macOS ARM64 DMG
+    # 压缩 macOS ARM64 应用
     if [ -d "build/macos-arm64/selene.app" ]; then
-        log_info "创建 macOS ARM64 DMG..."
+        log_info "压缩 macOS ARM64 应用..."
         
-        DMG_NAME="selene-${APP_VERSION}-macos-arm64.dmg"
-        DMG_PATH="dist/${DMG_NAME}"
+        ditto -c -k --sequesterRsrc --keepParent \
+            build/macos-arm64/selene.app \
+            "dist/selene-${APP_VERSION}-macos-arm64.zip"
         
-        # 创建临时 DMG 目录
-        mkdir -p build/dmg-arm64
-        cp -r build/macos-arm64/selene.app build/dmg-arm64/
-        
-        # 创建 DMG
-        hdiutil create -volname "Selene ${APP_VERSION}" \
-            -srcfolder build/dmg-arm64 \
-            -ov -format UDZO \
-            "${DMG_PATH}"
-        
-        # 清理临时目录
-        rm -rf build/dmg-arm64
-        
-        log_success "macOS ARM64 DMG 已创建: ${DMG_PATH}"
+        log_success "macOS ARM64 应用已压缩到 dist/selene-${APP_VERSION}-macos-arm64.zip"
     else
         log_warning "macOS ARM64 应用文件未找到"
     fi
     
-    # 创建 macOS x86_64 DMG
+    # 压缩 macOS x86_64 应用
     if [ -d "build/macos-x86_64/selene.app" ]; then
-        log_info "创建 macOS x86_64 DMG..."
+        log_info "压缩 macOS x86_64 应用..."
         
-        DMG_NAME="selene-${APP_VERSION}-macos-x86_64.dmg"
-        DMG_PATH="dist/${DMG_NAME}"
+        ditto -c -k --sequesterRsrc --keepParent \
+            build/macos-x86_64/selene.app \
+            "dist/selene-${APP_VERSION}-macos-x86_64.zip"
         
-        # 创建临时 DMG 目录
-        mkdir -p build/dmg-x86_64
-        cp -r build/macos-x86_64/selene.app build/dmg-x86_64/
-        
-        # 创建 DMG
-        hdiutil create -volname "Selene ${APP_VERSION}" \
-            -srcfolder build/dmg-x86_64 \
-            -ov -format UDZO \
-            "${DMG_PATH}"
-        
-        # 清理临时目录
-        rm -rf build/dmg-x86_64
-        
-        log_success "macOS x86_64 DMG 已创建: ${DMG_PATH}"
+        log_success "macOS x86_64 应用已压缩到 dist/selene-${APP_VERSION}-macos-x86_64.zip"
     else
         log_warning "macOS x86_64 应用文件未找到"
     fi
@@ -360,21 +336,38 @@ main() {
     # 检查参数
     BUILD_ANDROID=true
     BUILD_IOS=true
-    BUILD_MACOS=true
+    BUILD_MACOS_ARM64=true
+    BUILD_MACOS_X86_64=true
     BUILD_WINDOWS=true
-    PARALLEL_BUILD=false
+    PARALLEL_BUILD=true
     
     while [[ $# -gt 0 ]]; do
         case $1 in
             --android-only)
                 BUILD_IOS=false
-                BUILD_MACOS=false
+                BUILD_MACOS_ARM64=false
+                BUILD_MACOS_X86_64=false
                 BUILD_WINDOWS=false
                 shift
                 ;;
             --ios-only)
                 BUILD_ANDROID=false
-                BUILD_MACOS=false
+                BUILD_MACOS_ARM64=false
+                BUILD_MACOS_X86_64=false
+                BUILD_WINDOWS=false
+                shift
+                ;;
+            --macos-arm64-only)
+                BUILD_ANDROID=false
+                BUILD_IOS=false
+                BUILD_MACOS_X86_64=false
+                BUILD_WINDOWS=false
+                shift
+                ;;
+            --macos-x86_64-only)
+                BUILD_ANDROID=false
+                BUILD_IOS=false
+                BUILD_MACOS_ARM64=false
                 BUILD_WINDOWS=false
                 shift
                 ;;
@@ -387,22 +380,25 @@ main() {
             --windows-only)
                 BUILD_ANDROID=false
                 BUILD_IOS=false
-                BUILD_MACOS=false
+                BUILD_MACOS_ARM64=false
+                BUILD_MACOS_X86_64=false
                 shift
                 ;;
-            --parallel)
-                PARALLEL_BUILD=true
+            --sequential)
+                PARALLEL_BUILD=false
                 shift
                 ;;
             --help)
                 echo "用法: $0 [选项]"
                 echo "选项:"
-                echo "  --android-only    只构建安卓版本"
-                echo "  --ios-only       只构建 iOS 版本"
-                echo "  --macos-only     只构建 macOS 版本"
-                echo "  --windows-only   只构建 Windows 版本"
-                echo "  --parallel       并行构建所有平台（实验性功能）"
-                echo "  --help           显示此帮助信息"
+                echo "  --android-only       只构建安卓版本"
+                echo "  --ios-only          只构建 iOS 版本"
+                echo "  --macos-arm64-only  只构建 macOS ARM64 版本"
+                echo "  --macos-x86_64-only 只构建 macOS x86_64 版本"
+                echo "  --macos-only        构建 macOS 所有架构"
+                echo "  --windows-only      只构建 Windows 版本"
+                echo "  --sequential        顺序构建（默认为并行构建）"
+                echo "  --help              显示此帮助信息"
                 exit 0
                 ;;
             *)
@@ -436,10 +432,12 @@ main() {
             pids+=($!)
         fi
         
-        if [ "$BUILD_MACOS" = true ]; then
-            # macOS 的两个架构也并行构建
+        if [ "$BUILD_MACOS_ARM64" = true ]; then
             build_macos_arm64 &
             pids+=($!)
+        fi
+        
+        if [ "$BUILD_MACOS_X86_64" = true ]; then
             build_macos_x86_64 &
             pids+=($!)
         fi
@@ -466,8 +464,12 @@ main() {
             build_ios
         fi
         
-        if [ "$BUILD_MACOS" = true ]; then
-            build_macos
+        if [ "$BUILD_MACOS_ARM64" = true ]; then
+            build_macos_arm64
+        fi
+        
+        if [ "$BUILD_MACOS_X86_64" = true ]; then
+            build_macos_x86_64
         fi
         
         if [ "$BUILD_WINDOWS" = true ]; then

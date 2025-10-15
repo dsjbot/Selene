@@ -33,6 +33,8 @@ ios-build/
 .pub-cache/
 .pub/
 /build/
+/build-arm64/
+/build-x86_64/
 /coverage/
 
 # Symbolication related
