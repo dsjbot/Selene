@@ -132,12 +132,7 @@ class _PcVideoPlayerWidgetState extends State<PcVideoPlayerWidget>
     _setupPlayerListeners();
 
     // 打开媒体
-    await _player!.open(Media(_currentUrl!), play: true);
-
-    // 如果指定了起始位置，跳转到该位置
-    if (startAt != null) {
-      await _player!.seek(startAt);
-    }
+    await _player!.open(Media(_currentUrl!, start: startAt), play: true);
 
     setState(() {
       _isInitialized = true;
@@ -196,12 +191,7 @@ class _PcVideoPlayerWidgetState extends State<PcVideoPlayerWidget>
         _cachedPlaybackSpeed = _player!.state.rate;
 
         // 打开新媒体
-        await _player!.open(Media(url), play: true);
-
-        // 如果指定了起始位置，跳转到该位置
-        if (startAt != null) {
-          await _player!.seek(startAt);
-        }
+        await _player!.open(Media(url, start: startAt), play: true);
 
         // 恢复播放速度
         await _player!.setRate(_cachedPlaybackSpeed);
