@@ -83,8 +83,6 @@ class _CustomBetterPlayerControlsState
     }
   }
 
-
-
   void _onVideoStateChanged(BetterPlayerEvent event) {
     if (!mounted) return;
 
@@ -507,121 +505,154 @@ class _CustomBetterPlayerControlsState
                 ],
               ),
             ),
-          // 全屏锁定按钮 - 在全屏且控件可见时显示
-          if (isFullscreen && _controlsVisible)
+          // 全屏锁定按钮 - 在全屏时显示
+          if (isFullscreen)
             Positioned(
               right: 16.0,
               top: 0,
               bottom: 0,
               child: Center(
+                child: AnimatedOpacity(
+                  opacity: _controlsVisible ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 200),
+                  child: IgnorePointer(
+                    ignoring: !_controlsVisible,
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _isLocked = !_isLocked;
+                          if (_isLocked) {
+                            // 锁定时启动自动隐藏计时器
+                            _startHideTimer();
+                          } else {
+                            // 解锁时显示控件并启动计时器
+                            _controlsVisible = true;
+                            _startHideTimer();
+                          }
+                        });
+                      },
+                      behavior: HitTestBehavior.opaque,
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        child: Icon(
+                          _isLocked ? Icons.lock : Icons.lock_open,
+                          color: Colors.white,
+                          size: 24,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          Positioned(
+            top: isFullscreen ? 8 : 4,
+            left: isFullscreen ? 16.0 : 8.0,
+            child: AnimatedOpacity(
+              opacity: (_controlsVisible && !_isLocked) ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 200),
+              child: IgnorePointer(
+                ignoring: !_controlsVisible || _isLocked,
                 child: GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _isLocked = !_isLocked;
-                      if (_isLocked) {
-                        // 锁定时启动自动隐藏计时器
-                        _startHideTimer();
-                      } else {
-                        // 解锁时显示控件并启动计时器
-                        _controlsVisible = true;
-                        _startHideTimer();
-                      }
-                    });
+                  onTap: () async {
+                    _onUserInteraction();
+                    if (isFullscreen) {
+                      _exitFullscreen();
+                    } else {
+                      widget.onBackPressed?.call();
+                    }
                   },
                   behavior: HitTestBehavior.opaque,
                   child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.5),
-                      borderRadius: BorderRadius.circular(24),
-                    ),
+                    padding: const EdgeInsets.all(8),
                     child: Icon(
-                      _isLocked ? Icons.lock : Icons.lock_open,
+                      Icons.arrow_back,
                       color: Colors.white,
-                      size: 24,
+                      size: isFullscreen ? 24 : 20,
                     ),
                   ),
                 ),
               ),
             ),
-          if (_controlsVisible && !_isLocked)
-            Positioned(
-              top: isFullscreen ? 8 : 4,
-              left: isFullscreen ? 16.0 : 8.0,
-              child: GestureDetector(
-                onTap: () async {
-                  _onUserInteraction();
-                  if (isFullscreen) {
-                    _exitFullscreen();
-                  } else {
-                    widget.onBackPressed?.call();
-                  }
-                },
-                behavior: HitTestBehavior.opaque,
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  child: Icon(
-                    Icons.arrow_back,
-                    color: Colors.white,
-                    size: isFullscreen ? 24 : 20,
-                  ),
-                ),
-              ),
-            ),
-          if (_controlsVisible && !_isLocked)
-            Positioned(
-              top: isFullscreen ? 8 : 4,
-              right: isFullscreen ? 16.0 : 8.0,
-              child: GestureDetector(
-                onTap: () async {
-                  _onUserInteraction();
-                  await _showDLNADialog();
-                },
-                behavior: HitTestBehavior.opaque,
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  child: Icon(
-                    Icons.cast,
-                    color: Colors.white,
-                    size: isFullscreen ? 24 : 20,
-                  ),
-                ),
-              ),
-            ),
-          if (_controlsVisible && !_isLocked)
-            Positioned(
-              top: 0,
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: GestureDetector(
-                  onTap: () {
-                    _onUserInteraction();
-                    if (widget.controller.isPlaying() ?? false) {
-                      widget.controller.pause();
-                      widget.onPause?.call();
-                    } else {
-                      widget.controller.play();
-                    }
-                  },
-                  child: Icon(
-                    (widget.controller.isPlaying() ?? false)
-                        ? Icons.pause
-                        : Icons.play_arrow,
-                    color: Colors.white,
-                    size: isFullscreen ? 64 : 48,
-                  ),
-                ),
-              ),
-            ),
-          if (_controlsVisible && !_isLocked)
-            Positioned(
-              bottom: isFullscreen ? 58.0 : 42.0,
-              left: 0,
-              right: 0,
+          ),
+          Positioned(
+            top: isFullscreen ? 8 : 4,
+            right: isFullscreen ? 16.0 : 8.0,
+            child: AnimatedOpacity(
+              opacity: (_controlsVisible && !_isLocked) ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 200),
               child: IgnorePointer(
-                ignoring: false,
+                ignoring: !_controlsVisible || _isLocked,
+                child: GestureDetector(
+                  onTap: () async {
+                    _onUserInteraction();
+                    await _showDLNADialog();
+                  },
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    child: Icon(
+                      Icons.cast,
+                      color: Colors.white,
+                      size: isFullscreen ? 24 : 20,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 0,
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: AnimatedOpacity(
+                opacity: (!_isLocked &&
+                        (!(widget.controller.isPlaying() ?? false) ||
+                            _controlsVisible))
+                    ? 1.0
+                    : 0.0,
+                duration: const Duration(milliseconds: 200),
+                child: IgnorePointer(
+                  ignoring: _isLocked ||
+                      ((widget.controller.isPlaying() ?? false) &&
+                          !_controlsVisible),
+                  child: GestureDetector(
+                    onTap: () {
+                      _onUserInteraction();
+                      if (widget.controller.isPlaying() ?? false) {
+                        widget.controller.pause();
+                        widget.onPause?.call();
+                      } else {
+                        widget.controller.play();
+                      }
+                    },
+                    child: Icon(
+                      (widget.controller.isPlaying() ?? false)
+                          ? Icons.pause
+                          : Icons.play_arrow,
+                      color: Colors.white,
+                      size: isFullscreen ? 64 : 48,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: isFullscreen ? 58.0 : 42.0,
+            left: 0,
+            right: 0,
+            child: AnimatedOpacity(
+              opacity: (_controlsVisible && !_isLocked) ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 200),
+              child: IgnorePointer(
+                ignoring: !_controlsVisible || _isLocked,
                 child: Container(
                   height: 24,
                   margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -648,123 +679,130 @@ class _CustomBetterPlayerControlsState
                 ),
               ),
             ),
-          if (_controlsVisible && !_isLocked)
-            Positioned(
-              bottom: isFullscreen ? 4.0 : -6.0,
-              left: 0,
-              right: 0,
-              child: GestureDetector(
-                onTap: () {},
-                behavior: HitTestBehavior.opaque,
-                child: Padding(
-                  padding: EdgeInsets.only(
-                    left: isFullscreen ? 16.0 : 8.0,
-                    right: isFullscreen ? 16.0 : 8.0,
-                    top: isFullscreen ? 0.0 : 0.0,
-                    bottom: isFullscreen ? 8.0 : 8.0,
-                  ),
-                  child: Row(
-                    children: [
-                      GestureDetector(
-                        onTap: () {
-                          _onUserInteraction();
-                          if (widget.controller.isPlaying() ?? false) {
-                            widget.controller.pause();
-                            widget.onPause?.call();
-                          } else {
-                            widget.controller.play();
-                          }
-                        },
-                        behavior: HitTestBehavior.opaque,
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          child: Icon(
-                            (widget.controller.isPlaying() ?? false)
-                                ? Icons.pause
-                                : Icons.play_arrow,
-                            color: Colors.white,
-                            size: isFullscreen ? 28 : 24,
-                          ),
-                        ),
-                      ),
-                      if (!widget.isLastEpisode)
-                        Transform.translate(
-                          offset: const Offset(-8, 0),
-                          child: GestureDetector(
-                            onTap: () {
-                              _onUserInteraction();
-                              widget.onNextEpisode?.call();
-                            },
-                            behavior: HitTestBehavior.opaque,
-                            child: Container(
-                              padding: const EdgeInsets.all(8),
-                              child: Icon(
-                                Icons.skip_next,
-                                color: Colors.white,
-                                size: isFullscreen ? 28 : 24,
-                              ),
-                            ),
-                          ),
-                        ),
-                      Expanded(
-                        child: _buildPositionIndicator(),
-                      ),
-                      IconButton(
-                        icon: Icon(
-                          Icons.speed,
-                          color: Colors.white,
-                          size: isFullscreen ? 22 : 20,
-                        ),
-                        onPressed: () async {
-                          _onUserInteraction();
-                          await _showSpeedDialog();
-                        },
-                      ),
-                      if (!isFullscreen)
+          ),
+          Positioned(
+            bottom: isFullscreen ? 4.0 : -6.0,
+            left: 0,
+            right: 0,
+            child: AnimatedOpacity(
+              opacity: (_controlsVisible && !_isLocked) ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 200),
+              child: IgnorePointer(
+                ignoring: !_controlsVisible || _isLocked,
+                child: GestureDetector(
+                  onTap: () {},
+                  behavior: HitTestBehavior.opaque,
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      left: isFullscreen ? 16.0 : 8.0,
+                      right: isFullscreen ? 16.0 : 8.0,
+                      top: isFullscreen ? 0.0 : 0.0,
+                      bottom: isFullscreen ? 8.0 : 8.0,
+                    ),
+                    child: Row(
+                      children: [
                         GestureDetector(
                           onTap: () {
                             _onUserInteraction();
-                            if (widget.betterPlayerKey != null) {
-                              widget.controller.enablePictureInPicture(
-                                  widget.betterPlayerKey!);
+                            if (widget.controller.isPlaying() ?? false) {
+                              widget.controller.pause();
+                              widget.onPause?.call();
+                            } else {
+                              widget.controller.play();
                             }
                           },
                           behavior: HitTestBehavior.opaque,
                           child: Container(
                             padding: const EdgeInsets.all(8),
-                            child: const Icon(
-                              Icons.picture_in_picture_alt,
+                            child: Icon(
+                              (widget.controller.isPlaying() ?? false)
+                                  ? Icons.pause
+                                  : Icons.play_arrow,
                               color: Colors.white,
-                              size: 22,
+                              size: isFullscreen ? 28 : 24,
                             ),
                           ),
                         ),
-                      GestureDetector(
-                        onTap: () {
-                          _onUserInteraction();
-                          if (isFullscreen) {
-                            _exitFullscreen();
-                          } else {
-                            widget.onFullscreenChange(true);
-                          }
-                        },
-                        behavior: HitTestBehavior.opaque,
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          child: Icon(
-                            isFullscreen
-                                ? Icons.fullscreen_exit
-                                : Icons.fullscreen,
+                        if (!widget.isLastEpisode)
+                          Transform.translate(
+                            offset: const Offset(-8, 0),
+                            child: GestureDetector(
+                              onTap: () {
+                                _onUserInteraction();
+                                widget.onNextEpisode?.call();
+                              },
+                              behavior: HitTestBehavior.opaque,
+                              child: Container(
+                                padding: const EdgeInsets.all(8),
+                                child: Icon(
+                                  Icons.skip_next,
+                                  color: Colors.white,
+                                  size: isFullscreen ? 28 : 24,
+                                ),
+                              ),
+                            ),
+                          ),
+                        Expanded(
+                          child: _buildPositionIndicator(),
+                        ),
+                        IconButton(
+                          icon: Icon(
+                            Icons.speed,
                             color: Colors.white,
-                            size: isFullscreen ? 28 : 24,
+                            size: isFullscreen ? 22 : 20,
+                          ),
+                          onPressed: () async {
+                            _onUserInteraction();
+                            await _showSpeedDialog();
+                          },
+                        ),
+                        if (!isFullscreen)
+                          GestureDetector(
+                            onTap: () {
+                              _onUserInteraction();
+                              if (widget.betterPlayerKey != null) {
+                                widget.controller.enablePictureInPicture(
+                                    widget.betterPlayerKey!);
+                              }
+                            },
+                            behavior: HitTestBehavior.opaque,
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              child: const Icon(
+                                Icons.picture_in_picture_alt,
+                                color: Colors.white,
+                                size: 22,
+                              ),
+                            ),
+                          ),
+                        GestureDetector(
+                          onTap: () {
+                            _onUserInteraction();
+                            if (isFullscreen) {
+                              _exitFullscreen();
+                            } else {
+                              widget.onFullscreenChange(true);
+                            }
+                          },
+                          behavior: HitTestBehavior.opaque,
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            child: Icon(
+                              isFullscreen
+                                  ? Icons.fullscreen_exit
+                                  : Icons.fullscreen,
+                              color: Colors.white,
+                              size: isFullscreen ? 28 : 24,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
+          ),
         ],
       ),
     );

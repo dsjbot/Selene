@@ -119,6 +119,7 @@ class _PlayerScreenState extends State<PlayerScreen>
 
   // 保存进度相关状态
   DateTime? _lastSaveTime;
+  int? _lastSavePosition; // 上次保存的播放位置（秒）
   static const Duration _saveProgressInterval = Duration(seconds: 10);
 
   @override
@@ -294,6 +295,8 @@ class _PlayerScreenState extends State<PlayerScreen>
         currentEpisodeIndex = targetIndex;
       });
     }
+    // 重置上次保存的位置，因为切换了集数
+    _lastSavePosition = null;
     // 将 playTime 转换为 Duration 并传递给 updateVideoUrl
     final startAt = playTime > 0 ? Duration(seconds: playTime) : null;
     updateVideoUrl(currentDetail!.episodes[targetIndex], startAt: startAt);
@@ -415,18 +418,6 @@ class _PlayerScreenState extends State<PlayerScreen>
     try {
       if (currentDetail == null) return;
 
-      // 如果不是强制保存，检查时间间隔
-      if (!force) {
-        final now = DateTime.now();
-        if (_lastSaveTime != null &&
-            now.difference(_lastSaveTime!) < _saveProgressInterval) {
-          return; // 时间间隔不够，跳过保存
-        }
-      }
-
-      // 更新最后保存时间
-      _lastSaveTime = DateTime.now();
-
       // 获取当前播放位置和总时长
       Duration? currentPosition;
       Duration? duration;
@@ -448,6 +439,35 @@ class _PlayerScreenState extends State<PlayerScreen>
         }
       }
 
+      if (currentPosition == null || duration == null) return;
+
+      // 如果播放进度小于 1 s，则不保存
+      if (currentPosition.inSeconds < 1) {
+        return;
+      }
+
+      final playTime = currentPosition.inSeconds;
+      final totalTime = duration.inSeconds;
+
+      // 如果不是强制保存，检查时间间隔和进度变化
+      if (!force) {
+        final now = DateTime.now();
+        // 检查时间间隔
+        if (_lastSaveTime != null &&
+            now.difference(_lastSaveTime!) < _saveProgressInterval) {
+          return; // 时间间隔不够，跳过保存
+        }
+        // 检查进度是否发生变化（允许1秒的误差）
+        if (_lastSavePosition != null &&
+            playTime == _lastSavePosition!) {
+          return; // 进度没有明显变化，跳过保存
+        }
+      }
+
+      // 更新最后保存时间和位置
+      _lastSaveTime = DateTime.now();
+      _lastSavePosition = playTime;
+
       // 提前获取所有需要的参数，避免异步执行时参数被改变
       final currentIDSnapshot = currentID;
       final currentSourceSnapshot = currentSource;
@@ -458,16 +478,6 @@ class _PlayerScreenState extends State<PlayerScreen>
       final totalEpisodesSnapshot = totalEpisodes;
       final searchTitleSnapshot = searchTitle;
       final sourceNameSnapshot = currentDetail?.sourceName ?? currentSource;
-
-      if (currentPosition == null || duration == null) return;
-
-      // 如果播放进度小于 1 s，则不保存
-      if (currentPosition.inSeconds < 1) {
-        return;
-      }
-
-      final playTime = currentPosition.inSeconds;
-      final totalTime = duration.inSeconds;
 
       // 创建播放记录对象
       final playRecord = PlayRecord(
@@ -511,17 +521,18 @@ class _PlayerScreenState extends State<PlayerScreen>
       case AppLifecycleState.paused:
       case AppLifecycleState.inactive:
       case AppLifecycleState.detached:
-        if(DeviceUtils.isPC()) {
+        if (DeviceUtils.isPC()) {
           break;
         }
         // 应用进入后台前保存进度
         _saveProgress(force: true, scene: '应用进入后台');
         break;
       case AppLifecycleState.resumed:
-        if(DeviceUtils.isPC()) {
+        if (DeviceUtils.isPC()) {
           break;
         }
         _lastSaveTime = null;
+        _lastSavePosition = null;
         break;
       case AppLifecycleState.hidden:
         break;
@@ -668,7 +679,8 @@ class _PlayerScreenState extends State<PlayerScreen>
     } else {
       if (_mobileVideoPlayerController != null) {
         // 添加进度监听器
-        _mobileVideoPlayerController!.addProgressListener(_onVideoProgressUpdate);
+        _mobileVideoPlayerController!
+            .addProgressListener(_onVideoProgressUpdate);
       }
     }
   }
@@ -842,17 +854,23 @@ class _PlayerScreenState extends State<PlayerScreen>
     if (currentSourceIndex == -1) return;
 
     // 动态计算卡片宽度
+    // 在平板横屏模式下，需要考虑左侧区域只占65%的宽度
     final screenWidth = MediaQuery.of(context).size.width;
+    final effectiveWidth = (_isTablet && !_isPortraitTablet)
+        ? screenWidth * 0.65 // 平板横屏：只使用左侧65%的宽度
+        : screenWidth; // 其他情况：使用全屏宽度
+
     const listViewPadding = 16.0; // ListView的左右padding
     const itemMargin = 6.0; // 每个item的右边距
-    final availableWidth = screenWidth - (listViewPadding * 2); // 减去左右padding
+    final availableWidth =
+        effectiveWidth - (listViewPadding * 2); // 减去左右padding
     final cardsPerView = _isTablet ? 6.2 : 3.2;
     final cardWidth = (availableWidth / cardsPerView) - itemMargin; // 减去右边距
 
     // 计算选中项在可视区域中央的偏移量
-    // 可视区域中心 = (屏幕宽度 - ListView左右padding) / 2
+    // 可视区域中心 = (有效宽度 - ListView左右padding) / 2
     // 选中项应该位于这个中心位置
-    final visibleAreaWidth = screenWidth - (listViewPadding * 2);
+    final visibleAreaWidth = effectiveWidth - (listViewPadding * 2);
     final visibleCenter = visibleAreaWidth / 2;
     final itemCenter = cardWidth / 2;
 
@@ -937,10 +955,16 @@ class _PlayerScreenState extends State<PlayerScreen>
     if (currentDetail == null || !_episodesScrollController.hasClients) return;
 
     // 动态计算按钮宽度
+    // 在平板横屏模式下，需要考虑左侧区域只占65%的宽度
     final screenWidth = MediaQuery.of(context).size.width;
+    final effectiveWidth = (_isTablet && !_isPortraitTablet)
+        ? screenWidth * 0.65 // 平板横屏：只使用左侧65%的宽度
+        : screenWidth; // 其他情况：使用全屏宽度
+
     const listViewPadding = 16.0; // ListView的左右padding
     const itemMargin = 6.0; // 每个item的右边距
-    final availableWidth = screenWidth - (listViewPadding * 2); // 减去左右padding
+    final availableWidth =
+        effectiveWidth - (listViewPadding * 2); // 减去左右padding
     final cardsPerView = _isTablet ? 6.2 : 3.2;
     final buttonWidth = (availableWidth / cardsPerView) - itemMargin; // 减去右边距
 
@@ -949,9 +973,9 @@ class _PlayerScreenState extends State<PlayerScreen>
         : currentEpisodeIndex;
 
     // 计算选中项在可视区域中央的偏移量
-    // 可视区域中心 = (屏幕宽度 - ListView左右padding) / 2
+    // 可视区域中心 = (有效宽度 - ListView左右padding) / 2
     // 选中项应该位于这个中心位置
-    final visibleAreaWidth = screenWidth - (listViewPadding * 2);
+    final visibleAreaWidth = effectiveWidth - (listViewPadding * 2);
     final visibleCenter = visibleAreaWidth / 2;
     final itemCenter = buttonWidth / 2;
 
@@ -974,7 +998,7 @@ class _PlayerScreenState extends State<PlayerScreen>
   /// 构建播放器组件
   Widget _buildPlayerWidget() {
     final isPC = DeviceUtils.isPC();
-    
+
     return Stack(
       children: [
         if (!_isCasting && !isPC)
@@ -1594,22 +1618,24 @@ class _PlayerScreenState extends State<PlayerScreen>
                           isDarkMode: isDarkMode,
                           episodeIndex: episodeIndex,
                           episodeTitle: episodeTitle,
-                          onTap: isCurrentEpisode ? null : () {
-                            // 显示切换加载蒙版
-                            setState(() {
-                              _showSwitchLoadingOverlay = true;
-                              _switchLoadingMessage = '切换选集...';
-                            });
+                          onTap: isCurrentEpisode
+                              ? null
+                              : () {
+                                  // 显示切换加载蒙版
+                                  setState(() {
+                                    _showSwitchLoadingOverlay = true;
+                                    _switchLoadingMessage = '切换选集...';
+                                  });
 
-                            // 集数切换前保存进度
-                            _saveProgress(force: true, scene: '选集列表点击');
+                                  // 集数切换前保存进度
+                                  _saveProgress(force: true, scene: '选集列表点击');
 
-                            setState(() {
-                              currentEpisodeIndex = episodeIndex;
-                            });
-                            updateVideoUrl(episode);
-                            _scrollToCurrentEpisode();
-                          },
+                                  setState(() {
+                                    currentEpisodeIndex = episodeIndex;
+                                  });
+                                  updateVideoUrl(episode);
+                                  _scrollToCurrentEpisode();
+                                },
                         ),
                       ),
                     );
@@ -1993,7 +2019,8 @@ class _PlayerScreenState extends State<PlayerScreen>
                       isDarkMode: isDarkMode,
                       source: source,
                       speedInfo: speedInfo,
-                      onTap: isCurrentSource ? null : () => _switchSource(source),
+                      onTap:
+                          isCurrentSource ? null : () => _switchSource(source),
                     ),
                   ),
                 );
@@ -2783,7 +2810,6 @@ class _PlayerScreenState extends State<PlayerScreen>
   }
 }
 
-
 /// 带 hover 效果的返回按钮（PC 端专用）
 class _HoverBackButton extends StatefulWidget {
   final VoidCallback onTap;
@@ -2855,8 +2881,8 @@ class _EpisodeCardWithHoverState extends State<_EpisodeCardWithHover> {
   @override
   Widget build(BuildContext context) {
     return MouseRegion(
-      cursor: (DeviceUtils.isPC() && !widget.isCurrentEpisode) 
-          ? SystemMouseCursors.click 
+      cursor: (DeviceUtils.isPC() && !widget.isCurrentEpisode)
+          ? SystemMouseCursors.click
           : MouseCursor.defer,
       onEnter: (_) {
         if (DeviceUtils.isPC() && !widget.isCurrentEpisode) {
@@ -2875,9 +2901,9 @@ class _EpisodeCardWithHoverState extends State<_EpisodeCardWithHover> {
             color: widget.isCurrentEpisode
                 ? Colors.green.withOpacity(0.2)
                 : (_isHovering && DeviceUtils.isPC()
-                    ? (widget.isDarkMode 
-                        ? const Color(0xFF1A3D2E)  // 深色模式下的浅绿色
-                        : const Color(0xFFE8F5E9))  // 浅色模式下的浅绿色
+                    ? (widget.isDarkMode
+                        ? const Color(0xFF1A3D2E) // 深色模式下的浅绿色
+                        : const Color(0xFFE8F5E9)) // 浅色模式下的浅绿色
                     : (widget.isDarkMode
                         ? Colors.grey[700]
                         : Colors.grey[300])),
@@ -2897,9 +2923,7 @@ class _EpisodeCardWithHoverState extends State<_EpisodeCardWithHover> {
                   style: TextStyle(
                     color: widget.isCurrentEpisode
                         ? Colors.green
-                        : (widget.isDarkMode
-                            ? Colors.white
-                            : Colors.black),
+                        : (widget.isDarkMode ? Colors.white : Colors.black),
                     fontSize: 14,
                     fontWeight: FontWeight.w300,
                   ),
@@ -2908,16 +2932,13 @@ class _EpisodeCardWithHoverState extends State<_EpisodeCardWithHover> {
               // 中间集数名称
               Center(
                 child: Padding(
-                  padding: const EdgeInsets.only(
-                      top: 6, left: 4, right: 4),
+                  padding: const EdgeInsets.only(top: 6, left: 4, right: 4),
                   child: Text(
                     widget.episodeTitle,
                     style: TextStyle(
                       color: widget.isCurrentEpisode
                           ? Colors.green
-                          : (widget.isDarkMode
-                              ? Colors.white
-                              : Colors.black),
+                          : (widget.isDarkMode ? Colors.white : Colors.black),
                       fontSize: 13,
                       fontWeight: FontWeight.w400,
                     ),
@@ -2961,8 +2982,8 @@ class _SourceCardWithHoverState extends State<_SourceCardWithHover> {
   @override
   Widget build(BuildContext context) {
     return MouseRegion(
-      cursor: (DeviceUtils.isPC() && !widget.isCurrentSource) 
-          ? SystemMouseCursors.click 
+      cursor: (DeviceUtils.isPC() && !widget.isCurrentSource)
+          ? SystemMouseCursors.click
           : MouseCursor.defer,
       onEnter: (_) {
         if (DeviceUtils.isPC() && !widget.isCurrentSource) {
@@ -2981,9 +3002,9 @@ class _SourceCardWithHoverState extends State<_SourceCardWithHover> {
             color: widget.isCurrentSource
                 ? Colors.green.withOpacity(0.2)
                 : (_isHovering && DeviceUtils.isPC()
-                    ? (widget.isDarkMode 
-                        ? const Color(0xFF1A3D2E)  // 深色模式下的浅绿色
-                        : const Color(0xFFE8F5E9))  // 浅色模式下的浅绿色
+                    ? (widget.isDarkMode
+                        ? const Color(0xFF1A3D2E) // 深色模式下的浅绿色
+                        : const Color(0xFFE8F5E9)) // 浅色模式下的浅绿色
                     : (widget.isDarkMode
                         ? Colors.grey[700]
                         : Colors.grey[300])),
@@ -3022,9 +3043,7 @@ class _SourceCardWithHoverState extends State<_SourceCardWithHover> {
                     style: TextStyle(
                       color: widget.isCurrentSource
                           ? Colors.green
-                          : (widget.isDarkMode
-                              ? Colors.white
-                              : Colors.black),
+                          : (widget.isDarkMode ? Colors.white : Colors.black),
                       fontSize: 13,
                       fontWeight: FontWeight.w400,
                     ),
@@ -3058,9 +3077,7 @@ class _SourceCardWithHoverState extends State<_SourceCardWithHover> {
               // 右下角速率信息
               if (widget.speedInfo != null &&
                   widget.speedInfo!.loadSpeed.isNotEmpty &&
-                  !widget.speedInfo!.loadSpeed
-                      .toLowerCase()
-                      .contains('超时'))
+                  !widget.speedInfo!.loadSpeed.toLowerCase().contains('超时'))
                 Positioned(
                   bottom: 4,
                   right: 6,
@@ -3107,10 +3124,10 @@ class _HoverButtonState extends State<_HoverButton> {
   @override
   Widget build(BuildContext context) {
     final isPC = DeviceUtils.isPC();
-    
+
     return MouseRegion(
-      cursor: (isPC && widget.enabled && widget.onTap != null) 
-          ? SystemMouseCursors.click 
+      cursor: (isPC && widget.enabled && widget.onTap != null)
+          ? SystemMouseCursors.click
           : MouseCursor.defer,
       onEnter: isPC ? (_) => setState(() => _isHovered = true) : null,
       onExit: isPC ? (_) => setState(() => _isHovered = false) : null,
