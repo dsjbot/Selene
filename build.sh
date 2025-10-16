@@ -268,28 +268,52 @@ copy_artifacts() {
         log_warning "iOS .ipa 文件未找到"
     fi
     
-    # 压缩 macOS ARM64 应用
+    # 打包 macOS ARM64 应用为 DMG
     if [ -d "build/macos-arm64/selene.app" ]; then
-        log_info "压缩 macOS ARM64 应用..."
+        log_info "打包 macOS ARM64 应用为 DMG..."
         
-        ditto -c -k --sequesterRsrc --keepParent \
-            build/macos-arm64/selene.app \
-            "dist/selene-${APP_VERSION}-macos-arm64.zip"
+        DMG_NAME="selene-${APP_VERSION}-macos-arm64.dmg"
+        DMG_PATH="dist/${DMG_NAME}"
         
-        log_success "macOS ARM64 应用已压缩到 dist/selene-${APP_VERSION}-macos-arm64.zip"
+        # 创建临时目录
+        TMP_DMG_DIR=$(mktemp -d)
+        cp -R build/macos-arm64/selene.app "$TMP_DMG_DIR/"
+        
+        # 创建 DMG
+        hdiutil create -volname "Selene" \
+            -srcfolder "$TMP_DMG_DIR" \
+            -ov -format UDZO \
+            "$DMG_PATH"
+        
+        # 清理临时目录
+        rm -rf "$TMP_DMG_DIR"
+        
+        log_success "macOS ARM64 应用已打包到 ${DMG_PATH}"
     else
         log_warning "macOS ARM64 应用文件未找到"
     fi
     
-    # 压缩 macOS x86_64 应用
+    # 打包 macOS x86_64 应用为 DMG
     if [ -d "build/macos-x86_64/selene.app" ]; then
-        log_info "压缩 macOS x86_64 应用..."
+        log_info "打包 macOS x86_64 应用为 DMG..."
         
-        ditto -c -k --sequesterRsrc --keepParent \
-            build/macos-x86_64/selene.app \
-            "dist/selene-${APP_VERSION}-macos-x86_64.zip"
+        DMG_NAME="selene-${APP_VERSION}-macos-x86_64.dmg"
+        DMG_PATH="dist/${DMG_NAME}"
         
-        log_success "macOS x86_64 应用已压缩到 dist/selene-${APP_VERSION}-macos-x86_64.zip"
+        # 创建临时目录
+        TMP_DMG_DIR=$(mktemp -d)
+        cp -R build/macos-x86_64/selene.app "$TMP_DMG_DIR/"
+        
+        # 创建 DMG
+        hdiutil create -volname "Selene" \
+            -srcfolder "$TMP_DMG_DIR" \
+            -ov -format UDZO \
+            "$DMG_PATH"
+        
+        # 清理临时目录
+        rm -rf "$TMP_DMG_DIR"
+        
+        log_success "macOS x86_64 应用已打包到 ${DMG_PATH}"
     else
         log_warning "macOS x86_64 应用文件未找到"
     fi
