@@ -14,6 +14,7 @@ import '../widgets/pulsing_dots_indicator.dart';
 import 'player_screen.dart';
 import '../widgets/filter_pill_hover.dart';
 import '../utils/device_utils.dart';
+import '../widgets/filter_options_selector.dart';
 
 class TvScreen extends StatefulWidget {
   const TvScreen({super.key});
@@ -176,7 +177,7 @@ class _TvScreenState extends State<TvScreen> {
   void _handleScroll() {
     if (_scrollController.hasClients) {
       final position = _scrollController.position;
-      
+
       // 如果内容不足以滚动（maxScrollExtent <= 0），直接尝试加载更多
       if (position.maxScrollExtent <= 0) {
         // 检查是否有更多数据且当前不在加载中
@@ -185,7 +186,7 @@ class _TvScreenState extends State<TvScreen> {
         }
         return;
       }
-      
+
       // 正常滚动情况：当滚动到距离底部50像素内时触发加载
       const double threshold = 50.0;
       if (position.pixels >= position.maxScrollExtent - threshold) {
@@ -196,12 +197,15 @@ class _TvScreenState extends State<TvScreen> {
 
   /// 检查内容是否不足一屏，如果是则自动加载更多
   void _checkAndLoadMoreIfNeeded() {
-    if (!_scrollController.hasClients || !_hasMore || _isLoading || _isLoadingMore) {
+    if (!_scrollController.hasClients ||
+        !_hasMore ||
+        _isLoading ||
+        _isLoadingMore) {
       return;
     }
-    
+
     final position = _scrollController.position;
-    
+
     // 如果内容不足以滚动，说明没有填满屏幕，自动加载更多
     if (position.maxScrollExtent <= 0 && _tvShows.isNotEmpty) {
       _loadMoreTvShows();
@@ -228,26 +232,23 @@ class _TvScreenState extends State<TvScreen> {
       String regionValue = _selectedTvRegion;
       String yearValue = _selectedTvYear;
       String platformValue = _selectedTvPlatform;
-      
+
       // 转换地区参数为中文标签
       if (regionValue != 'all') {
-        regionValue = _tvRegionOptions
-            .firstWhere((e) => e.value == regionValue)
-            .label;
+        regionValue =
+            _tvRegionOptions.firstWhere((e) => e.value == regionValue).label;
       }
-      
+
       // 转换年代参数为中文标签
       if (yearValue != 'all') {
-        yearValue = _tvYearOptions
-            .firstWhere((e) => e.value == yearValue)
-            .label;
+        yearValue =
+            _tvYearOptions.firstWhere((e) => e.value == yearValue).label;
       }
-      
+
       // 转换类型参数为中文标签
       if (categoryValue != 'all') {
-        categoryValue = _tvTypeOptions
-            .firstWhere((e) => e.value == categoryValue)
-            .label;
+        categoryValue =
+            _tvTypeOptions.firstWhere((e) => e.value == categoryValue).label;
       }
       // 转换平台参数为中文标签
       if (platformValue != 'all') {
@@ -255,7 +256,7 @@ class _TvScreenState extends State<TvScreen> {
             .firstWhere((e) => e.value == platformValue)
             .label;
       }
-      
+
       final params = DoubanRecommendsParams(
         kind: 'tv',
         category: categoryValue,
@@ -267,7 +268,7 @@ class _TvScreenState extends State<TvScreen> {
         pageLimit: _pageLimit,
         page: _page,
       );
-      
+
       final result = await DoubanService.fetchDoubanRecommends(
         context,
         params,
@@ -278,7 +279,7 @@ class _TvScreenState extends State<TvScreen> {
           // 筛选状态已改变，忽略这个过期的响应
           return;
         }
-        
+
         setState(() {
           if (result.success && result.data != null) {
             _tvShows.addAll(result.data!);
@@ -292,7 +293,7 @@ class _TvScreenState extends State<TvScreen> {
           }
           _isLoading = false;
         });
-        
+
         // 如果是刷新且内容不足一屏，尝试自动加载更多
         if (isRefresh && result.success && result.data != null) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -316,7 +317,7 @@ class _TvScreenState extends State<TvScreen> {
           // 筛选状态已改变，忽略这个过期的响应
           return;
         }
-        
+
         setState(() {
           if (result.success && result.data != null) {
             _tvShows.addAll(result.data!);
@@ -330,7 +331,7 @@ class _TvScreenState extends State<TvScreen> {
           }
           _isLoading = false;
         });
-        
+
         // 如果是刷新且内容不足一屏，尝试自动加载更多
         if (isRefresh && result.success && result.data != null) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -357,26 +358,23 @@ class _TvScreenState extends State<TvScreen> {
       String regionValue = _selectedTvRegion;
       String yearValue = _selectedTvYear;
       String platformValue = _selectedTvPlatform;
-      
+
       // 转换地区参数为中文标签
       if (regionValue != 'all') {
-        regionValue = _tvRegionOptions
-            .firstWhere((e) => e.value == regionValue)
-            .label;
+        regionValue =
+            _tvRegionOptions.firstWhere((e) => e.value == regionValue).label;
       }
-      
+
       // 转换年代参数为中文标签
       if (yearValue != 'all') {
-        yearValue = _tvYearOptions
-            .firstWhere((e) => e.value == yearValue)
-            .label;
+        yearValue =
+            _tvYearOptions.firstWhere((e) => e.value == yearValue).label;
       }
-      
+
       // 转换类型参数为中文标签
       if (categoryValue != 'all') {
-        categoryValue = _tvTypeOptions
-            .firstWhere((e) => e.value == categoryValue)
-            .label;
+        categoryValue =
+            _tvTypeOptions.firstWhere((e) => e.value == categoryValue).label;
       }
       // 转换平台参数为中文标签
       if (platformValue != 'all') {
@@ -384,7 +382,7 @@ class _TvScreenState extends State<TvScreen> {
             .firstWhere((e) => e.value == platformValue)
             .label;
       }
-      
+
       final params = DoubanRecommendsParams(
         kind: 'tv',
         category: categoryValue,
@@ -396,7 +394,7 @@ class _TvScreenState extends State<TvScreen> {
         pageLimit: _pageLimit,
         page: _page,
       );
-      
+
       final result = await DoubanService.fetchDoubanRecommends(
         context,
         params,
@@ -407,7 +405,7 @@ class _TvScreenState extends State<TvScreen> {
           // 筛选状态已改变，忽略这个过期的响应
           return;
         }
-        
+
         setState(() {
           if (result.success && result.data != null) {
             _tvShows.addAll(result.data!);
@@ -438,7 +436,7 @@ class _TvScreenState extends State<TvScreen> {
           // 筛选状态已改变，忽略这个过期的响应
           return;
         }
-        
+
         setState(() {
           if (result.success && result.data != null) {
             _tvShows.addAll(result.data!);
@@ -636,7 +634,8 @@ class _TvScreenState extends State<TvScreen> {
                   setState(() => _selectedTvType = v);
                   _fetchTvShows(isRefresh: true);
                 }),
-                _buildFilterPill('地区', _tvRegionOptions, _selectedTvRegion, (v) {
+                _buildFilterPill('地区', _tvRegionOptions, _selectedTvRegion,
+                    (v) {
                   setState(() => _selectedTvRegion = v);
                   _fetchTvShows(isRefresh: true);
                 }),
@@ -644,7 +643,8 @@ class _TvScreenState extends State<TvScreen> {
                   setState(() => _selectedTvYear = v);
                   _fetchTvShows(isRefresh: true);
                 }),
-                _buildFilterPill('平台', _tvPlatformOptions, _selectedTvPlatform, (v) {
+                _buildFilterPill('平台', _tvPlatformOptions, _selectedTvPlatform,
+                    (v) {
                   setState(() => _selectedTvPlatform = v);
                   _fetchTvShows(isRefresh: true);
                 }),
@@ -677,9 +677,13 @@ class _TvScreenState extends State<TvScreen> {
           scrollDirection: Axis.horizontal,
           child: CapsuleTabSwitcher(
             tabs: _tvSecondaryOptions.map((e) => e.label).toList(),
-            selectedTab: _tvSecondaryOptions.firstWhere((e) => e.value == _selectedRegionValue).label,
+            selectedTab: _tvSecondaryOptions
+                .firstWhere((e) => e.value == _selectedRegionValue)
+                .label,
             onTabChanged: (newLabel) {
-              final newValue = _tvSecondaryOptions.firstWhere((e) => e.label == newLabel).value;
+              final newValue = _tvSecondaryOptions
+                  .firstWhere((e) => e.label == newLabel)
+                  .value;
               setState(() {
                 _selectedRegionValue = newValue;
               });
@@ -695,8 +699,8 @@ class _TvScreenState extends State<TvScreen> {
       String selectedValue, ValueChanged<String> onSelected) {
     final selectedOption = options.firstWhere((e) => e.value == selectedValue,
         orElse: () => options.first);
-    bool isDefault = selectedValue == 'all' ||
-        (title == '排序' && selectedValue == 'T');
+    bool isDefault =
+        selectedValue == 'all' || (title == '排序' && selectedValue == 'T');
 
     return FilterPillHover(
       isPC: DeviceUtils.isPC(),
@@ -715,63 +719,12 @@ class _TvScreenState extends State<TvScreen> {
       List<SelectorOption> options,
       String selectedValue,
       ValueChanged<String> onSelected) {
-    // 计算需要的行数
-    final rowCount = (options.length / 4).ceil();
-    // 计算GridView的高度：行数 * (item高度 + 间距) + padding
-    final gridHeight = rowCount * (40.0 + 10.0) - 10.0 + 32.0; // 32.0是上下padding
-    
-    showModalBottomSheet(
+    showFilterOptionsSelector(
       context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) {
-        return Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).scaffoldBackgroundColor,
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(20),
-              topRight: Radius.circular(20),
-            ),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(title, style: Theme.of(context).textTheme.titleLarge),
-              ),
-              Container(
-                height: gridHeight,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: GridView.builder(
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 4,
-                    childAspectRatio: 2.5,
-                    crossAxisSpacing: 10,
-                    mainAxisSpacing: 10,
-                  ),
-                  itemCount: options.length,
-                  itemBuilder: (context, index) {
-                    final option = options[index];
-                    final isSelected = option.value == selectedValue;
-                    return FilterOptionHover(
-                      isPC: DeviceUtils.isPC(),
-                      isSelected: isSelected,
-                      label: option.label,
-                      onTap: () {
-                        onSelected(option.value);
-                        Navigator.pop(context);
-                      },
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 16), // 底部间距
-            ],
-          ),
-        );
-      },
+      title: title,
+      options: options,
+      selectedValue: selectedValue,
+      onSelected: onSelected,
     );
   }
 
@@ -797,9 +750,11 @@ class _TvScreenState extends State<TvScreen> {
           scrollDirection: Axis.horizontal,
           child: CapsuleTabSwitcher(
             tabs: items.map((e) => e.label).toList(),
-            selectedTab: items.firstWhere((e) => e.value == selectedValue).label,
+            selectedTab:
+                items.firstWhere((e) => e.value == selectedValue).label,
             onTabChanged: (newLabel) {
-              final newValue = items.firstWhere((e) => e.label == newLabel).value;
+              final newValue =
+                  items.firstWhere((e) => e.label == newLabel).value;
               onItemSelected(newValue);
             },
           ),
@@ -812,7 +767,8 @@ class _TvScreenState extends State<TvScreen> {
     final themeService = Provider.of<ThemeService>(context);
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16), // 减少顶部padding，保持底部padding与加载指示器一致
+      padding: const EdgeInsets.fromLTRB(
+          16, 8, 16, 16), // 减少顶部padding，保持底部padding与加载指示器一致
       child: Column(
         children: [
           Container(

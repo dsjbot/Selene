@@ -13,15 +13,10 @@ import '../widgets/custom_switch.dart';
 import '../widgets/favorites_grid.dart';
 import '../widgets/search_result_agg_grid.dart';
 import '../widgets/search_results_grid.dart';
+import '../widgets/filter_options_selector.dart';
+import '../widgets/filter_pill_hover.dart';
 import '../utils/device_utils.dart';
 import 'player_screen.dart';
-
-class SelectorOption {
-  final String label;
-  final String value;
-
-  const SelectorOption({required this.label, required this.value});
-}
 
 enum SortOrder { none, asc, desc }
 
@@ -1543,95 +1538,108 @@ class _SearchScreenState extends State<SearchScreen>
       List<SelectorOption> options,
       String selectedValue,
       ValueChanged<String> onSelected) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) {
-        final screenWidth = MediaQuery.of(context).size.width;
-        const horizontalPadding = 16.0;
-        const spacing = 10.0;
-        final itemWidth =
-            (screenWidth - horizontalPadding * 2 - spacing * 2) / 3;
+    if (DeviceUtils.isPC()) {
+      // PC端使用 filter_options_selector.dart 中的 PC 组件
+      showFilterOptionsSelector(
+        context: context,
+        title: title,
+        options: options,
+        selectedValue: selectedValue,
+        onSelected: onSelected,
+        useCompactLayout: title == '标题', // 只有标题筛选使用紧凑布局
+      );
+    } else {
+      // 移动端显示底部弹出
+      showModalBottomSheet(
+        context: context,
+        backgroundColor: Colors.transparent,
+        isScrollControlled: true,
+        builder: (context) {
+          final screenWidth = MediaQuery.of(context).size.width;
+          const horizontalPadding = 16.0;
+          const spacing = 10.0;
+          final itemWidth =
+              (screenWidth - horizontalPadding * 2 - spacing * 2) / 3;
 
-        return Container(
-          width: double.infinity, // 设置宽度为100%
-          decoration: BoxDecoration(
-            color: Theme.of(context).scaffoldBackgroundColor,
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(20),
-              topRight: Radius.circular(20),
-            ),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start, // 左对齐
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Center(
-                  child: Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                ),
+          return Container(
+            width: double.infinity, // 设置宽度为100%
+            decoration: BoxDecoration(
+              color: Theme.of(context).scaffoldBackgroundColor,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(20),
+                topRight: Radius.circular(20),
               ),
-              Container(
-                constraints: BoxConstraints(
-                  maxHeight: MediaQuery.of(context).size.height * 0.6,
-                  minHeight: 200.0,
-                ),
-                child: SingleChildScrollView(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: horizontalPadding, vertical: 8),
-                    child: Wrap(
-                      alignment: WrapAlignment.start, // 左对齐
-                      spacing: spacing,
-                      runSpacing: spacing,
-                      children: options.map((option) {
-                        final isSelected = option.value == selectedValue;
-                        return SizedBox(
-                          width: itemWidth,
-                          child: InkWell(
-                            onTap: () {
-                              onSelected(option.value);
-                              Navigator.pop(context);
-                            },
-                            borderRadius: BorderRadius.circular(8),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 8),
-                              alignment: Alignment.centerLeft, // 内容左对齐
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? const Color(0xFF27AE60)
-                                    : Theme.of(context)
-                                        .chipTheme
-                                        .backgroundColor,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                option.label,
-                                textAlign: TextAlign.left, // 文字左对齐
-                                style: TextStyle(
-                                  color: isSelected ? Colors.white : null,
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      }).toList(),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start, // 左对齐
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Center(
+                    child: Text(
+                      title,
+                      style: Theme.of(context).textTheme.titleLarge,
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
-            ],
-          ),
-        );
-      },
-    );
+                Container(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(context).size.height * 0.6,
+                    minHeight: 200.0,
+                  ),
+                  child: SingleChildScrollView(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: horizontalPadding, vertical: 8),
+                      child: Wrap(
+                        alignment: WrapAlignment.start, // 左对齐
+                        spacing: spacing,
+                        runSpacing: spacing,
+                        children: options.map((option) {
+                          final isSelected = option.value == selectedValue;
+                          return SizedBox(
+                            width: itemWidth,
+                            child: InkWell(
+                              onTap: () {
+                                onSelected(option.value);
+                                Navigator.pop(context);
+                              },
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 8),
+                                alignment: Alignment.centerLeft, // 内容左对齐
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? const Color(0xFF27AE60)
+                                      : Theme.of(context)
+                                          .chipTheme
+                                          .backgroundColor,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  option.label,
+                                  textAlign: TextAlign.left, // 文字左对齐
+                                  style: TextStyle(
+                                    color: isSelected ? Colors.white : null,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          );
+        },
+      );
+    }
   }
 
   Widget _buildYearSortButton() {

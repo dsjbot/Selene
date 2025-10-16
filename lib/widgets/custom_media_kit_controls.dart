@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'pc_video_player_widget.dart';
@@ -100,6 +101,11 @@ class _CustomMediaKitControlsState extends State<CustomMediaKitControls> {
   StreamSubscription? _playingSubscription;
   StreamSubscription? _positionSubscription;
   bool _isFullscreen = false;
+  bool _showSpeedMenu = false;
+  final GlobalKey _speedButtonKey = GlobalKey();
+  bool _isHoveringSpeedButton = false;
+  bool _isHoveringSpeedMenu = false;
+  final FocusNode _focusNode = FocusNode();
 
   @override
   void initState() {
@@ -108,6 +114,8 @@ class _CustomMediaKitControlsState extends State<CustomMediaKitControls> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _forceStartHideTimer();
+        // 请求焦点以接收键盘事件
+        _focusNode.requestFocus();
       }
     });
   }
@@ -166,11 +174,16 @@ class _CustomMediaKitControlsState extends State<CustomMediaKitControls> {
     _hideTimer?.cancel();
     _playingSubscription?.cancel();
     _positionSubscription?.cancel();
+    _focusNode.dispose();
     super.dispose();
   }
 
   void _startHideTimer() {
     _hideTimer?.cancel();
+    // 如果倍速菜单正在显示或鼠标悬停在速度按钮/菜单上，不启动隐藏定时器
+    if (_showSpeedMenu || _isHoveringSpeedButton || _isHoveringSpeedMenu) {
+      return;
+    }
     if (widget.player.state.playing) {
       _hideTimer = Timer(const Duration(seconds: 3), () {
         if (mounted) {
@@ -332,6 +345,63 @@ class _CustomMediaKitControlsState extends State<CustomMediaKitControls> {
     }
   }
 
+  // 处理键盘事件
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    // 只处理按键按下事件
+    if (event is KeyDownEvent) {
+      // ESC 键退出全屏
+      if (event.logicalKey == LogicalKeyboardKey.escape) {
+        if (_isFullscreen) {
+          _toggleFullscreen();
+          return KeyEventResult.handled;
+        }
+      }
+      // 空格键播放/暂停
+      else if (event.logicalKey == LogicalKeyboardKey.space) {
+        _onUserInteraction();
+        if (widget.player.state.playing) {
+          widget.player.pause();
+          widget.onPause?.call();
+        } else {
+          widget.player.play();
+        }
+        setState(() {});
+        return KeyEventResult.handled;
+      }
+      // F 键切换全屏
+      else if (event.logicalKey == LogicalKeyboardKey.keyF) {
+        _toggleFullscreen();
+        return KeyEventResult.handled;
+      }
+      // 左方向键快退 10 秒
+      else if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+        final currentPosition = widget.player.state.position;
+        final newPosition = currentPosition - const Duration(seconds: 10);
+        final clampedPosition = Duration(
+          milliseconds: newPosition.inMilliseconds.clamp(0, widget.player.state.duration.inMilliseconds),
+        );
+        widget.player.seek(clampedPosition);
+        // 显示控制栏
+        _onUserInteraction();
+        return KeyEventResult.handled;
+      }
+      // 右方向键快进 10 秒
+      else if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+        final currentPosition = widget.player.state.position;
+        final duration = widget.player.state.duration;
+        final newPosition = currentPosition + const Duration(seconds: 10);
+        final clampedPosition = Duration(
+          milliseconds: newPosition.inMilliseconds.clamp(0, duration.inMilliseconds),
+        );
+        widget.player.seek(clampedPosition);
+        // 显示控制栏
+        _onUserInteraction();
+        return KeyEventResult.handled;
+      }
+    }
+    return KeyEventResult.ignored;
+  }
+
   @override
   Widget build(BuildContext context) {
     // 如果正在加载视频，只显示加载界面
@@ -360,7 +430,10 @@ class _CustomMediaKitControlsState extends State<CustomMediaKitControls> {
       );
     }
 
-    return MouseRegion(
+    return Focus(
+      focusNode: _focusNode,
+      onKeyEvent: _handleKeyEvent,
+      child: MouseRegion(
       cursor: (_isFullscreen && !_controlsVisible)
           ? SystemMouseCursors.none
           : SystemMouseCursors.basic,
@@ -383,9 +456,12 @@ class _CustomMediaKitControlsState extends State<CustomMediaKitControls> {
         _startHideTimer();
       },
       onExit: (_) {
-        // 鼠标移出时立即隐藏控制栏
+        // 鼠标移出时立即隐藏控制栏，但如果倍速菜单正在显示或鼠标在速度按钮/菜单上则不隐藏
         _hideTimer?.cancel();
-        if (_controlsVisible) {
+        if (_controlsVisible &&
+            !_showSpeedMenu &&
+            !_isHoveringSpeedButton &&
+            !_isHoveringSpeedMenu) {
           setState(() {
             _controlsVisible = false;
           });
@@ -579,15 +655,47 @@ class _CustomMediaKitControlsState extends State<CustomMediaKitControls> {
                         Expanded(
                           child: _buildPositionIndicator(),
                         ),
-                        HoverButton(
-                          onTap: () async {
-                            _onUserInteraction();
-                            await _showSpeedDialog();
+                        MouseRegion(
+                          key: _speedButtonKey,
+                          cursor: SystemMouseCursors.click,
+                          onEnter: (_) {
+                            setState(() {
+                              _isHoveringSpeedButton = true;
+                              _showSpeedMenu = true;
+                              _controlsVisible = true;
+                            });
+                            _hideTimer?.cancel();
                           },
-                          child: Icon(
-                            Icons.speed,
-                            color: Colors.white,
-                            size: _isFullscreen ? 22 : 20,
+                          onExit: (_) {
+                            setState(() {
+                              _isHoveringSpeedButton = false;
+                            });
+                            // 延迟检查是否需要隐藏菜单
+                            Future.delayed(const Duration(milliseconds: 100),
+                                () {
+                              if (mounted &&
+                                  !_isHoveringSpeedButton &&
+                                  !_isHoveringSpeedMenu) {
+                                setState(() {
+                                  _showSpeedMenu = false;
+                                });
+                                _startHideTimer();
+                              }
+                            });
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: _isHoveringSpeedButton
+                                ? BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: Colors.grey.withValues(alpha: 0.5),
+                                  )
+                                : null,
+                            child: Icon(
+                              Icons.speed,
+                              color: Colors.white,
+                              size: _isFullscreen ? 22 : 20,
+                            ),
                           ),
                         ),
                         HoverButton(
@@ -610,7 +718,96 @@ class _CustomMediaKitControlsState extends State<CustomMediaKitControls> {
               ),
             ),
           ),
+          // 倍速选择弹窗
+          if (_showSpeedMenu) _buildSpeedMenu(),
         ],
+      ),
+      ),
+    );
+  }
+
+  Widget _buildSpeedMenu() {
+    final speeds = [0.5, 0.75, 1.0, 1.5, 2.0];
+    final currentSpeed = widget.player.state.rate;
+
+    // 获取速度按钮的位置
+    final RenderBox? renderBox =
+        _speedButtonKey.currentContext?.findRenderObject() as RenderBox?;
+    if (renderBox == null) return const SizedBox.shrink();
+
+    final buttonPosition = renderBox.localToGlobal(Offset.zero);
+    final buttonSize = renderBox.size;
+
+    // 根据全屏状态调整弹窗大小
+    final menuWidth = _isFullscreen ? 120.0 : 90.0;
+    final itemHeight = _isFullscreen ? 48.0 : 36.0;
+    final menuHeight = speeds.length * itemHeight;
+    // 计算水平居中位置：按钮中心 - 弹框宽度的一半
+    final menuLeft =
+        buttonPosition.dx + (buttonSize.width / 2) - (menuWidth / 2);
+    // 计算垂直位置：按钮顶部 - 弹框高度 - 间距
+    final menuTop = buttonPosition.dy - menuHeight - (_isFullscreen ? 2 : 24);
+
+    return Positioned(
+      left: menuLeft,
+      top: menuTop,
+      child: MouseRegion(
+        onEnter: (_) {
+          setState(() {
+            _isHoveringSpeedMenu = true;
+          });
+          _hideTimer?.cancel();
+        },
+        onExit: (_) {
+          setState(() {
+            _isHoveringSpeedMenu = false;
+          });
+          // 延迟检查是否需要隐藏菜单
+          Future.delayed(const Duration(milliseconds: 100), () {
+            if (mounted && !_isHoveringSpeedButton && !_isHoveringSpeedMenu) {
+              setState(() {
+                _showSpeedMenu = false;
+              });
+              _startHideTimer();
+            }
+          });
+        },
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            width: menuWidth,
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.85),
+              borderRadius: BorderRadius.circular(_isFullscreen ? 8 : 6),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.1),
+                width: 1,
+              ),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(_isFullscreen ? 8 : 6),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: speeds.map((speed) {
+                  final isSelected = (speed - currentSpeed).abs() < 0.01;
+                  return _SpeedMenuItem(
+                    speed: speed,
+                    isSelected: isSelected,
+                    isFullscreen: _isFullscreen,
+                    onTap: () {
+                      widget.player.setRate(speed);
+                      setState(() {
+                        _showSpeedMenu = false;
+                        _isHoveringSpeedMenu = false;
+                      });
+                      _startHideTimer();
+                    },
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -642,54 +839,55 @@ class _CustomMediaKitControlsState extends State<CustomMediaKitControls> {
     }
     return '${twoDigits(minutes)}:${twoDigits(seconds)}';
   }
+}
 
-  Future<void> _showSpeedDialog() async {
-    final speeds = [0.5, 0.75, 1.0, 1.5, 2.0];
-    final currentSpeed = widget.player.state.rate;
+// 倍速菜单项组件
+class _SpeedMenuItem extends StatefulWidget {
+  final double speed;
+  final bool isSelected;
+  final bool isFullscreen;
+  final VoidCallback onTap;
 
-    final chosenSpeed = await showModalBottomSheet<double>(
-      context: context,
-      builder: (context) => SafeArea(
+  const _SpeedMenuItem({
+    required this.speed,
+    required this.isSelected,
+    required this.isFullscreen,
+    required this.onTap,
+  });
+
+  @override
+  State<_SpeedMenuItem> createState() => _SpeedMenuItemState();
+}
+
+class _SpeedMenuItemState extends State<_SpeedMenuItem> {
+  bool _isHovering = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _isHovering = true),
+      onExit: (_) => setState(() => _isHovering = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
         child: Container(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.6,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Flexible(
-                child: ListView(
-                  shrinkWrap: true,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  children: speeds.map((speed) {
-                    return ListTile(
-                      title: Text(
-                        '${speed}x',
-                        style: TextStyle(
-                          color: speed == currentSpeed
-                              ? Theme.of(context).primaryColor
-                              : null,
-                          fontWeight: speed == currentSpeed
-                              ? FontWeight.bold
-                              : FontWeight.normal,
-                        ),
-                      ),
-                      onTap: () {
-                        Navigator.of(context).pop(speed);
-                      },
-                    );
-                  }).toList(),
-                ),
-              ),
-            ],
+          height: widget.isFullscreen ? 48.0 : 36.0,
+          color: _isHovering
+              ? Colors.white.withValues(alpha: 0.1)
+              : Colors.transparent,
+          alignment: Alignment.center,
+          child: Text(
+            '${widget.speed}x',
+            style: TextStyle(
+              color: widget.isSelected ? Colors.red : Colors.white,
+              fontSize: widget.isFullscreen ? 14 : 12,
+              fontWeight:
+                  widget.isSelected ? FontWeight.bold : FontWeight.normal,
+            ),
           ),
         ),
       ),
     );
-
-    if (chosenSpeed != null) {
-      widget.player.setRate(chosenSpeed);
-    }
   }
 }
 

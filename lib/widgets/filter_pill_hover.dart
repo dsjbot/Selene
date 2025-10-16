@@ -87,6 +87,7 @@ class FilterOptionHover extends StatefulWidget {
   final bool isSelected;
   final String label;
   final VoidCallback onTap;
+  final bool useCompactLayout;
 
   const FilterOptionHover({
     super.key,
@@ -94,6 +95,7 @@ class FilterOptionHover extends StatefulWidget {
     required this.isSelected,
     required this.label,
     required this.onTap,
+    this.useCompactLayout = false,
   });
 
   @override
@@ -115,6 +117,9 @@ class _FilterOptionHoverState extends State<FilterOptionHover> {
       textColor = Theme.of(context).textTheme.bodyMedium?.color ?? Colors.black;
     }
 
+    // 根据 useCompactLayout 参数决定使用哪种布局
+    final bool shouldUseCompactLayout = widget.isPC && widget.useCompactLayout;
+
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
@@ -124,6 +129,9 @@ class _FilterOptionHoverState extends State<FilterOptionHover> {
         borderRadius: BorderRadius.circular(8),
         child: Container(
           alignment: Alignment.center,
+          padding: shouldUseCompactLayout
+              ? const EdgeInsets.symmetric(horizontal: 8, vertical: 4)
+              : null,
           decoration: BoxDecoration(
             color: widget.isSelected
                 ? const Color(0xFF27AE60)
@@ -132,8 +140,12 @@ class _FilterOptionHoverState extends State<FilterOptionHover> {
           ),
           child: Text(
             widget.label,
+            textAlign: shouldUseCompactLayout ? TextAlign.center : null,
+            maxLines: shouldUseCompactLayout ? 2 : null,
+            overflow: shouldUseCompactLayout ? TextOverflow.ellipsis : null,
             style: TextStyle(
               color: textColor,
+              fontSize: shouldUseCompactLayout ? 12 : null,
             ),
           ),
         ),
