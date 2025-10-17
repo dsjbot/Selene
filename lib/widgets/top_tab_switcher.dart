@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../services/theme_service.dart';
 import '../utils/device_utils.dart';
+import '../utils/font_utils.dart';
 
 class TopTabSwitcher extends StatefulWidget {
   final String selectedTab;
@@ -222,7 +223,7 @@ class _TopTabSwitcherState extends State<TopTabSwitcher>
               return Center(
                 child: Text(
                   label,
-                  style: GoogleFonts.poppins(
+                  style: FontUtils.poppins(
                     fontSize: 12, // 缩小字体
                     fontWeight: fontWeight,
                     color: textColor,

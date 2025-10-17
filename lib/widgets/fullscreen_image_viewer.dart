@@ -8,6 +8,7 @@ import 'package:gal/gal.dart';
 import 'package:app_settings/app_settings.dart';
 import 'package:provider/provider.dart';
 import '../utils/image_url.dart';
+import '../utils/font_utils.dart';
 import '../services/theme_service.dart';
 
 /// 全屏图片查看器
@@ -88,7 +89,7 @@ class _FullscreenImageViewerState extends State<FullscreenImageViewer> {
                     padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
                     child: Text(
                       '保存图片',
-                      style: GoogleFonts.poppins(
+                      style: FontUtils.poppins(
                         color: textColor,
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
@@ -104,7 +105,7 @@ class _FullscreenImageViewerState extends State<FullscreenImageViewer> {
                     ),
                     title: Text(
                       '保存到相册',
-                      style: GoogleFonts.poppins(
+                      style: FontUtils.poppins(
                         color: textColor,
                         fontSize: 16,
                       ),
@@ -122,7 +123,7 @@ class _FullscreenImageViewerState extends State<FullscreenImageViewer> {
                     ),
                     title: Text(
                       '取消',
-                      style: GoogleFonts.poppins(
+                      style: FontUtils.poppins(
                         color: secondaryTextColor,
                         fontSize: 16,
                       ),
@@ -167,18 +168,18 @@ class _FullscreenImageViewerState extends State<FullscreenImageViewer> {
                 backgroundColor: isDark ? const Color(0xFF1e1e1e) : Colors.white,
                 title: Text(
                   '需要存储权限',
-                  style: GoogleFonts.poppins(color: textColor),
+                  style: FontUtils.poppins(color: textColor),
                 ),
                 content: Text(
                   '保存图片到相册需要存储权限，请在设置中允许此权限。',
-                  style: GoogleFonts.poppins(color: textColor),
+                  style: FontUtils.poppins(color: textColor),
                 ),
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(),
                     child: Text(
                       '取消',
-                      style: GoogleFonts.poppins(color: textColor),
+                      style: FontUtils.poppins(color: textColor),
                     ),
                   ),
                   TextButton(
@@ -188,7 +189,7 @@ class _FullscreenImageViewerState extends State<FullscreenImageViewer> {
                     },
                     child: Text(
                       '去设置',
-                      style: GoogleFonts.poppins(color: textColor),
+                      style: FontUtils.poppins(color: textColor),
                     ),
                   ),
                 ],
@@ -231,7 +232,7 @@ class _FullscreenImageViewerState extends State<FullscreenImageViewer> {
           SnackBar(
             content: Text(
               '正在保存图片...',
-              style: GoogleFonts.poppins(
+              style: FontUtils.poppins(
                 color: isDark ? Colors.white : Colors.white,
               ),
             ),
@@ -261,7 +262,7 @@ class _FullscreenImageViewerState extends State<FullscreenImageViewer> {
           SnackBar(
             content: Text(
               '图片已保存到相册',
-              style: GoogleFonts.poppins(color: Colors.white),
+              style: FontUtils.poppins(color: Colors.white),
             ),
             backgroundColor: Colors.green.withValues(alpha: 0.8),
             duration: const Duration(seconds: 2),
@@ -274,7 +275,7 @@ class _FullscreenImageViewerState extends State<FullscreenImageViewer> {
           SnackBar(
             content: Text(
               '保存失败: ${e.toString()}',
-              style: GoogleFonts.poppins(color: Colors.white),
+              style: FontUtils.poppins(color: Colors.white),
             ),
             backgroundColor: Colors.red.withValues(alpha: 0.8),
             duration: const Duration(seconds: 3),
@@ -379,7 +380,7 @@ class _FullscreenImageViewerState extends State<FullscreenImageViewer> {
                                 const SizedBox(height: 16),
                                 Text(
                                   '加载中...',
-                                  style: GoogleFonts.poppins(
+                                  style: FontUtils.poppins(
                                     color: textColor,
                                     fontSize: 16,
                                   ),
@@ -403,7 +404,7 @@ class _FullscreenImageViewerState extends State<FullscreenImageViewer> {
                                 const SizedBox(height: 16),
                                 Text(
                                   '图片加载失败',
-                                  style: GoogleFonts.poppins(
+                                  style: FontUtils.poppins(
                                     color: textColor,
                                     fontSize: 16,
                                   ),

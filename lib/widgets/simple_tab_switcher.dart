@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../services/theme_service.dart';
 import '../utils/device_utils.dart';
+import '../utils/font_utils.dart';
 
 class SimpleTabSwitcher extends StatelessWidget {
   final List<String> tabs;
@@ -100,7 +101,7 @@ class _SimpleTabHoverState extends State<_SimpleTabHover> {
           alignment: Alignment.center, // 垂直居中
           child: Text(
             widget.label,
-            style: GoogleFonts.poppins(
+            style: FontUtils.poppins(
               fontSize: 13,
               fontWeight: widget.isSelected ? FontWeight.w600 : FontWeight.w400,
               color: color,

@@ -10,6 +10,7 @@ import '../services/theme_service.dart';
 import '../utils/device_utils.dart';
 import 'video_card.dart';
 import '../utils/image_url.dart';
+import '../utils/font_utils.dart';
 import 'video_menu_bottom_sheet.dart';
 import 'shimmer_effect.dart';
 
@@ -321,7 +322,7 @@ class _ContinueWatchingSectionState extends State<ContinueWatchingSection>
                   // 标题
                   Text(
                     '清空播放记录',
-                    style: GoogleFonts.poppins(
+                    style: FontUtils.poppins(
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
                       color: themeService.isDarkMode
@@ -333,7 +334,7 @@ class _ContinueWatchingSectionState extends State<ContinueWatchingSection>
                   // 描述
                   Text(
                     '确定要清空所有播放记录吗？此操作无法撤销。',
-                    style: GoogleFonts.poppins(
+                    style: FontUtils.poppins(
                       fontSize: 14,
                       color: themeService.isDarkMode
                           ? const Color(0xFFb0b0b0)
@@ -357,7 +358,7 @@ class _ContinueWatchingSectionState extends State<ContinueWatchingSection>
                           ),
                           child: Text(
                             '取消',
-                            style: GoogleFonts.poppins(
+                            style: FontUtils.poppins(
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
                               color: themeService.isDarkMode
@@ -385,7 +386,7 @@ class _ContinueWatchingSectionState extends State<ContinueWatchingSection>
                           ),
                           child: Text(
                             '清空',
-                            style: GoogleFonts.poppins(
+                            style: FontUtils.poppins(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
                             ),
@@ -421,7 +422,7 @@ class _ContinueWatchingSectionState extends State<ContinueWatchingSection>
             SnackBar(
               content: Text(
                 '播放记录已清空',
-                style: GoogleFonts.poppins(color: Colors.white),
+                style: FontUtils.poppins(color: Colors.white),
               ),
               backgroundColor: const Color(0xFF27ae60),
               behavior: SnackBarBehavior.floating,
@@ -439,7 +440,7 @@ class _ContinueWatchingSectionState extends State<ContinueWatchingSection>
             SnackBar(
               content: Text(
                 response.message ?? '清空失败',
-                style: GoogleFonts.poppins(color: Colors.white),
+                style: FontUtils.poppins(color: Colors.white),
               ),
               backgroundColor: const Color(0xFFe74c3c),
               behavior: SnackBarBehavior.floating,
@@ -458,7 +459,7 @@ class _ContinueWatchingSectionState extends State<ContinueWatchingSection>
           SnackBar(
             content: Text(
               '清空失败: ${e.toString()}',
-              style: GoogleFonts.poppins(color: Colors.white),
+              style: FontUtils.poppins(color: Colors.white),
             ),
             backgroundColor: const Color(0xFFe74c3c),
             behavior: SnackBarBehavior.floating,
@@ -496,7 +497,7 @@ class _ContinueWatchingSectionState extends State<ContinueWatchingSection>
                   builder: (context, themeService, child) {
                     return Text(
                       '继续观看',
-                      style: GoogleFonts.poppins(
+                      style: FontUtils.poppins(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
                         color: themeService.isDarkMode
@@ -536,7 +537,7 @@ class _ContinueWatchingSectionState extends State<ContinueWatchingSection>
                       ),
                       child: Text(
                         '清空',
-                        style: GoogleFonts.poppins(
+                        style: FontUtils.poppins(
                           fontSize: 14,
                           color: DeviceUtils.isPC() && _isClearButtonHovered
                               ? const Color(0xFFe74c3c) // hover 时红色
@@ -825,7 +826,7 @@ class _ContinueWatchingSectionState extends State<ContinueWatchingSection>
             const SizedBox(height: 8),
             Text(
               '加载播放记录失败',
-              style: GoogleFonts.poppins(
+              style: FontUtils.poppins(
                 fontSize: 14,
                 color: Colors.grey[600],
               ),
@@ -835,7 +836,7 @@ class _ContinueWatchingSectionState extends State<ContinueWatchingSection>
               onPressed: _loadPlayRecords,
               child: Text(
                 '重试',
-                style: GoogleFonts.poppins(
+                style: FontUtils.poppins(
                   fontSize: 12,
                   color: const Color(0xFF2c3e50),
                 ),

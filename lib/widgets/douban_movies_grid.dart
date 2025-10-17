@@ -6,6 +6,7 @@ import 'video_card.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'video_menu_bottom_sheet.dart';
 import '../models/video_info.dart';
+import '../utils/font_utils.dart';
 import 'shimmer_effect.dart';
 
 class DoubanMoviesGrid extends StatelessWidget {
@@ -117,7 +118,7 @@ class DoubanMoviesGrid extends StatelessWidget {
           const SizedBox(height: 24),
           Text(
             '加载失败',
-            style: GoogleFonts.poppins(
+            style: FontUtils.poppins(
               fontSize: 18,
               fontWeight: FontWeight.w500,
               color: const Color(0xFF7f8c8d),
@@ -126,7 +127,7 @@ class DoubanMoviesGrid extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             errorMessage ?? '未知错误',
-            style: GoogleFonts.poppins(
+            style: FontUtils.poppins(
               fontSize: 14,
               color: const Color(0xFF95a5a6),
             ),
@@ -153,7 +154,7 @@ class DoubanMoviesGrid extends StatelessWidget {
           const SizedBox(height: 24),
           Text(
             '暂无$contentName',
-            style: GoogleFonts.poppins(
+            style: FontUtils.poppins(
               fontSize: 18,
               fontWeight: FontWeight.w500,
               color: const Color(0xFF7f8c8d),
@@ -162,7 +163,7 @@ class DoubanMoviesGrid extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             '当前分类下没有$contentName',
-            style: GoogleFonts.poppins(
+            style: FontUtils.poppins(
               fontSize: 14,
               color: const Color(0xFF95a5a6),
             ),

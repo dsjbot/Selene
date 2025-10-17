@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:io' show Platform;
 import '../services/user_data_service.dart';
 import '../utils/device_utils.dart';
+import '../utils/font_utils.dart';
 import '../widgets/windows_title_bar.dart';
 import 'home_screen.dart';
 
@@ -106,7 +106,7 @@ class _LoginScreenState extends State<LoginScreen> {
       SnackBar(
         content: Text(
           message,
-          style: GoogleFonts.poppins(
+          style: FontUtils.poppins(
             color: Colors.white,
             fontSize: 14,
           ),
@@ -241,7 +241,7 @@ class _LoginScreenState extends State<LoginScreen> {
         // Selene 标题
         Text(
           'Selene',
-          style: GoogleFonts.sourceCodePro(
+          style: FontUtils.sourceCodePro(
             fontSize: 42,
             fontWeight: FontWeight.w400,
             color: const Color(0xFF2c3e50),
@@ -259,18 +259,18 @@ class _LoginScreenState extends State<LoginScreen> {
               // URL 输入框
               TextFormField(
                 controller: _urlController,
-                style: GoogleFonts.poppins(
+                style: FontUtils.poppins(
                   fontSize: 16,
                   color: const Color(0xFF2c3e50),
                 ),
                 decoration: InputDecoration(
                   labelText: '服务器地址',
-                  labelStyle: GoogleFonts.poppins(
+                  labelStyle: FontUtils.poppins(
                     color: const Color(0xFF7f8c8d),
                     fontSize: 14,
                   ),
                   hintText: 'https://example.com',
-                  hintStyle: GoogleFonts.poppins(
+                  hintStyle: FontUtils.poppins(
                     color: const Color(0xFFbdc3c7),
                     fontSize: 16,
                   ),
@@ -314,18 +314,18 @@ class _LoginScreenState extends State<LoginScreen> {
               // 用户名输入框
               TextFormField(
                 controller: _usernameController,
-                style: GoogleFonts.poppins(
+                style: FontUtils.poppins(
                   fontSize: 16,
                   color: const Color(0xFF2c3e50),
                 ),
                 decoration: InputDecoration(
                   labelText: '用户名',
-                  labelStyle: GoogleFonts.poppins(
+                  labelStyle: FontUtils.poppins(
                     color: const Color(0xFF7f8c8d),
                     fontSize: 14,
                   ),
                   hintText: '请输入用户名',
-                  hintStyle: GoogleFonts.poppins(
+                  hintStyle: FontUtils.poppins(
                     color: const Color(0xFFbdc3c7),
                     fontSize: 16,
                   ),
@@ -366,18 +366,18 @@ class _LoginScreenState extends State<LoginScreen> {
               TextFormField(
                 controller: _passwordController,
                 obscureText: !_isPasswordVisible,
-                style: GoogleFonts.poppins(
+                style: FontUtils.poppins(
                   fontSize: 16,
                   color: const Color(0xFF2c3e50),
                 ),
                 decoration: InputDecoration(
                   labelText: '密码',
-                  labelStyle: GoogleFonts.poppins(
+                  labelStyle: FontUtils.poppins(
                     color: const Color(0xFF7f8c8d),
                     fontSize: 14,
                   ),
                   hintText: '请输入密码',
-                  hintStyle: GoogleFonts.poppins(
+                  hintStyle: FontUtils.poppins(
                     color: const Color(0xFFbdc3c7),
                     fontSize: 16,
                   ),
@@ -462,7 +462,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           const SizedBox(width: 12),
                           Text(
                             '登录中...',
-                            style: GoogleFonts.poppins(
+                            style: FontUtils.poppins(
                               fontSize: 16,
                               fontWeight: FontWeight.w500,
                               color: Colors.white,
@@ -472,7 +472,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       )
                     : Text(
                         '登录',
-                        style: GoogleFonts.poppins(
+                        style: FontUtils.poppins(
                           fontSize: 16,
                           fontWeight: FontWeight.w500,
                           letterSpacing: 1.0,
@@ -497,7 +497,7 @@ class _LoginScreenState extends State<LoginScreen> {
           // Selene 标题
           Text(
             'Selene',
-            style: GoogleFonts.sourceCodePro(
+            style: FontUtils.sourceCodePro(
               fontSize: 42,
               fontWeight: FontWeight.w400,
               color: const Color(0xFF2c3e50),
@@ -515,18 +515,18 @@ class _LoginScreenState extends State<LoginScreen> {
                 // URL 输入框
                 TextFormField(
                   controller: _urlController,
-                  style: GoogleFonts.poppins(
+                  style: FontUtils.poppins(
                     fontSize: 16,
                     color: const Color(0xFF2c3e50),
                   ),
                   decoration: InputDecoration(
                     labelText: '服务器地址',
-                    labelStyle: GoogleFonts.poppins(
+                    labelStyle: FontUtils.poppins(
                       color: const Color(0xFF7f8c8d),
                       fontSize: 14,
                     ),
                     hintText: 'https://example.com',
-                    hintStyle: GoogleFonts.poppins(
+                    hintStyle: FontUtils.poppins(
                       color: const Color(0xFFbdc3c7),
                       fontSize: 16,
                     ),
@@ -570,18 +570,18 @@ class _LoginScreenState extends State<LoginScreen> {
                 // 用户名输入框
                 TextFormField(
                   controller: _usernameController,
-                  style: GoogleFonts.poppins(
+                  style: FontUtils.poppins(
                     fontSize: 16,
                     color: const Color(0xFF2c3e50),
                   ),
                   decoration: InputDecoration(
                     labelText: '用户名',
-                    labelStyle: GoogleFonts.poppins(
+                    labelStyle: FontUtils.poppins(
                       color: const Color(0xFF7f8c8d),
                       fontSize: 14,
                     ),
                     hintText: '请输入用户名',
-                    hintStyle: GoogleFonts.poppins(
+                    hintStyle: FontUtils.poppins(
                       color: const Color(0xFFbdc3c7),
                       fontSize: 16,
                     ),
@@ -622,18 +622,18 @@ class _LoginScreenState extends State<LoginScreen> {
                 TextFormField(
                   controller: _passwordController,
                   obscureText: !_isPasswordVisible,
-                  style: GoogleFonts.poppins(
+                  style: FontUtils.poppins(
                     fontSize: 16,
                     color: const Color(0xFF2c3e50),
                   ),
                   decoration: InputDecoration(
                     labelText: '密码',
-                    labelStyle: GoogleFonts.poppins(
+                    labelStyle: FontUtils.poppins(
                       color: const Color(0xFF7f8c8d),
                       fontSize: 14,
                     ),
                     hintText: '请输入密码',
-                    hintStyle: GoogleFonts.poppins(
+                    hintStyle: FontUtils.poppins(
                       color: const Color(0xFFbdc3c7),
                       fontSize: 16,
                     ),
@@ -719,7 +719,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             const SizedBox(width: 12),
                             Text(
                               '登录中...',
-                              style: GoogleFonts.poppins(
+                              style: FontUtils.poppins(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w500,
                                 color: Colors.white,
@@ -729,7 +729,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         )
                       : Text(
                           '登录',
-                          style: GoogleFonts.poppins(
+                          style: FontUtils.poppins(
                             fontSize: 16,
                             fontWeight: FontWeight.w500,
                             letterSpacing: 1.0,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import '../utils/font_utils.dart';
 import '../services/theme_service.dart';
 
 /// 自定义下拉刷新指示器
@@ -80,7 +81,7 @@ class CustomRefreshIndicatorContent extends StatelessWidget {
               ],
               Text(
                 text ?? '下拉刷新',
-                style: GoogleFonts.poppins(
+                style: FontUtils.poppins(
                   color: Colors.white,
                   fontSize: 14,
                   fontWeight: FontWeight.w500,

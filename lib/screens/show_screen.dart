@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../services/theme_service.dart';
 import '../widgets/capsule_tab_switcher.dart';
@@ -14,6 +13,7 @@ import '../widgets/pulsing_dots_indicator.dart';
 import 'player_screen.dart';
 import '../widgets/filter_pill_hover.dart';
 import '../utils/device_utils.dart';
+import '../utils/font_utils.dart';
 import '../widgets/filter_options_selector.dart';
 
 class ShowScreen extends StatefulWidget {
@@ -526,7 +526,7 @@ class _ShowScreenState extends State<ShowScreen> {
         children: [
           Text(
             '综艺',
-            style: GoogleFonts.poppins(
+            style: FontUtils.poppins(
               fontSize: 28,
               fontWeight: FontWeight.w600,
               color: Theme.of(context).textTheme.titleLarge?.color,
@@ -537,7 +537,7 @@ class _ShowScreenState extends State<ShowScreen> {
             height: 20, // 固定高度确保一致性
             child: Text(
               '来自豆瓣的精选内容',
-              style: GoogleFonts.poppins(
+              style: FontUtils.poppins(
                 fontSize: 14,
                 color: Theme.of(context).textTheme.bodySmall?.color,
               ),
@@ -603,7 +603,7 @@ class _ShowScreenState extends State<ShowScreen> {
       children: [
         Text(
           '筛选',
-          style: GoogleFonts.poppins(
+          style: FontUtils.poppins(
             fontSize: 14,
             fontWeight: FontWeight.w500,
             color: Theme.of(context).textTheme.bodyMedium?.color,
@@ -654,7 +654,7 @@ class _ShowScreenState extends State<ShowScreen> {
       children: [
         Text(
           '类型',
-          style: GoogleFonts.poppins(
+          style: FontUtils.poppins(
             fontSize: 14,
             fontWeight: FontWeight.w500,
             color: Theme.of(context).textTheme.bodyMedium?.color,
@@ -727,7 +727,7 @@ class _ShowScreenState extends State<ShowScreen> {
       children: [
         Text(
           title,
-          style: GoogleFonts.poppins(
+          style: FontUtils.poppins(
             fontSize: 14,
             fontWeight: FontWeight.w500,
             color: Theme.of(context).textTheme.bodyMedium?.color,
@@ -772,7 +772,7 @@ class _ShowScreenState extends State<ShowScreen> {
           const SizedBox(height: 12),
           Text(
             '已经到底啦~',
-            style: GoogleFonts.poppins(
+            style: FontUtils.poppins(
               fontSize: 14,
               color: themeService.isDarkMode
                   ? Colors.white.withOpacity(0.6)
@@ -783,7 +783,7 @@ class _ShowScreenState extends State<ShowScreen> {
           const SizedBox(height: 4),
           Text(
             '共 ${_shows.length} 个综艺',
-            style: GoogleFonts.poppins(
+            style: FontUtils.poppins(
               fontSize: 12,
               color: themeService.isDarkMode
                   ? Colors.white.withOpacity(0.4)

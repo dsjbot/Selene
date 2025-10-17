@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../widgets/favorites_grid.dart';
 import '../models/play_record.dart';
 import '../models/video_info.dart';
+import '../utils/font_utils.dart';
 import '../widgets/video_menu_bottom_sheet.dart';
 import '../services/page_cache_service.dart';
 
@@ -16,7 +16,7 @@ class FavoritesScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text(
           '收藏夹',
-          style: GoogleFonts.poppins(
+          style: FontUtils.poppins(
             fontSize: 18,
             fontWeight: FontWeight.w600,
             color: const Color(0xFF2c3e50),
@@ -51,7 +51,7 @@ class FavoritesScreen extends StatelessWidget {
               SnackBar(
                 content: Text(
                   '播放: ${playRecord.title}',
-                  style: GoogleFonts.poppins(color: Colors.white),
+                  style: FontUtils.poppins(color: Colors.white),
                 ),
                 backgroundColor: const Color(0xFF27ae60),
                 behavior: SnackBarBehavior.floating,
@@ -69,7 +69,7 @@ class FavoritesScreen extends StatelessWidget {
                   SnackBar(
                     content: Text(
                       '播放: ${videoInfo.title}',
-                      style: GoogleFonts.poppins(color: Colors.white),
+                      style: FontUtils.poppins(color: Colors.white),
                     ),
                     backgroundColor: const Color(0xFF27AE60),
                     behavior: SnackBarBehavior.floating,
@@ -108,7 +108,7 @@ class FavoritesScreen extends StatelessWidget {
             SnackBar(
               content: Text(
                 result.errorMessage ?? '取消收藏失败',
-                style: GoogleFonts.poppins(color: Colors.white),
+                style: FontUtils.poppins(color: Colors.white),
               ),
               backgroundColor: const Color(0xFFe74c3c),
               behavior: SnackBarBehavior.floating,
@@ -129,7 +129,7 @@ class FavoritesScreen extends StatelessWidget {
           SnackBar(
             content: Text(
               '取消收藏失败: ${e.toString()}',
-              style: GoogleFonts.poppins(color: Colors.white),
+              style: FontUtils.poppins(color: Colors.white),
             ),
             backgroundColor: const Color(0xFFe74c3c),
             behavior: SnackBarBehavior.floating,

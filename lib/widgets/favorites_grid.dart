@@ -7,6 +7,7 @@ import '../models/play_record.dart';
 import '../models/video_info.dart';
 import '../services/page_cache_service.dart';
 import '../utils/device_utils.dart';
+import '../utils/font_utils.dart';
 import 'video_menu_bottom_sheet.dart';
 import 'shimmer_effect.dart';
 
@@ -361,7 +362,7 @@ class _FavoritesGridState extends State<FavoritesGrid>
           const SizedBox(height: 24),
           Text(
             '加载失败',
-            style: GoogleFonts.poppins(
+            style: FontUtils.poppins(
               fontSize: 18,
               fontWeight: FontWeight.w500,
               color: const Color(0xFF7f8c8d),
@@ -370,7 +371,7 @@ class _FavoritesGridState extends State<FavoritesGrid>
           const SizedBox(height: 12),
           Text(
             _errorMessage ?? '未知错误',
-            style: GoogleFonts.poppins(
+            style: FontUtils.poppins(
               fontSize: 14,
               color: const Color(0xFF95a5a6),
             ),
@@ -388,7 +389,7 @@ class _FavoritesGridState extends State<FavoritesGrid>
             ),
             child: Text(
               '重试',
-              style: GoogleFonts.poppins(
+              style: FontUtils.poppins(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
               ),
@@ -412,7 +413,7 @@ class _FavoritesGridState extends State<FavoritesGrid>
           const SizedBox(height: 24),
           Text(
             '暂无收藏内容',
-            style: GoogleFonts.poppins(
+            style: FontUtils.poppins(
               fontSize: 18,
               fontWeight: FontWeight.w500,
               color: const Color(0xFF7f8c8d),
@@ -421,7 +422,7 @@ class _FavoritesGridState extends State<FavoritesGrid>
           const SizedBox(height: 12),
           Text(
             '您收藏的视频将显示在这里',
-            style: GoogleFonts.poppins(
+            style: FontUtils.poppins(
               fontSize: 14,
               color: const Color(0xFF95a5a6),
             ),

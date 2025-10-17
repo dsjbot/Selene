@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../utils/font_utils.dart';
 
 class SelectorOption {
   final String label;
@@ -60,7 +60,7 @@ class _FilterPillHoverState extends State<FilterPillHover> {
             children: [
               Text(
                 widget.isDefault ? widget.title : widget.selectedOption.label,
-                style: GoogleFonts.poppins(
+                style: FontUtils.poppins(
                   fontSize: 13,
                   color: textColor,
                   fontWeight:

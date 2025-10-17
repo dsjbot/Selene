@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -11,6 +10,7 @@ import 'video_menu_bottom_sheet.dart';
 import '../utils/image_url.dart';
 import '../models/search_result.dart';
 import '../utils/device_utils.dart';
+import '../utils/font_utils.dart';
 
 /// 视频卡片组件
 class VideoCard extends StatefulWidget {
@@ -180,7 +180,7 @@ class _VideoCardState extends State<VideoCard> {
                               ),
                               child: Text(
                                 widget.videoInfo.year,
-                                style: GoogleFonts.poppins(
+                                style: FontUtils.poppins(
                                   color: Colors.white,
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
@@ -210,7 +210,7 @@ class _VideoCardState extends State<VideoCard> {
                               child: Center(
                                 child: Text(
                                   widget.videoInfo.rate!,
-                                  style: GoogleFonts.poppins(
+                                  style: FontUtils.poppins(
                                     color: Colors.white,
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
@@ -237,7 +237,7 @@ class _VideoCardState extends State<VideoCard> {
                               ),
                               child: Text(
                                 episodeText,
-                                style: GoogleFonts.poppins(
+                                style: FontUtils.poppins(
                                   color: Colors.white,
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
@@ -473,7 +473,7 @@ class _VideoCardState extends State<VideoCard> {
                         // 标题
                         Text(
                           widget.videoInfo.title,
-                          style: GoogleFonts.poppins(
+                          style: FontUtils.poppins(
                             fontSize: width < 100 ? 12 : 13, // 根据宽度调整字体大小，调大字体
                             fontWeight: FontWeight.w500,
                             color: isPC && _isHovered
@@ -513,7 +513,7 @@ class _VideoCardState extends State<VideoCard> {
                                   ? _getAggregatedSourceText(
                                       widget.videoInfo.sourceName)
                                   : widget.videoInfo.sourceName,
-                              style: GoogleFonts.poppins(
+                              style: FontUtils.poppins(
                                 fontSize:
                                     width < 100 ? 11 : 12, // 根据宽度调整字体大小，调大字体
                                 color: isPC && _isHovered

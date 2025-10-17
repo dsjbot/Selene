@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import '../services/theme_service.dart';
 import '../utils/device_utils.dart';
+import '../utils/font_utils.dart';
 import 'user_menu.dart';
 import 'dart:io' show Platform;
 import 'windows_title_bar.dart';
@@ -271,7 +271,7 @@ class _MainLayoutState extends State<MainLayout> {
               behavior: HitTestBehavior.opaque,
               child: Text(
                 'Selene',
-                style: GoogleFonts.sourceCodePro(
+                style: FontUtils.sourceCodePro(
                   fontSize: 24,
                   fontWeight: FontWeight.w400,
                   color: themeService.isDarkMode
@@ -318,7 +318,7 @@ class _MainLayoutState extends State<MainLayout> {
         textAlignVertical: TextAlignVertical.center,
         decoration: InputDecoration(
           hintText: '搜索电影、剧集、动漫...',
-          hintStyle: GoogleFonts.poppins(
+          hintStyle: FontUtils.poppins(
             color: themeService.isDarkMode
                 ? const Color(0xFF666666)
                 : const Color(0xFF95a5a6),
@@ -539,7 +539,7 @@ class _MainLayoutState extends State<MainLayout> {
           ),
           isDense: true,
         ),
-        style: GoogleFonts.poppins(
+        style: FontUtils.poppins(
           fontSize: 14,
           color: themeService.isDarkMode
               ? const Color(0xFFffffff)
@@ -855,7 +855,7 @@ class _MainLayoutState extends State<MainLayout> {
                         const SizedBox(height: 4),
                         Text(
                           item['label'],
-                          style: GoogleFonts.poppins(
+                          style: FontUtils.poppins(
                             fontSize: 12,
                             fontWeight:
                                 isSelected ? FontWeight.w600 : FontWeight.w400,

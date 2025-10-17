@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../services/theme_service.dart';
 import '../utils/device_utils.dart';
+import '../utils/font_utils.dart';
 
 class CapsuleTabSwitcher extends StatefulWidget {
   final List<String> tabs;
@@ -61,7 +62,7 @@ class _CapsuleTabSwitcherState extends State<CapsuleTabSwitcher>
       final textPainter = TextPainter(
         text: TextSpan(
           text: tab,
-          style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600),
+          style: FontUtils.poppins(fontSize: 12, fontWeight: FontWeight.w600),
         ),
         maxLines: 1,
         textDirection: TextDirection.ltr,
@@ -309,7 +310,7 @@ class _CapsuleTabHoverState extends State<_CapsuleTabHover> {
 
               return Text(
                 widget.label,
-                style: GoogleFonts.poppins(
+                style: FontUtils.poppins(
                   fontSize: 12,
                   fontWeight: fontWeight,
                   color: color,
