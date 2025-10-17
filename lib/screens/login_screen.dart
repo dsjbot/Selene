@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:io' show Platform;
 import '../services/user_data_service.dart';
 import '../utils/device_utils.dart';
+import '../widgets/windows_title_bar.dart';
 import 'home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -207,16 +209,25 @@ class _LoginScreenState extends State<LoginScreen> {
             stops: [0.0, 0.18, 0.38, 0.60, 0.80, 1.0],
           ),
         ),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.symmetric(
-                horizontal: isTablet ? 0 : 32.0,
-                vertical: 24.0,
+        child: Column(
+          children: [
+            // Windows 自定义标题栏
+            if (Platform.isWindows) const WindowsTitleBar(),
+            // 主要内容
+            Expanded(
+              child: SafeArea(
+                child: Center(
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isTablet ? 0 : 32.0,
+                      vertical: 24.0,
+                    ),
+                    child: isTablet ? _buildTabletLayout() : _buildMobileLayout(),
+                  ),
+                ),
               ),
-              child: isTablet ? _buildTabletLayout() : _buildMobileLayout(),
             ),
-          ),
+          ],
         ),
       ),
     );

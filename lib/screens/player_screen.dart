@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../widgets/mobile_video_player_widget.dart';
@@ -19,6 +20,7 @@ import '../utils/device_utils.dart';
 import '../widgets/player_details_panel.dart';
 import '../widgets/player_episodes_panel.dart';
 import '../widgets/player_sources_panel.dart';
+import '../widgets/windows_title_bar.dart';
 
 class PlayerScreen extends StatefulWidget {
   final String? source;
@@ -2596,26 +2598,35 @@ class _PlayerScreenState extends State<PlayerScreen>
                   ),
             color: isDarkMode ? theme.scaffoldBackgroundColor : null,
           ),
-          child: Stack(
+          child: Column(
             children: [
-              // 主要内容（不包含播放器）
-              if (!_isWebFullscreen)
-                if (_isTablet && !_isPortraitTablet)
-                  // 平板横屏模式：左右布局
-                  _buildTabletLandscapeLayout(theme)
-                else if (_isPortraitTablet)
-                  // 平板竖屏模式：上下布局，播放器占50%高度
-                  _buildPortraitTabletLayout(theme)
-                else
-                  // 手机模式：保持原有布局
-                  _buildPhoneLayout(theme),
-              // 播放器层（使用 Positioned 控制位置和大小）
-              _buildPlayerLayer(theme),
-              // 错误覆盖层
-              if (_showError && _errorMessage != null)
-                _buildErrorOverlay(theme),
-              // 加载覆盖层
-              if (_isLoading) _buildLoadingOverlay(theme),
+              // Windows 自定义标题栏（播放页使用全黑背景）
+              if (Platform.isWindows) const WindowsTitleBar(forceBlack: true),
+              // 主要内容
+              Expanded(
+                child: Stack(
+                  children: [
+                    // 主要内容（不包含播放器）
+                    if (!_isWebFullscreen)
+                      if (_isTablet && !_isPortraitTablet)
+                        // 平板横屏模式：左右布局
+                        _buildTabletLandscapeLayout(theme)
+                      else if (_isPortraitTablet)
+                        // 平板竖屏模式：上下布局，播放器占50%高度
+                        _buildPortraitTabletLayout(theme)
+                      else
+                        // 手机模式：保持原有布局
+                        _buildPhoneLayout(theme),
+                    // 播放器层（使用 Positioned 控制位置和大小）
+                    _buildPlayerLayer(theme),
+                    // 错误覆盖层
+                    if (_showError && _errorMessage != null)
+                      _buildErrorOverlay(theme),
+                    // 加载覆盖层
+                    if (_isLoading) _buildLoadingOverlay(theme),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
