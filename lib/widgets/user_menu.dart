@@ -26,6 +26,7 @@ class _UserMenuState extends State<UserMenu> {
   String _role = 'user';
   String _doubanDataSource = '直连';
   String _doubanImageSource = '直连';
+  String _m3u8ProxyUrl = '';
 
   @override
   void initState() {
@@ -36,15 +37,19 @@ class _UserMenuState extends State<UserMenu> {
   Future<void> _loadUserInfo() async {
     final username = await UserDataService.getUsername();
     final cookies = await UserDataService.getCookies();
-    final doubanDataSource = await UserDataService.getDoubanDataSourceDisplayName();
-    final doubanImageSource = await UserDataService.getDoubanImageSourceDisplayName();
-    
+    final doubanDataSource =
+        await UserDataService.getDoubanDataSourceDisplayName();
+    final doubanImageSource =
+        await UserDataService.getDoubanImageSourceDisplayName();
+    final m3u8ProxyUrl = await UserDataService.getM3u8ProxyUrl();
+
     if (mounted) {
       setState(() {
         _username = username;
         _role = _parseRoleFromCookies(cookies);
         _doubanDataSource = doubanDataSource;
         _doubanImageSource = doubanImageSource;
+        _m3u8ProxyUrl = m3u8ProxyUrl;
       });
     }
   }
@@ -58,11 +63,11 @@ class _UserMenuState extends State<UserMenu> {
       // 解析cookies字符串
       final cookieMap = <String, String>{};
       final cookiePairs = cookies.split(';');
-      
+
       for (final cookie in cookiePairs) {
         final trimmed = cookie.trim();
         final firstEqualIndex = trimmed.indexOf('=');
-        
+
         if (firstEqualIndex > 0) {
           final key = trimmed.substring(0, firstEqualIndex);
           final value = trimmed.substring(firstEqualIndex + 1);
@@ -79,7 +84,7 @@ class _UserMenuState extends State<UserMenu> {
 
       // 处理可能的双重编码
       String decoded = Uri.decodeComponent(authCookie);
-      
+
       // 如果解码后仍然包含 %，说明是双重编码，需要再次解码
       if (decoded.contains('%')) {
         decoded = Uri.decodeComponent(decoded);
@@ -87,7 +92,7 @@ class _UserMenuState extends State<UserMenu> {
 
       final authData = json.decode(decoded);
       final role = authData['role'] as String?;
-      
+
       return role ?? 'user';
     } catch (e) {
       // 解析失败时默认为user
@@ -98,7 +103,7 @@ class _UserMenuState extends State<UserMenu> {
   Future<void> _handleLogout() async {
     // 只清除密码和cookies，保留服务器地址和用户名
     await UserDataService.clearPasswordAndCookies();
-    
+
     // 跳转到登录页
     if (mounted) {
       Navigator.of(context).pushAndRemoveUntil(
@@ -134,7 +139,7 @@ class _UserMenuState extends State<UserMenu> {
   Widget _buildRoleTag() {
     String label;
     Color color;
-    
+
     switch (_role) {
       case 'admin':
         label = '管理员';
@@ -150,7 +155,7 @@ class _UserMenuState extends State<UserMenu> {
         color = const Color(0xFF10b981); // 绿色
         break;
     }
-    
+
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: 8,
@@ -192,7 +197,7 @@ class _UserMenuState extends State<UserMenu> {
               Icon(
                 icon,
                 size: 20,
-                color: widget.isDarkMode 
+                color: widget.isDarkMode
                     ? const Color(0xFF9ca3af)
                     : const Color(0xFF6b7280),
               ),
@@ -205,7 +210,7 @@ class _UserMenuState extends State<UserMenu> {
                       title,
                       style: GoogleFonts.poppins(
                         fontSize: 16,
-                        color: widget.isDarkMode 
+                        color: widget.isDarkMode
                             ? const Color(0xFFffffff)
                             : const Color(0xFF1f2937),
                         fontWeight: FontWeight.w500,
@@ -216,7 +221,7 @@ class _UserMenuState extends State<UserMenu> {
                       currentValue,
                       style: GoogleFonts.poppins(
                         fontSize: 12,
-                        color: widget.isDarkMode 
+                        color: widget.isDarkMode
                             ? const Color(0xFF9ca3af)
                             : const Color(0xFF6b7280),
                         fontWeight: FontWeight.w400,
@@ -228,7 +233,7 @@ class _UserMenuState extends State<UserMenu> {
               Icon(
                 LucideIcons.chevronRight,
                 size: 16,
-                color: widget.isDarkMode 
+                color: widget.isDarkMode
                     ? const Color(0xFF9ca3af)
                     : const Color(0xFF6b7280),
               ),
@@ -239,19 +244,19 @@ class _UserMenuState extends State<UserMenu> {
     );
   }
 
-  void _showOptionDialog(String title, String currentValue, List<String> options, Future<void> Function(String) onChanged) {
+  void _showOptionDialog(String title, String currentValue,
+      List<String> options, Future<void> Function(String) onChanged) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          backgroundColor: widget.isDarkMode 
-              ? const Color(0xFF2c2c2c)
-              : Colors.white,
+          backgroundColor:
+              widget.isDarkMode ? const Color(0xFF2c2c2c) : Colors.white,
           title: Text(
             title,
             style: GoogleFonts.poppins(
               fontSize: 18,
-              color: widget.isDarkMode 
+              color: widget.isDarkMode
                   ? const Color(0xFFffffff)
                   : const Color(0xFF1f2937),
               fontWeight: FontWeight.w600,
@@ -277,13 +282,13 @@ class _UserMenuState extends State<UserMenu> {
                     child: Row(
                       children: [
                         Icon(
-                          currentValue == option 
+                          currentValue == option
                               ? LucideIcons.check
                               : LucideIcons.circle,
                           size: 20,
                           color: currentValue == option
                               ? const Color(0xFF10b981)
-                              : (widget.isDarkMode 
+                              : (widget.isDarkMode
                                   ? const Color(0xFF9ca3af)
                                   : const Color(0xFF6b7280)),
                         ),
@@ -293,7 +298,7 @@ class _UserMenuState extends State<UserMenu> {
                             option,
                             style: GoogleFonts.poppins(
                               fontSize: 16,
-                              color: widget.isDarkMode 
+                              color: widget.isDarkMode
                                   ? const Color(0xFFffffff)
                                   : const Color(0xFF1f2937),
                               fontWeight: FontWeight.w500,
@@ -312,6 +317,176 @@ class _UserMenuState extends State<UserMenu> {
     );
   }
 
+  void _showM3u8ProxyUrlDialog() {
+    final controller = TextEditingController(text: _m3u8ProxyUrl);
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor:
+              widget.isDarkMode ? const Color(0xFF2c2c2c) : Colors.white,
+          title: Text(
+            'M3U8 代理 URL',
+            style: GoogleFonts.poppins(
+              fontSize: 18,
+              color: widget.isDarkMode
+                  ? const Color(0xFFffffff)
+                  : const Color(0xFF1f2937),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          content: TextField(
+            controller: controller,
+            style: GoogleFonts.poppins(
+              fontSize: 14,
+              color: widget.isDarkMode
+                  ? const Color(0xFFffffff)
+                  : const Color(0xFF1f2937),
+            ),
+            decoration: InputDecoration(
+              hintText: '输入代理 URL（可选）',
+              hintStyle: GoogleFonts.poppins(
+                fontSize: 14,
+                color: widget.isDarkMode
+                    ? const Color(0xFF9ca3af)
+                    : const Color(0xFF6b7280),
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(
+                  color: widget.isDarkMode
+                      ? const Color(0xFF374151)
+                      : const Color(0xFFe5e7eb),
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(
+                  color: widget.isDarkMode
+                      ? const Color(0xFF374151)
+                      : const Color(0xFFe5e7eb),
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(
+                  color: Color(0xFF10b981),
+                  width: 2,
+                ),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text(
+                '取消',
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  color: widget.isDarkMode
+                      ? const Color(0xFF9ca3af)
+                      : const Color(0xFF6b7280),
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () async {
+                final url = controller.text.trim();
+                await UserDataService.saveM3u8ProxyUrl(url);
+                setState(() {
+                  _m3u8ProxyUrl = url;
+                });
+                if (context.mounted) {
+                  Navigator.of(context).pop();
+                }
+              },
+              child: Text(
+                '保存',
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  color: const Color(0xFF10b981),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildInputOption({
+    required String title,
+    required String currentValue,
+    required VoidCallback onTap,
+    required IconData icon,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 16,
+          ),
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                size: 20,
+                color: widget.isDarkMode
+                    ? const Color(0xFF9ca3af)
+                    : const Color(0xFF6b7280),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        color: widget.isDarkMode
+                            ? const Color(0xFFffffff)
+                            : const Color(0xFF1f2937),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      currentValue.isEmpty ? '未设置' : currentValue,
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        color: widget.isDarkMode
+                            ? const Color(0xFF9ca3af)
+                            : const Color(0xFF6b7280),
+                        fontWeight: FontWeight.w400,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                LucideIcons.chevronRight,
+                size: 16,
+                color: widget.isDarkMode
+                    ? const Color(0xFF9ca3af)
+                    : const Color(0xFF6b7280),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Material(
@@ -327,7 +502,7 @@ class _UserMenuState extends State<UserMenu> {
                 width: 280,
                 margin: const EdgeInsets.symmetric(horizontal: 20),
                 decoration: BoxDecoration(
-                  color: widget.isDarkMode 
+                  color: widget.isDarkMode
                       ? const Color(0xFF2c2c2c)
                       : Colors.white,
                   borderRadius: BorderRadius.circular(12),
@@ -352,7 +527,7 @@ class _UserMenuState extends State<UserMenu> {
                             '当前用户',
                             style: GoogleFonts.poppins(
                               fontSize: 12,
-                              color: widget.isDarkMode 
+                              color: widget.isDarkMode
                                   ? const Color(0xFF9ca3af)
                                   : const Color(0xFF6b7280),
                               fontWeight: FontWeight.w400,
@@ -367,15 +542,15 @@ class _UserMenuState extends State<UserMenu> {
                                 _username ?? '未知用户',
                                 style: GoogleFonts.poppins(
                                   fontSize: 18,
-                                  color: widget.isDarkMode 
+                                  color: widget.isDarkMode
                                       ? const Color(0xFFffffff)
                                       : const Color(0xFF1f2937),
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
-                               const SizedBox(width: 8),
-                               // 角色标签
-                               _buildRoleTag(),
+                              const SizedBox(width: 8),
+                              // 角色标签
+                              _buildRoleTag(),
                             ],
                           ),
                         ],
@@ -384,7 +559,7 @@ class _UserMenuState extends State<UserMenu> {
                     // 分割线
                     Container(
                       height: 1,
-                      color: widget.isDarkMode 
+                      color: widget.isDarkMode
                           ? const Color(0xFF374151)
                           : const Color(0xFFe5e7eb),
                     ),
@@ -409,7 +584,7 @@ class _UserMenuState extends State<UserMenu> {
                     // 分割线
                     Container(
                       height: 1,
-                      color: widget.isDarkMode 
+                      color: widget.isDarkMode
                           ? const Color(0xFF374151)
                           : const Color(0xFFe5e7eb),
                     ),
@@ -434,7 +609,21 @@ class _UserMenuState extends State<UserMenu> {
                     // 分割线
                     Container(
                       height: 1,
-                      color: widget.isDarkMode 
+                      color: widget.isDarkMode
+                          ? const Color(0xFF374151)
+                          : const Color(0xFFe5e7eb),
+                    ),
+                    // M3U8 代理 URL 选项
+                    _buildInputOption(
+                      title: 'M3U8 代理 URL',
+                      currentValue: _m3u8ProxyUrl,
+                      onTap: _showM3u8ProxyUrlDialog,
+                      icon: LucideIcons.link,
+                    ),
+                    // 分割线
+                    Container(
+                      height: 1,
+                      color: widget.isDarkMode
                           ? const Color(0xFF374151)
                           : const Color(0xFFe5e7eb),
                     ),
@@ -460,7 +649,7 @@ class _UserMenuState extends State<UserMenu> {
                                 '清除豆瓣缓存',
                                 style: GoogleFonts.poppins(
                                   fontSize: 16,
-                                  color: widget.isDarkMode 
+                                  color: widget.isDarkMode
                                       ? const Color(0xFFffffff)
                                       : const Color(0xFF1f2937),
                                   fontWeight: FontWeight.w500,
@@ -474,7 +663,7 @@ class _UserMenuState extends State<UserMenu> {
                     // 分割线
                     Container(
                       height: 1,
-                      color: widget.isDarkMode 
+                      color: widget.isDarkMode
                           ? const Color(0xFF374151)
                           : const Color(0xFFe5e7eb),
                     ),

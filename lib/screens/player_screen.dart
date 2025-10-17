@@ -7,6 +7,7 @@ import '../widgets/video_card.dart';
 import '../services/api_service.dart';
 import '../services/m3u8_service.dart';
 import '../services/douban_service.dart';
+import '../services/user_data_service.dart';
 import '../models/search_result.dart';
 import '../models/douban_movie.dart';
 import '../models/play_record.dart';
@@ -458,8 +459,7 @@ class _PlayerScreenState extends State<PlayerScreen>
           return; // 时间间隔不够，跳过保存
         }
         // 检查进度是否发生变化（允许1秒的误差）
-        if (_lastSavePosition != null &&
-            playTime == _lastSavePosition!) {
+        if (_lastSavePosition != null && playTime == _lastSavePosition!) {
           return; // 进度没有明显变化，跳过保存
         }
       }
@@ -590,6 +590,17 @@ class _PlayerScreenState extends State<PlayerScreen>
   Future<void> updateVideoUrl(String newUrl, {Duration? startAt}) async {
     print("newUrl: $newUrl, startAt: $startAt");
     try {
+      // 获取 M3U8 代理 URL
+      final m3u8ProxyUrl = await UserDataService.getM3u8ProxyUrl();
+
+      // 如果代理 URL 不为空，则将 newUrl encode 后拼接到代理 URL 后面
+      String finalUrl = newUrl;
+      if (m3u8ProxyUrl.isNotEmpty) {
+        final encodedUrl = Uri.encodeComponent(newUrl);
+        finalUrl = '$m3u8ProxyUrl$encodedUrl';
+        print("使用 M3U8 代理: $finalUrl");
+      }
+
       if (_isCasting) {
         // 构建标题：{title} - {第 x 集} - {sourceName}
         // 如果总集数为 1，则不显示集数
@@ -602,15 +613,15 @@ class _PlayerScreenState extends State<PlayerScreen>
           formattedTitle = '$videoTitle - $sourceName';
         }
         // 投屏状态：调用 DLNA 播放器的 updateVideoUrl
-        _dlnaPlayerController?.updateVideoUrl(newUrl, formattedTitle,
+        _dlnaPlayerController?.updateVideoUrl(finalUrl, formattedTitle,
             startAt: startAt);
       } else {
         // 本地播放：根据设备类型调用对应播放器的 updateDataSource
         if (DeviceUtils.isPC()) {
-          await _pcVideoPlayerController?.updateDataSource(newUrl,
+          await _pcVideoPlayerController?.updateDataSource(finalUrl,
               startAt: startAt);
         } else {
-          await _mobileVideoPlayerController?.updateDataSource(newUrl,
+          await _mobileVideoPlayerController?.updateDataSource(finalUrl,
               startAt: startAt);
         }
       }

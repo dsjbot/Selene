@@ -7,6 +7,7 @@ class UserDataService {
   static const String _cookiesKey = 'cookies';
   static const String _doubanDataSourceKey = 'douban_data_source';
   static const String _doubanImageSourceKey = 'douban_image_source';
+  static const String _m3u8ProxyUrlKey = 'm3u8_proxy_url';
 
   // 保存用户登录信息
   static Future<void> saveUserData({
@@ -193,5 +194,17 @@ class UserDataService {
       default:
         return '直连';
     }
+  }
+
+  // 保存 M3U8 代理 URL
+  static Future<void> saveM3u8ProxyUrl(String url) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_m3u8ProxyUrlKey, url);
+  }
+
+  // 获取 M3U8 代理 URL
+  static Future<String> getM3u8ProxyUrl() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_m3u8ProxyUrlKey) ?? '';
   }
 }
