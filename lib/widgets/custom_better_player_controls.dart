@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:awesome_video_player/awesome_video_player.dart';
 import 'package:volume_controller/volume_controller.dart';
+import 'package:screen_brightness/screen_brightness.dart';
 import 'mobile_video_player_widget.dart';
 import 'dlna_device_dialog.dart';
 
@@ -68,6 +69,9 @@ class _CustomBetterPlayerControlsState
   double _currentVolume = 0.5;
   bool _showVolumeIndicator = false;
   Timer? _volumeHideTimer;
+  double _currentBrightness = 0.5;
+  bool _showBrightnessIndicator = false;
+  Timer? _brightnessHideTimer;
 
   @override
   void initState() {
@@ -75,6 +79,7 @@ class _CustomBetterPlayerControlsState
     widget.controller.addEventsListener(_onVideoStateChanged);
     widget.controller.videoPlayerController?.addListener(_onVideoPlayerUpdate);
     _initVolume();
+    _initBrightness();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _forceStartHideTimer();
@@ -95,6 +100,20 @@ class _CustomBetterPlayerControlsState
     } catch (e) {
       // 如果获取音量失败，使用默认值
       _currentVolume = 0.5;
+    }
+  }
+
+  Future<void> _initBrightness() async {
+    try {
+      final brightness = await ScreenBrightness().current;
+      if (mounted) {
+        setState(() {
+          _currentBrightness = brightness;
+        });
+      }
+    } catch (e) {
+      // 如果获取亮度失败，使用默认值
+      _currentBrightness = 0.5;
     }
   }
 
@@ -218,6 +237,7 @@ class _CustomBetterPlayerControlsState
   void dispose() {
     _hideTimer?.cancel();
     _volumeHideTimer?.cancel();
+    _brightnessHideTimer?.cancel();
     // 恢复系统音量UI显示
     VolumeController.instance.showSystemUI = true;
     widget.controller.videoPlayerController
@@ -421,6 +441,48 @@ class _CustomBetterPlayerControlsState
     });
   }
 
+  void _onBrightnessSwipeStart(DragStartDetails details) {
+    if (!mounted || _isLocked) return;
+    _brightnessHideTimer?.cancel();
+    _hideTimer?.cancel(); // 取消 controls 自动隐藏
+    setState(() {
+      _controlsVisible = true; // 确保 controls 显示
+    });
+  }
+
+  void _onBrightnessSwipeUpdate(DragUpdateDetails details) {
+    if (!mounted || _isLocked) return;
+
+    final screenHeight = MediaQuery.of(context).size.height;
+    final deltaY = details.delta.dy;
+    final brightnessChange = -(deltaY / screenHeight) * 2; // 负号因为向上滑动是负值
+
+    setState(() {
+      _currentBrightness = (_currentBrightness + brightnessChange).clamp(0.0, 1.0);
+      _showBrightnessIndicator = true;
+    });
+
+    ScreenBrightness().setScreenBrightness(_currentBrightness);
+    _startBrightnessHideTimer();
+  }
+
+  void _onBrightnessSwipeEnd(DragEndDetails details) {
+    if (!mounted || _isLocked) return;
+    _startBrightnessHideTimer();
+    _startHideTimer(); // 重新启动 controls 自动隐藏计时器
+  }
+
+  void _startBrightnessHideTimer() {
+    _brightnessHideTimer?.cancel();
+    _brightnessHideTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) {
+        setState(() {
+          _showBrightnessIndicator = false;
+        });
+      }
+    });
+  }
+
   void _exitFullscreen() {
     if (!mounted) return;
     widget.onFullscreenChange(false);
@@ -522,9 +584,41 @@ class _CustomBetterPlayerControlsState
           Positioned.fill(
             child: Row(
               children: [
-                // 左侧和中间区域 - 处理长按和水平滑动
+                // 左侧区域 - 处理亮度调节和通用手势（仅在全屏时）
+                if (isFullscreen)
+                  Expanded(
+                    flex: 1,
+                    child: GestureDetector(
+                      onLongPressStart:
+                          (_isInPipMode || _isLocked) ? null : _onLongPressStart,
+                      onLongPressEnd:
+                          (_isInPipMode || _isLocked) ? null : _onLongPressEnd,
+                      onLongPressCancel: (_isInPipMode || _isLocked)
+                          ? null
+                          : () {
+                              if (_isLongPressing) {
+                                _onLongPressEnd(const LongPressEndDetails());
+                              }
+                            },
+                      onVerticalDragStart: _onBrightnessSwipeStart,
+                      onVerticalDragUpdate: _onBrightnessSwipeUpdate,
+                      onVerticalDragEnd: _onBrightnessSwipeEnd,
+                      onHorizontalDragStart:
+                          (_isInPipMode || _isLocked) ? null : _onSwipeStart,
+                      onHorizontalDragUpdate:
+                          (_isInPipMode || _isLocked) ? null : _onSwipeUpdate,
+                      onHorizontalDragEnd:
+                          (_isInPipMode || _isLocked) ? null : _onSwipeEnd,
+                      onTap: _isInPipMode ? null : _onBlankAreaTap,
+                      behavior: HitTestBehavior.opaque,
+                      child: Container(
+                        color: Colors.transparent,
+                      ),
+                    ),
+                  ),
+                // 中间区域 - 处理长按和水平滑动
                 Expanded(
-                  flex: isFullscreen ? 3 : 1,
+                  flex: isFullscreen ? 2 : 1,
                   child: GestureDetector(
                     onLongPressStart:
                         (_isInPipMode || _isLocked) ? null : _onLongPressStart,
@@ -550,14 +644,31 @@ class _CustomBetterPlayerControlsState
                     ),
                   ),
                 ),
-                // 右侧区域 - 处理音量调节（仅在全屏时）
+                // 右侧区域 - 处理音量调节和通用手势（仅在全屏时）
                 if (isFullscreen)
                   Expanded(
                     flex: 1,
                     child: GestureDetector(
+                      onLongPressStart:
+                          (_isInPipMode || _isLocked) ? null : _onLongPressStart,
+                      onLongPressEnd:
+                          (_isInPipMode || _isLocked) ? null : _onLongPressEnd,
+                      onLongPressCancel: (_isInPipMode || _isLocked)
+                          ? null
+                          : () {
+                              if (_isLongPressing) {
+                                _onLongPressEnd(const LongPressEndDetails());
+                              }
+                            },
                       onVerticalDragStart: _onVolumeSwipeStart,
                       onVerticalDragUpdate: _onVolumeSwipeUpdate,
                       onVerticalDragEnd: _onVolumeSwipeEnd,
+                      onHorizontalDragStart:
+                          (_isInPipMode || _isLocked) ? null : _onSwipeStart,
+                      onHorizontalDragUpdate:
+                          (_isInPipMode || _isLocked) ? null : _onSwipeUpdate,
+                      onHorizontalDragEnd:
+                          (_isInPipMode || _isLocked) ? null : _onSwipeEnd,
                       onTap: _isInPipMode ? null : _onBlankAreaTap,
                       behavior: HitTestBehavior.opaque,
                       child: Container(
@@ -592,6 +703,72 @@ class _CustomBetterPlayerControlsState
                     size: isFullscreen ? 32 : 28,
                   ),
                 ],
+              ),
+            ),
+          // 左侧亮度指示器 - 在全屏时显示
+          if (isFullscreen && _showBrightnessIndicator && !_isLocked)
+            Positioned(
+              left: 16.0,
+              top: 0,
+              bottom: 0,
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.7),
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _currentBrightness < 0.5
+                            ? Icons.brightness_low
+                            : Icons.brightness_high,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        height: 100,
+                        width: 4,
+                        child: Stack(
+                          children: [
+                            // 背景
+                            Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.3),
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                            // 当前亮度
+                            Align(
+                              alignment: Alignment.bottomCenter,
+                              child: FractionallySizedBox(
+                                heightFactor: _currentBrightness,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(2),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '${(_currentBrightness * 100).round()}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           // 全屏锁定按钮和音量指示器 - 在全屏时显示（同一位置）

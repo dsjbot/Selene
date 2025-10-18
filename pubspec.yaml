@@ -63,6 +63,7 @@ dependencies:
   package_info_plus: ^8.0.0
   bitsdojo_window: ^0.1.6
   volume_controller: ^3.4.0
+  screen_brightness: ^2.1.7
 
 dev_dependencies:
   flutter_test:
