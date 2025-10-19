@@ -31,6 +31,7 @@ class _UserMenuState extends State<UserMenu> {
   String _doubanImageSource = '直连';
   String _m3u8ProxyUrl = '';
   String _version = '';
+  bool _preferSpeedTest = true;
 
   @override
   void initState() {
@@ -56,6 +57,7 @@ class _UserMenuState extends State<UserMenu> {
     final doubanImageSource =
         await UserDataService.getDoubanImageSourceDisplayName();
     final m3u8ProxyUrl = await UserDataService.getM3u8ProxyUrl();
+    final preferSpeedTest = await UserDataService.getPreferSpeedTest();
 
     if (mounted) {
       setState(() {
@@ -64,6 +66,7 @@ class _UserMenuState extends State<UserMenu> {
         _doubanDataSource = doubanDataSource;
         _doubanImageSource = doubanImageSource;
         _m3u8ProxyUrl = m3u8ProxyUrl;
+        _preferSpeedTest = preferSpeedTest;
       });
     }
   }
@@ -203,8 +206,8 @@ class _UserMenuState extends State<UserMenu> {
         onTap: () => _showOptionDialog(title, currentValue, options, onChanged),
         child: Container(
           padding: const EdgeInsets.symmetric(
-            horizontal: 20,
-            vertical: 16,
+            horizontal: 16,
+            vertical: 10,
           ),
           child: Row(
             children: [
@@ -444,8 +447,8 @@ class _UserMenuState extends State<UserMenu> {
         onTap: onTap,
         child: Container(
           padding: const EdgeInsets.symmetric(
-            horizontal: 20,
-            vertical: 16,
+            horizontal: 16,
+            vertical: 10,
           ),
           child: Row(
             children: [
@@ -496,6 +499,96 @@ class _UserMenuState extends State<UserMenu> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildToggleOption({
+    required String title,
+    required String subtitle,
+    required bool value,
+    required Future<void> Function(bool) onChanged,
+    required IconData icon,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 10,
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              size: 20,
+              color: widget.isDarkMode
+                  ? const Color(0xFF9ca3af)
+                  : const Color(0xFF6b7280),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: FontUtils.poppins(
+                      fontSize: 16,
+                      color: widget.isDarkMode
+                          ? const Color(0xFFffffff)
+                          : const Color(0xFF1f2937),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: FontUtils.poppins(
+                      fontSize: 12,
+                      color: widget.isDarkMode
+                          ? const Color(0xFF9ca3af)
+                          : const Color(0xFF6b7280),
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            GestureDetector(
+              onTap: () async {
+                await onChanged(!value);
+                setState(() {});
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 44,
+                height: 24,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  color: value
+                      ? const Color(0xFF10b981)
+                      : (widget.isDarkMode
+                          ? const Color(0xFF374151)
+                          : const Color(0xFFe5e7eb)),
+                ),
+                child: AnimatedAlign(
+                  duration: const Duration(milliseconds: 200),
+                  alignment: value ? Alignment.centerRight : Alignment.centerLeft,
+                  child: Container(
+                    width: 20,
+                    height: 20,
+                    margin: const EdgeInsets.symmetric(horizontal: 2),
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -641,6 +734,26 @@ class _UserMenuState extends State<UserMenu> {
                           ? const Color(0xFF374151)
                           : const Color(0xFFe5e7eb),
                     ),
+                    // 优选测速选项
+                    _buildToggleOption(
+                      title: '优选测速',
+                      subtitle: _preferSpeedTest ? '已开启' : '已关闭',
+                      value: _preferSpeedTest,
+                      onChanged: (value) async {
+                        await UserDataService.savePreferSpeedTest(value);
+                        setState(() {
+                          _preferSpeedTest = value;
+                        });
+                      },
+                      icon: LucideIcons.zap,
+                    ),
+                    // 分割线
+                    Container(
+                      height: 1,
+                      color: widget.isDarkMode
+                          ? const Color(0xFF374151)
+                          : const Color(0xFFe5e7eb),
+                    ),
                     // 清除豆瓣缓存按钮
                     Material(
                       color: Colors.transparent,
@@ -648,8 +761,8 @@ class _UserMenuState extends State<UserMenu> {
                         onTap: _handleClearDoubanCache,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 16,
+                            horizontal: 16,
+                            vertical: 10,
                           ),
                           child: Row(
                             children: [
@@ -688,8 +801,8 @@ class _UserMenuState extends State<UserMenu> {
                         onTap: _handleLogout,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 16,
+                            horizontal: 16,
+                            vertical: 10,
                           ),
                           child: Row(
                             children: [

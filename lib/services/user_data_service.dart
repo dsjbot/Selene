@@ -8,6 +8,7 @@ class UserDataService {
   static const String _doubanDataSourceKey = 'douban_data_source';
   static const String _doubanImageSourceKey = 'douban_image_source';
   static const String _m3u8ProxyUrlKey = 'm3u8_proxy_url';
+  static const String _preferSpeedTestKey = 'prefer_speed_test';
 
   // 保存用户登录信息
   static Future<void> saveUserData({
@@ -206,5 +207,17 @@ class UserDataService {
   static Future<String> getM3u8ProxyUrl() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_m3u8ProxyUrlKey) ?? '';
+  }
+
+  // 保存优选测速设置
+  static Future<void> savePreferSpeedTest(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_preferSpeedTestKey, enabled);
+  }
+
+  // 获取优选测速设置（默认为 true）
+  static Future<bool> getPreferSpeedTest() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_preferSpeedTestKey) ?? true;
   }
 }

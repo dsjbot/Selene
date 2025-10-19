@@ -80,7 +80,6 @@ class PlayerDetailsPanel extends StatelessWidget {
     final List<String> languages = doubanDetails!.languages;
     final String? duration = doubanDetails!.duration;
     final String? originalTitle = doubanDetails!.originalTitle;
-    final String? releaseDate = doubanDetails!.releaseDate;
     final int? totalEpisodes = doubanDetails!.totalEpisodes;
 
     return SingleChildScrollView(
@@ -178,15 +177,6 @@ class PlayerDetailsPanel extends StatelessWidget {
                             ),
                             const SizedBox(height: 4),
                           ],
-                          if (releaseDate != null)
-                            Text(
-                              releaseDate,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: isDarkMode
-                                    ? Colors.grey[400]
-                                    : Colors.grey[600],
-                              ),
-                            ),
                         ],
                       ),
                     ],

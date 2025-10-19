@@ -200,9 +200,12 @@ class _PlayerScreenState extends State<PlayerScreen>
       return;
     }
 
-    if (widget.source != null &&
+    // 读取优选测速配置
+    final preferSpeedTest = await UserDataService.getPreferSpeedTest();
+
+    if (!preferSpeedTest || (widget.source != null &&
         widget.id != null &&
-        (widget.prefer == null || widget.prefer != 'true')) {
+        (widget.prefer == null || widget.prefer != 'true'))) {
       updateLoadingMessage('正在获取播放源详情...');
       updateLoadingProgress(0.5);
       updateLoadingEmoji('🔍');
@@ -241,8 +244,9 @@ class _PlayerScreenState extends State<PlayerScreen>
       return;
     }
 
-    // 未指定源和 id/需要优选，执行优选
-    if (currentSource.isEmpty || currentID.isEmpty || needPrefer) {
+    // 未指定源和 id/需要优选，且优选测速开关打开时，执行优选
+    if ((currentSource.isEmpty || currentID.isEmpty || needPrefer) &&
+        preferSpeedTest) {
       updateLoadingMessage('正在优选最佳播放源...');
       updateLoadingProgress(0.66);
       updateLoadingEmoji('⚡');
