@@ -1541,13 +1541,14 @@ class _SearchScreenState extends State<SearchScreen>
         isScrollControlled: true,
         builder: (context) {
           final screenWidth = MediaQuery.of(context).size.width;
+          final modalWidth = DeviceUtils.isTablet(context)? screenWidth * 0.5 : screenWidth;
           const horizontalPadding = 16.0;
           const spacing = 10.0;
           final itemWidth =
-              (screenWidth - horizontalPadding * 2 - spacing * 2) / 3;
+              (modalWidth - horizontalPadding * 2 - spacing * 2) / 3;
 
           return Container(
-            width: double.infinity, // 设置宽度为100%
+            width: DeviceUtils.isTablet(context)? modalWidth : double.infinity, // 设置宽度为100%
             decoration: BoxDecoration(
               color: Theme.of(context).scaffoldBackgroundColor,
               borderRadius: const BorderRadius.only(
