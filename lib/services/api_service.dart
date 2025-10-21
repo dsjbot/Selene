@@ -6,6 +6,7 @@ import '../screens/login_screen.dart';
 import '../models/favorite_item.dart';
 import '../models/search_result.dart';
 import '../models/play_record.dart';
+import '../models/search_resource.dart';
 
 /// API响应结果类
 class ApiResponse<T> {
@@ -41,7 +42,7 @@ class ApiResponse<T> {
 /// 通用API请求服务
 class ApiService {
   static const Duration _timeout = Duration(seconds: 30);
-  
+
   /// 获取基础URL
   static Future<String?> _getBaseUrl() async {
     return await UserDataService.getServerUrl();
@@ -58,11 +59,13 @@ class ApiService {
     if (baseUrl == null) {
       throw Exception('服务器地址未配置，请先登录');
     }
-    
+
     // 确保baseUrl不以/结尾，endpoint以/开头
-    String cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+    String cleanBaseUrl = baseUrl.endsWith('/')
+        ? baseUrl.substring(0, baseUrl.length - 1)
+        : baseUrl;
     String cleanEndpoint = endpoint.startsWith('/') ? endpoint : '/$endpoint';
-    
+
     return '$cleanBaseUrl$cleanEndpoint';
   }
 
@@ -102,7 +105,7 @@ class ApiService {
     if (response.statusCode == 401) {
       // 清除用户数据
       await UserDataService.clearUserData();
-      
+
       // 跳转到登录页
       if (context != null) {
         Navigator.of(context).pushAndRemoveUntil(
@@ -110,7 +113,7 @@ class ApiService {
           (route) => false,
         );
       }
-      
+
       return ApiResponse.error(
         '登录已过期，请重新登录',
         statusCode: 401,
@@ -122,7 +125,8 @@ class ApiService {
       String errorMessage = '请求失败';
       try {
         final errorData = json.decode(response.body);
-        errorMessage = errorData['message'] ?? errorData['error'] ?? errorMessage;
+        errorMessage =
+            errorData['message'] ?? errorData['error'] ?? errorMessage;
       } catch (e) {
         // 如果解析失败，使用默认错误信息
         switch (response.statusCode) {
@@ -142,7 +146,7 @@ class ApiService {
             errorMessage = '网络请求失败 (${response.statusCode})';
         }
       }
-      
+
       return ApiResponse.error(
         errorMessage,
         statusCode: response.statusCode,
@@ -152,12 +156,13 @@ class ApiService {
     // 处理成功响应
     try {
       final responseData = json.decode(response.body);
-      
+
       if (fromJson != null) {
         final data = fromJson(responseData);
         return ApiResponse.success(data, statusCode: response.statusCode);
       } else {
-        return ApiResponse.success(responseData as T, statusCode: response.statusCode);
+        return ApiResponse.success(responseData as T,
+            statusCode: response.statusCode);
       }
     } catch (e) {
       return ApiResponse.error(
@@ -177,7 +182,7 @@ class ApiService {
   }) async {
     try {
       String url = await _buildUrl(endpoint);
-      
+
       // 添加查询参数
       if (queryParameters != null && queryParameters.isNotEmpty) {
         final uri = Uri.parse(url);
@@ -186,11 +191,13 @@ class ApiService {
       }
 
       final requestHeaders = await _buildHeaders(additionalHeaders: headers);
-      
-      final response = await http.get(
-        Uri.parse(url),
-        headers: requestHeaders,
-      ).timeout(_timeout);
+
+      final response = await http
+          .get(
+            Uri.parse(url),
+            headers: requestHeaders,
+          )
+          .timeout(_timeout);
 
       return await _handleResponse(response, fromJson, context);
     } catch (e) {
@@ -209,12 +216,14 @@ class ApiService {
     try {
       final url = await _buildUrl(endpoint);
       final requestHeaders = await _buildHeaders(additionalHeaders: headers);
-      
-      final response = await http.post(
-        Uri.parse(url),
-        headers: requestHeaders,
-        body: body != null ? json.encode(body) : null,
-      ).timeout(_timeout);
+
+      final response = await http
+          .post(
+            Uri.parse(url),
+            headers: requestHeaders,
+            body: body != null ? json.encode(body) : null,
+          )
+          .timeout(_timeout);
 
       return await _handleResponse(response, fromJson, context);
     } catch (e) {
@@ -233,12 +242,14 @@ class ApiService {
     try {
       final url = await _buildUrl(endpoint);
       final requestHeaders = await _buildHeaders(additionalHeaders: headers);
-      
-      final response = await http.put(
-        Uri.parse(url),
-        headers: requestHeaders,
-        body: body != null ? json.encode(body) : null,
-      ).timeout(_timeout);
+
+      final response = await http
+          .put(
+            Uri.parse(url),
+            headers: requestHeaders,
+            body: body != null ? json.encode(body) : null,
+          )
+          .timeout(_timeout);
 
       return await _handleResponse(response, fromJson, context);
     } catch (e) {
@@ -256,11 +267,13 @@ class ApiService {
     try {
       final url = await _buildUrl(endpoint);
       final requestHeaders = await _buildHeaders(additionalHeaders: headers);
-      
-      final response = await http.delete(
-        Uri.parse(url),
-        headers: requestHeaders,
-      ).timeout(_timeout);
+
+      final response = await http
+          .delete(
+            Uri.parse(url),
+            headers: requestHeaders,
+          )
+          .timeout(_timeout);
 
       return await _handleResponse(response, fromJson, context);
     } catch (e) {
@@ -283,24 +296,24 @@ class ApiService {
         additionalHeaders: headers,
         includeAuth: true,
       );
-      
+
       // 移除Content-Type，让http包自动设置multipart的Content-Type
       requestHeaders.remove('Content-Type');
-      
+
       final request = http.MultipartRequest('POST', Uri.parse(url));
       request.headers.addAll(requestHeaders);
-      
+
       // 添加文件
       request.files.add(await http.MultipartFile.fromPath('file', filePath));
-      
+
       // 添加其他字段
       if (fields != null) {
         request.fields.addAll(fields);
       }
-      
+
       final streamedResponse = await request.send().timeout(_timeout);
       final response = await http.Response.fromStream(streamedResponse);
-      
+
       return await _handleResponse(response, fromJson, context);
     } catch (e) {
       return ApiResponse.error('文件上传异常: ${e.toString()}');
@@ -308,7 +321,8 @@ class ApiService {
   }
 
   /// 获取收藏夹列表
-  static Future<ApiResponse<List<FavoriteItem>>> getFavorites(BuildContext context) async {
+  static Future<ApiResponse<List<FavoriteItem>>> getFavorites(
+      BuildContext context) async {
     try {
       final baseUrl = await _getBaseUrl();
       if (baseUrl == null) {
@@ -331,15 +345,15 @@ class ApiService {
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(response.body);
         final List<FavoriteItem> favorites = [];
-        
+
         // 将Map转换为List并按save_time降序排序
         data.forEach((id, itemData) {
           favorites.add(FavoriteItem.fromJson(id, itemData));
         });
-        
+
         // 按save_time降序排序
         favorites.sort((a, b) => b.saveTime.compareTo(a.saveTime));
-        
+
         return ApiResponse.success(favorites, statusCode: response.statusCode);
       } else if (response.statusCode == 401) {
         // 未授权，跳转到登录页面
@@ -348,9 +362,11 @@ class ApiService {
             MaterialPageRoute(builder: (context) => const LoginScreen()),
           );
         }
-        return ApiResponse.error('登录已过期，请重新登录', statusCode: response.statusCode);
+        return ApiResponse.error('登录已过期，请重新登录',
+            statusCode: response.statusCode);
       } else {
-        return ApiResponse.error('获取收藏夹失败: ${response.statusCode}', statusCode: response.statusCode);
+        return ApiResponse.error('获取收藏夹失败: ${response.statusCode}',
+            statusCode: response.statusCode);
       }
     } catch (e) {
       return ApiResponse.error('获取收藏夹异常: ${e.toString()}');
@@ -358,16 +374,18 @@ class ApiService {
   }
 
   /// 获取搜索历史
-  static Future<ApiResponse<List<String>>> getSearchHistory(BuildContext context) async {
+  static Future<ApiResponse<List<String>>> getSearchHistory(
+      BuildContext context) async {
     try {
       final response = await get<List<String>>(
         '/api/searchhistory',
         context: context,
         fromJson: (data) => (data as List).cast<String>(),
       );
-      
+
       if (response.success && response.data != null) {
-        return ApiResponse.success(response.data!, statusCode: response.statusCode);
+        return ApiResponse.success(response.data!,
+            statusCode: response.statusCode);
       } else {
         return ApiResponse.error(response.message ?? '获取搜索历史失败');
       }
@@ -377,14 +395,15 @@ class ApiService {
   }
 
   /// 添加搜索历史
-  static Future<ApiResponse<void>> addSearchHistory(String query, BuildContext context) async {
+  static Future<ApiResponse<void>> addSearchHistory(
+      String query, BuildContext context) async {
     try {
       final response = await post<void>(
         '/api/searchhistory',
         context: context,
         body: {'keyword': query},
       );
-      
+
       return response;
     } catch (e) {
       return ApiResponse.error('添加搜索历史异常: ${e.toString()}');
@@ -392,13 +411,14 @@ class ApiService {
   }
 
   /// 清空搜索历史
-  static Future<ApiResponse<void>> clearSearchHistory(BuildContext context) async {
+  static Future<ApiResponse<void>> clearSearchHistory(
+      BuildContext context) async {
     try {
       final response = await delete<void>(
         '/api/searchhistory',
         context: context,
       );
-      
+
       return response;
     } catch (e) {
       return ApiResponse.error('清空搜索历史异常: ${e.toString()}');
@@ -406,14 +426,15 @@ class ApiService {
   }
 
   /// 删除单个搜索历史
-  static Future<ApiResponse<void>> deleteSearchHistory(String query, BuildContext context) async {
+  static Future<ApiResponse<void>> deleteSearchHistory(
+      String query, BuildContext context) async {
     try {
       final encodedQuery = Uri.encodeComponent(query);
       final response = await delete<void>(
         '/api/searchhistory?keyword=$encodedQuery',
         context: context,
       );
-      
+
       return response;
     } catch (e) {
       return ApiResponse.error('删除搜索历史异常: ${e.toString()}');
@@ -421,7 +442,8 @@ class ApiService {
   }
 
   /// 保存播放记录
-  static Future<ApiResponse<void>> savePlayRecord(PlayRecord playRecord, BuildContext context) async {
+  static Future<ApiResponse<void>> savePlayRecord(
+      PlayRecord playRecord, BuildContext context) async {
     try {
       // 构建正确的请求体格式
       final key = '${playRecord.source}+${playRecord.id}';
@@ -429,13 +451,13 @@ class ApiService {
         'key': key,
         'record': playRecord.toJson(),
       };
-      
+
       final response = await post<void>(
         '/api/playrecords',
         body: body,
         context: context,
       );
-      
+
       return response;
     } catch (e) {
       return ApiResponse.error('保存播放记录异常: ${e.toString()}');
@@ -443,7 +465,8 @@ class ApiService {
   }
 
   /// 删除播放记录
-  static Future<ApiResponse<void>> deletePlayRecord(String source, String id, BuildContext context) async {
+  static Future<ApiResponse<void>> deletePlayRecord(
+      String source, String id, BuildContext context) async {
     try {
       final key = '$source+$id';
       final encodedKey = Uri.encodeComponent(key);
@@ -451,7 +474,7 @@ class ApiService {
         '/api/playrecords?key=$encodedKey',
         context: context,
       );
-      
+
       return response;
     } catch (e) {
       return ApiResponse.error('删除播放记录异常: ${e.toString()}');
@@ -459,20 +482,21 @@ class ApiService {
   }
 
   /// 添加收藏
-  static Future<ApiResponse<void>> favorite(String source, String id, Map<String, dynamic> favoriteData, BuildContext context) async {
+  static Future<ApiResponse<void>> favorite(String source, String id,
+      Map<String, dynamic> favoriteData, BuildContext context) async {
     try {
       final key = '$source+$id';
       final body = {
         'key': key,
         'favorite': favoriteData,
       };
-      
+
       final response = await post<void>(
         '/api/favorites',
         body: body,
         context: context,
       );
-      
+
       return response;
     } catch (e) {
       return ApiResponse.error('收藏异常: ${e.toString()}');
@@ -480,7 +504,8 @@ class ApiService {
   }
 
   /// 取消收藏
-  static Future<ApiResponse<void>> unfavorite(String source, String id, BuildContext context) async {
+  static Future<ApiResponse<void>> unfavorite(
+      String source, String id, BuildContext context) async {
     try {
       final key = '$source+$id';
       final encodedKey = Uri.encodeComponent(key);
@@ -488,7 +513,7 @@ class ApiService {
         '/api/favorites?key=$encodedKey',
         context: context,
       );
-      
+
       return response;
     } catch (e) {
       return ApiResponse.error('取消收藏异常: ${e.toString()}');
@@ -500,12 +525,12 @@ class ApiService {
     try {
       final baseUrl = await _getBaseUrl();
       if (baseUrl == null) return false;
-      
+
       final response = await http.get(
         Uri.parse('$baseUrl/api/health'),
         headers: {'Accept': 'application/json'},
       ).timeout(const Duration(seconds: 5));
-      
+
       return response.statusCode == 200;
     } catch (e) {
       return false;
@@ -519,34 +544,36 @@ class ApiService {
       final serverUrl = await UserDataService.getServerUrl();
       final username = await UserDataService.getUsername();
       final password = await UserDataService.getPassword();
-      
+
       if (serverUrl == null || username == null || password == null) {
         return ApiResponse.error('缺少登录信息');
       }
-      
+
       // 处理 URL
       String baseUrl = serverUrl.trim();
       if (baseUrl.endsWith('/')) {
         baseUrl = baseUrl.substring(0, baseUrl.length - 1);
       }
       String loginUrl = '$baseUrl/api/login';
-      
+
       // 发送登录请求
-      final response = await http.post(
-        Uri.parse(loginUrl),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: json.encode({
-          'username': username,
-          'password': password,
-        }),
-      ).timeout(_timeout);
-      
+      final response = await http
+          .post(
+            Uri.parse(loginUrl),
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: json.encode({
+              'username': username,
+              'password': password,
+            }),
+          )
+          .timeout(_timeout);
+
       if (response.statusCode == 200) {
         // 解析并保存 cookies
         String cookies = _parseCookies(response);
-        
+
         // 更新 cookies
         await UserDataService.saveUserData(
           serverUrl: baseUrl,
@@ -554,7 +581,7 @@ class ApiService {
           password: password,
           cookies: cookies,
         );
-        
+
         return ApiResponse.success('自动登录成功', statusCode: response.statusCode);
       } else {
         return ApiResponse.error(
@@ -568,7 +595,8 @@ class ApiService {
   }
 
   /// 获取视频详情
-  static Future<List<SearchResult>> fetchSourceDetail(String source, String id) async {
+  static Future<List<SearchResult>> fetchSourceDetail(
+      String source, String id) async {
     try {
       final response = await get<SearchResult>(
         '/api/detail',
@@ -578,7 +606,7 @@ class ApiService {
         },
         fromJson: (data) => SearchResult.fromJson(data as Map<String, dynamic>),
       );
-      
+
       if (response.success && response.data != null) {
         return [response.data!];
       } else {
@@ -601,11 +629,11 @@ class ApiService {
         },
         fromJson: (data) => data as Map<String, dynamic>,
       );
-      
+
       if (response.success && response.data != null) {
         final data = response.data!;
         final results = data['results'] as List<dynamic>? ?? [];
-        
+
         // 直接返回所有搜索结果，不进行过滤
         return results
             .map((item) => SearchResult.fromJson(item as Map<String, dynamic>))
@@ -620,10 +648,36 @@ class ApiService {
     }
   }
 
+  /// 获取搜索资源列表
+  static Future<List<SearchResource>> getSearchResources() async {
+    try {
+      final response = await get<List<SearchResource>>(
+        '/api/search/resources',
+        fromJson: (data) {
+          final list = data as List<dynamic>;
+          return list
+              .map((item) =>
+                  SearchResource.fromJson(item as Map<String, dynamic>))
+              .toList();
+        },
+      );
+
+      if (response.success && response.data != null) {
+        return response.data!;
+      } else {
+        print('获取搜索源失败: ${response.message}');
+        return [];
+      }
+    } catch (e) {
+      print('获取搜索源失败: $e');
+      return [];
+    }
+  }
+
   /// 解析 Set-Cookie 头部
   static String _parseCookies(http.Response response) {
     List<String> cookies = [];
-    
+
     // 获取所有 Set-Cookie 头部
     final setCookieHeaders = response.headers['set-cookie'];
     if (setCookieHeaders != null) {
@@ -633,7 +687,7 @@ class ApiService {
         cookies.add(cookieParts[0].trim());
       }
     }
-    
+
     return cookies.join('; ');
   }
 }

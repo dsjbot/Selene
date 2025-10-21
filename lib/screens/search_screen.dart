@@ -79,7 +79,6 @@ class _SearchScreenState extends State<SearchScreen>
   StreamSubscription<List<SearchResult>>? _incrementalResultsSubscription;
   StreamSubscription<SearchProgress>? _progressSubscription;
   StreamSubscription<String>? _errorSubscription;
-  StreamSubscription<SearchEvent>? _eventSubscription;
 
   List<SearchResult> get _filteredSearchResults {
     List<SearchResult> results = List.from(_searchResults);
@@ -192,7 +191,6 @@ class _SearchScreenState extends State<SearchScreen>
     _incrementalResultsSubscription?.cancel();
     _progressSubscription?.cancel();
     _errorSubscription?.cancel();
-    _eventSubscription?.cancel();
     _updateTimer?.cancel();
     _searchService.dispose();
     _deleteAnimationController?.dispose();
@@ -205,24 +203,6 @@ class _SearchScreenState extends State<SearchScreen>
     _incrementalResultsSubscription?.cancel();
     _progressSubscription?.cancel();
     _errorSubscription?.cancel();
-    _eventSubscription?.cancel();
-
-    // 监听搜索事件
-    _eventSubscription = _searchService.eventStream.listen((event) {
-      if (mounted) {
-        if (event is SearchStartEvent) {
-          setState(() {
-            _hasReceivedStart = true;
-          });
-        } else if (event is SearchSourceErrorEvent ||
-            event is SearchSourceResultEvent) {
-          // 收到源错误或源结果事件时，确保已标记为收到start消息
-          setState(() {
-            _hasReceivedStart = true;
-          });
-        }
-      }
-    });
 
     // 监听增量搜索结果
     _incrementalResultsSubscription =
@@ -253,6 +233,7 @@ class _SearchScreenState extends State<SearchScreen>
       if (mounted) {
         setState(() {
           _searchProgress = progress;
+          _hasReceivedStart = true;
         });
       }
     });

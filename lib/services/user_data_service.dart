@@ -9,6 +9,7 @@ class UserDataService {
   static const String _doubanImageSourceKey = 'douban_image_source';
   static const String _m3u8ProxyUrlKey = 'm3u8_proxy_url';
   static const String _preferSpeedTestKey = 'prefer_speed_test';
+  static const String _localSearchKey = 'local_search';
 
   // 保存用户登录信息
   static Future<void> saveUserData({
@@ -219,5 +220,17 @@ class UserDataService {
   static Future<bool> getPreferSpeedTest() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getBool(_preferSpeedTestKey) ?? true;
+  }
+
+  // 保存本地搜索设置
+  static Future<void> saveLocalSearch(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_localSearchKey, enabled);
+  }
+
+  // 获取本地搜索设置（默认为 false）
+  static Future<bool> getLocalSearch() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_localSearchKey) ?? false;
   }
 }

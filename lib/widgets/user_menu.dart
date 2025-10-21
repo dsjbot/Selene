@@ -32,6 +32,7 @@ class _UserMenuState extends State<UserMenu> {
   String _m3u8ProxyUrl = '';
   String _version = '';
   bool _preferSpeedTest = true;
+  bool _localSearch = false;
 
   @override
   void initState() {
@@ -58,6 +59,7 @@ class _UserMenuState extends State<UserMenu> {
         await UserDataService.getDoubanImageSourceDisplayName();
     final m3u8ProxyUrl = await UserDataService.getM3u8ProxyUrl();
     final preferSpeedTest = await UserDataService.getPreferSpeedTest();
+    final localSearch = await UserDataService.getLocalSearch();
 
     if (mounted) {
       setState(() {
@@ -67,6 +69,7 @@ class _UserMenuState extends State<UserMenu> {
         _doubanImageSource = doubanImageSource;
         _m3u8ProxyUrl = m3u8ProxyUrl;
         _preferSpeedTest = preferSpeedTest;
+        _localSearch = localSearch;
       });
     }
   }
@@ -506,7 +509,6 @@ class _UserMenuState extends State<UserMenu> {
 
   Widget _buildToggleOption({
     required String title,
-    required String subtitle,
     required bool value,
     required Future<void> Function(bool) onChanged,
     required IconData icon,
@@ -529,31 +531,15 @@ class _UserMenuState extends State<UserMenu> {
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: FontUtils.poppins(
-                      fontSize: 16,
-                      color: widget.isDarkMode
-                          ? const Color(0xFFffffff)
-                          : const Color(0xFF1f2937),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: FontUtils.poppins(
-                      fontSize: 12,
-                      color: widget.isDarkMode
-                          ? const Color(0xFF9ca3af)
-                          : const Color(0xFF6b7280),
-                      fontWeight: FontWeight.w400,
-                    ),
-                  ),
-                ],
+              child: Text(
+                title,
+                style: FontUtils.poppins(
+                  fontSize: 16,
+                  color: widget.isDarkMode
+                      ? const Color(0xFFffffff)
+                      : const Color(0xFF1f2937),
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
             GestureDetector(
@@ -575,7 +561,8 @@ class _UserMenuState extends State<UserMenu> {
                 ),
                 child: AnimatedAlign(
                   duration: const Duration(milliseconds: 200),
-                  alignment: value ? Alignment.centerRight : Alignment.centerLeft,
+                  alignment:
+                      value ? Alignment.centerRight : Alignment.centerLeft,
                   child: Container(
                     width: 20,
                     height: 20,
@@ -737,7 +724,6 @@ class _UserMenuState extends State<UserMenu> {
                     // 优选测速选项
                     _buildToggleOption(
                       title: '优选测速',
-                      subtitle: _preferSpeedTest ? '已开启' : '已关闭',
                       value: _preferSpeedTest,
                       onChanged: (value) async {
                         await UserDataService.savePreferSpeedTest(value);
@@ -746,6 +732,25 @@ class _UserMenuState extends State<UserMenu> {
                         });
                       },
                       icon: LucideIcons.zap,
+                    ),
+                    // 分割线
+                    Container(
+                      height: 1,
+                      color: widget.isDarkMode
+                          ? const Color(0xFF374151)
+                          : const Color(0xFFe5e7eb),
+                    ),
+                    // 本地搜索选项
+                    _buildToggleOption(
+                      title: '本地搜索',
+                      value: _localSearch,
+                      onChanged: (value) async {
+                        await UserDataService.saveLocalSearch(value);
+                        setState(() {
+                          _localSearch = value;
+                        });
+                      },
+                      icon: LucideIcons.search,
                     ),
                     // 分割线
                     Container(
