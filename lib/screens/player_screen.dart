@@ -2472,7 +2472,13 @@ class _PlayerScreenState extends State<PlayerScreen>
 
   /// 获取视频详情
   Future<List<SearchResult>> fetchSourceDetail(String source, String id) async {
-    return await ApiService.fetchSourceDetail(source, id);
+    // 检查是否启用本地搜索
+    final isLocalSearch = await UserDataService.getLocalSearch();
+    if (isLocalSearch) {
+      return await SearchService.getDetailSync(source, id);
+    } else {
+      return await ApiService.fetchSourceDetail(source, id);
+    }
   }
 
   /// 搜索视频源数据（带过滤）
