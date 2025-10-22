@@ -90,9 +90,12 @@ build_android() {
     # 确保安卓构建目录存在
     mkdir -p build/android
     
-    # 构建 APK
-    flutter build apk --release --target-platform android-arm64 --split-per-abi
-    flutter build apk --release --target-platform android-arm --split-per-abi
+    # 构建 APK，添加优化参数
+    flutter build apk --release \
+        --target-platform android-arm64,android-arm \
+        --split-per-abi \
+        --obfuscate \
+        --split-debug-info=build/app/outputs/symbols
     
     log_success "安卓构建完成"
 }
@@ -241,10 +244,18 @@ copy_artifacts() {
         log_warning "安卓 armv7a APK 文件未找到"
     fi
     if [ -f "build/app/outputs/mapping/release/mapping.txt" ]; then
-        cp build/app/outputs/mapping/release/mapping.txt "dist/"
-        log_success "mapping.txt 已复制到 dist/mapping.txt"
+        cp build/app/outputs/mapping/release/mapping.txt "dist/mapping-${APP_VERSION}.txt"
+        log_success "R8 mapping.txt 已复制到 dist/mapping-${APP_VERSION}.txt"
     else
-        log_warning "mapping.txt 未找到"
+        log_warning "R8 mapping.txt 未找到"
+    fi
+    
+    # 复制 Dart 符号表
+    if [ -d "build/app/outputs/symbols" ]; then
+        cp -r build/app/outputs/symbols "dist/symbols-${APP_VERSION}"
+        log_success "Dart 符号表已复制到 dist/symbols-${APP_VERSION}/"
+    else
+        log_warning "Dart 符号表未找到"
     fi
 
     # 复制 iOS 构建产物
