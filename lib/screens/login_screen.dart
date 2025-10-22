@@ -104,7 +104,7 @@ class _LoginScreenState extends State<LoginScreen> {
       );
     } else {
       // 设置新的计时器，2秒后重置计数
-      _tapTimer = Timer(const Duration(seconds: 2), () {
+      _tapTimer = Timer(const Duration(seconds: 1), () {
         setState(() {
           _logoTapCount = 0;
         });
