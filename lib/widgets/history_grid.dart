@@ -93,39 +93,17 @@ class _HistoryGridState extends State<HistoryGrid>
   /// 刷新播放记录数据
   Future<void> _refreshPlayRecords() async {
     try {
-      await _cacheService.refreshPlayRecords(context);
-
-      // 刷新成功后，从缓存获取最新数据
-      if (mounted) {
-        final cachedRecords =
-            _cacheService.getCache<List<PlayRecord>>('play_records');
-        if (cachedRecords != null) {
-          // 只有当新数据与当前数据不同时才更新UI
-          if (_playRecords.length != cachedRecords.length ||
-              !_isSamePlayRecords(_playRecords, cachedRecords)) {
-            setState(() {
-              _playRecords = cachedRecords;
-            });
-          }
-        }
+      final cachedRecordsResult =
+          await _cacheService.getPlayRecordsDirect(context);
+      if (cachedRecordsResult.success && cachedRecordsResult.data != null) {
+        final cachedRecords = cachedRecordsResult.data!;
+        setState(() {
+          _playRecords = cachedRecords;
+        });
       }
     } catch (e) {
       // 静默处理错误，保持原有数据
     }
-  }
-
-  /// 比较两个播放记录列表是否相同
-  bool _isSamePlayRecords(List<PlayRecord> list1, List<PlayRecord> list2) {
-    if (list1.length != list2.length) return false;
-
-    for (int i = 0; i < list1.length; i++) {
-      if (list1[i].id != list2[i].id ||
-          list1[i].source != list2[i].source ||
-          list1[i].saveTime != list2[i].saveTime) {
-        return false;
-      }
-    }
-    return true;
   }
 
   /// 从UI中移除指定的播放记录（供外部调用）
@@ -133,8 +111,8 @@ class _HistoryGridState extends State<HistoryGrid>
     if (!mounted) return;
 
     setState(() {
-      _playRecords.removeWhere(
-          (record) => record.source == source && record.id == id);
+      _playRecords
+          .removeWhere((record) => record.source == source && record.id == id);
     });
   }
 
@@ -186,9 +164,8 @@ class _HistoryGridState extends State<HistoryGrid>
           final double screenWidth = constraints.maxWidth;
           const double padding = 16.0;
           const double spacing = 12.0;
-          final double availableWidth = screenWidth -
-              (padding * 2) -
-              (spacing * (crossAxisCount - 1));
+          final double availableWidth =
+              screenWidth - (padding * 2) - (spacing * (crossAxisCount - 1));
           const double minItemWidth = 80.0;
           final double calculatedItemWidth = availableWidth / crossAxisCount;
           final double itemWidth = math.max(calculatedItemWidth, minItemWidth);
@@ -298,33 +275,37 @@ class _HistoryGridState extends State<HistoryGrid>
   }
 
   Widget _buildEmptyState() {
+    final isTablet = DeviceUtils.isTablet(context);
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(
-            Icons.history,
-            size: 80,
-            color: Color(0xFFbdc3c7),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            '暂无播放历史',
-            style: FontUtils.poppins(
-              fontSize: 18,
-              fontWeight: FontWeight.w500,
-              color: const Color(0xFF7f8c8d),
+      child: Padding(
+        padding: EdgeInsets.only(top: isTablet ? 120.0 : 0.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.history,
+              size: 80,
+              color: Color(0xFFbdc3c7),
             ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            '您观看过的视频将显示在这里',
-            style: FontUtils.poppins(
-              fontSize: 14,
-              color: const Color(0xFF95a5a6),
+            const SizedBox(height: 24),
+            Text(
+              '暂无播放历史',
+              style: FontUtils.poppins(
+                fontSize: 18,
+                fontWeight: FontWeight.w500,
+                color: const Color(0xFF7f8c8d),
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 12),
+            Text(
+              '您观看过的视频将显示在这里',
+              style: FontUtils.poppins(
+                fontSize: 14,
+                color: const Color(0xFF95a5a6),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -343,9 +324,8 @@ class _HistoryGridState extends State<HistoryGrid>
           final double screenWidth = constraints.maxWidth;
           const double padding = 16.0;
           const double spacing = 12.0;
-          final double availableWidth = screenWidth -
-              (padding * 2) -
-              (spacing * (crossAxisCount - 1));
+          final double availableWidth =
+              screenWidth - (padding * 2) - (spacing * (crossAxisCount - 1));
           const double minItemWidth = 80.0;
           final double calculatedItemWidth = availableWidth / crossAxisCount;
           final double itemWidth = math.max(calculatedItemWidth, minItemWidth);

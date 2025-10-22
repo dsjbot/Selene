@@ -11,6 +11,9 @@ class UserDataService {
   static const String _preferSpeedTestKey = 'prefer_speed_test';
   static const String _localSearchKey = 'local_search';
   static const String _isLocalModeKey = 'is_local_mode';
+  
+  // 内存缓存
+  static bool? _isLocalModeCache;
 
   // 保存用户登录信息
   static Future<void> saveUserData({
@@ -239,11 +242,19 @@ class UserDataService {
   static Future<void> saveIsLocalMode(bool isLocalMode) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_isLocalModeKey, isLocalMode);
+    _isLocalModeCache = isLocalMode; // 同步更新内存缓存
   }
 
   // 获取本地模式设置（默认为 false）
   static Future<bool> getIsLocalMode() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_isLocalModeKey) ?? false;
+    final value = prefs.getBool(_isLocalModeKey) ?? false;
+    _isLocalModeCache = value; // 缓存到内存
+    return value;
+  }
+  
+  // 同步获取本地模式设置（从内存缓存读取）
+  static bool getIsLocalModeSync() {
+    return _isLocalModeCache ?? false;
   }
 }

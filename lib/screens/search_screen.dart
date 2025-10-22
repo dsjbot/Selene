@@ -602,8 +602,48 @@ class _SearchScreenState extends State<SearchScreen>
   }
 
   Widget _buildSearchHistory(ThemeService themeService) {
-    // 如果没有搜索历史，直接隐藏整个模块
-    if (_searchHistory.isEmpty) return const SizedBox.shrink();
+    // 如果没有搜索历史，显示空状态
+    if (_searchHistory.isEmpty) {
+      final isTablet = DeviceUtils.isTablet(context);
+      return Center(
+        child: Padding(
+          padding: EdgeInsets.only(top: isTablet ? 120.0 : 0.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                LucideIcons.history,
+                size: 80,
+                color: themeService.isDarkMode
+                    ? const Color(0xFF444444)
+                    : const Color(0xFFbdc3c7),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                '暂无搜索历史',
+                style: FontUtils.poppins(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w500,
+                  color: themeService.isDarkMode
+                      ? const Color(0xFF666666)
+                      : const Color(0xFF7f8c8d),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                '开始搜索你喜欢的内容吧',
+                style: FontUtils.poppins(
+                  fontSize: 14,
+                  color: themeService.isDarkMode
+                      ? const Color(0xFF555555)
+                      : const Color(0xFF95a5a6),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1522,14 +1562,17 @@ class _SearchScreenState extends State<SearchScreen>
         isScrollControlled: true,
         builder: (context) {
           final screenWidth = MediaQuery.of(context).size.width;
-          final modalWidth = DeviceUtils.isTablet(context)? screenWidth * 0.5 : screenWidth;
+          final modalWidth =
+              DeviceUtils.isTablet(context) ? screenWidth * 0.5 : screenWidth;
           const horizontalPadding = 16.0;
           const spacing = 10.0;
           final itemWidth =
               (modalWidth - horizontalPadding * 2 - spacing * 2) / 3;
 
           return Container(
-            width: DeviceUtils.isTablet(context)? modalWidth : double.infinity, // 设置宽度为100%
+            width: DeviceUtils.isTablet(context)
+                ? modalWidth
+                : double.infinity, // 设置宽度为100%
             decoration: BoxDecoration(
               color: Theme.of(context).scaffoldBackgroundColor,
               borderRadius: const BorderRadius.only(

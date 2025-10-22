@@ -132,20 +132,16 @@ class _FavoritesGridState extends State<FavoritesGrid>
   /// 刷新播放记录数据
   Future<void> _refreshPlayRecords() async {
     try {
-      await _cacheService.refreshPlayRecords(context);
-
-      // 刷新成功后，从缓存获取最新数据
-      if (mounted) {
-        final cachedRecords =
-            _cacheService.getCache<List<PlayRecord>>('play_records');
-        if (cachedRecords != null) {
-          // 只有当新数据与当前数据不同时才更新UI
-          if (_playRecords.length != cachedRecords.length ||
-              !_isSamePlayRecords(_playRecords, cachedRecords)) {
-            setState(() {
-              _playRecords = cachedRecords;
-            });
-          }
+      final cachedRecordsResult =
+          await _cacheService.getPlayRecordsDirect(context);
+      if (cachedRecordsResult.success && cachedRecordsResult.data != null) {
+        final cachedRecords = cachedRecordsResult.data!;
+        // 只有当新数据与当前数据不同时才更新UI
+        if (_playRecords.length != cachedRecords.length ||
+            !_isSamePlayRecords(_playRecords, cachedRecords)) {
+          setState(() {
+            _playRecords = cachedRecords;
+          });
         }
       }
     } catch (e) {
@@ -400,33 +396,37 @@ class _FavoritesGridState extends State<FavoritesGrid>
   }
 
   Widget _buildEmptyState() {
+    final isTablet = DeviceUtils.isTablet(context);
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.favorite_border,
-            size: 80,
-            color: const Color(0xFFbdc3c7),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            '暂无收藏内容',
-            style: FontUtils.poppins(
-              fontSize: 18,
-              fontWeight: FontWeight.w500,
-              color: const Color(0xFF7f8c8d),
+      child: Padding(
+        padding: EdgeInsets.only(top: isTablet ? 120.0 : 0.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.favorite_border,
+              size: 80,
+              color: Color(0xFFbdc3c7),
             ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            '您收藏的视频将显示在这里',
-            style: FontUtils.poppins(
-              fontSize: 14,
-              color: const Color(0xFF95a5a6),
+            const SizedBox(height: 24),
+            Text(
+              '暂无收藏内容',
+              style: FontUtils.poppins(
+                fontSize: 18,
+                fontWeight: FontWeight.w500,
+                color: const Color(0xFF7f8c8d),
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 12),
+            Text(
+              '您收藏的视频将显示在这里',
+              style: FontUtils.poppins(
+                fontSize: 14,
+                color: const Color(0xFF95a5a6),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

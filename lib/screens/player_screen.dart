@@ -2485,9 +2485,10 @@ class _PlayerScreenState extends State<PlayerScreen>
   Future<List<SearchResult>> fetchSourcesData(String query) async {
     // 检查是否启用本地搜索
     final isLocalSearch = await UserDataService.getLocalSearch();
+    final isLocalMode = await UserDataService.getIsLocalMode();
     
     List<SearchResult> results;
-    if (isLocalSearch) {
+    if (isLocalSearch || isLocalMode) {
       // 使用本地搜索
       results = await SearchService.searchSync(query);
     } else {

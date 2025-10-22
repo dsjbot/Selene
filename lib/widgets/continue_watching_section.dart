@@ -172,11 +172,10 @@ class _ContinueWatchingSectionState extends State<ContinueWatchingSection>
         });
       }
 
-      // 先尝试从缓存获取数据
-      final cachedRecords =
-          _cacheService.getCache<List<PlayRecord>>('play_records');
+      final cachedRecordsRes = await _cacheService.getPlayRecords(context);
 
-      if (cachedRecords != null) {
+      if (cachedRecordsRes.success && cachedRecordsRes.data != null) {
+        final cachedRecords = cachedRecordsRes.data!;
         // 有缓存数据，立即显示
         if (mounted) {
           setState(() {
@@ -189,29 +188,11 @@ class _ContinueWatchingSectionState extends State<ContinueWatchingSection>
         if (mounted) {
           _preloadImages(cachedRecords);
         }
-
-        // 异步获取最新数据
-        _refreshDataInBackground();
       } else {
-        // 没有缓存，从API获取
-        final result = await _cacheService.getPlayRecords(context);
-
-        if (mounted) {
-          if (result.success && result.data != null) {
-            setState(() {
-              _playRecords = result.data!;
-              _isLoading = false;
-            });
-
-            // 预加载图片
-            _preloadImages(result.data!);
-          } else {
-            setState(() {
-              _hasError = true;
-              _isLoading = false;
-            });
-          }
-        }
+        setState(() {
+          _hasError = true;
+          _isLoading = false;
+        });
       }
     } catch (e) {
       if (mounted) {
@@ -221,52 +202,6 @@ class _ContinueWatchingSectionState extends State<ContinueWatchingSection>
         });
       }
     }
-  }
-
-  /// 后台刷新数据
-  Future<void> _refreshDataInBackground() async {
-    if (!mounted) return;
-
-    try {
-      // 只刷新播放记录数据
-      await _cacheService.refreshPlayRecords(context);
-
-      // 刷新成功后，从缓存获取最新数据
-      if (mounted) {
-        final cachedRecords =
-            _cacheService.getCache<List<PlayRecord>>('play_records');
-        if (cachedRecords != null) {
-          // 只有当新数据与当前数据不同时才更新UI
-          if (_playRecords.length != cachedRecords.length ||
-              !_isSamePlayRecords(_playRecords, cachedRecords)) {
-            if (mounted) {
-              setState(() {
-                _playRecords = cachedRecords;
-              });
-
-              // 预加载新图片
-              _preloadImages(cachedRecords);
-            }
-          }
-        }
-      }
-    } catch (e) {
-      // 后台刷新失败，静默处理，保持原有数据
-    }
-  }
-
-  /// 比较两个播放记录列表是否相同
-  bool _isSamePlayRecords(List<PlayRecord> list1, List<PlayRecord> list2) {
-    if (list1.length != list2.length) return false;
-
-    for (int i = 0; i < list1.length; i++) {
-      if (list1[i].id != list2[i].id ||
-          list1[i].source != list2[i].source ||
-          list1[i].saveTime != list2[i].saveTime) {
-        return false;
-      }
-    }
-    return true;
   }
 
   /// 预加载图片
@@ -904,14 +839,10 @@ class _ContinueWatchingSectionState extends State<ContinueWatchingSection>
     if (!mounted) return;
 
     try {
-      // 强制从API获取最新数据并更新缓存
-      await _cacheService.refreshPlayRecords(context);
-
-      // 刷新成功后，从缓存获取最新数据
       if (mounted) {
-        final cachedRecords =
-            _cacheService.getCache<List<PlayRecord>>('play_records');
-        if (cachedRecords != null) {
+        final cachedRecordsResult = await _cacheService.getPlayRecordsDirect(context);
+        if (cachedRecordsResult.success && cachedRecordsResult.data != null) {
+          final cachedRecords = cachedRecordsResult.data!;
           setState(() {
             _playRecords = cachedRecords;
           });

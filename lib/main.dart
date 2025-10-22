@@ -110,19 +110,6 @@ class _AppWrapperState extends State<AppWrapper> {
 
   void _checkLoginStatus() async {
     try {
-      // 检查是否有自动登录所需的数据
-      final hasAutoLoginData = await UserDataService.hasAutoLoginData();
-
-      if (!hasAutoLoginData) {
-        // 如果没有自动登录数据，直接进入登录页
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
-        }
-        return;
-      }
-
       // 检查是否是本地模式
       final isLocalMode = await UserDataService.getIsLocalMode();
 
@@ -153,22 +140,35 @@ class _AppWrapperState extends State<AppWrapper> {
             MaterialPageRoute(builder: (context) => const HomeScreen()),
           );
         }
-      } else {
-        // 服务器模式：尝试自动登录
-        final loginResult = await ApiService.autoLogin();
+      }
 
+      // 检查是否有自动登录所需的数据
+      final hasAutoLoginData = await UserDataService.hasAutoLoginData();
+
+      if (!hasAutoLoginData) {
+        // 如果没有自动登录数据，直接进入登录页
         if (mounted) {
-          if (loginResult.success) {
-            // 自动登录成功，进入首页
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (context) => const HomeScreen()),
-            );
-          } else {
-            // 自动登录失败，进入登录页
-            setState(() {
-              _isLoading = false;
-            });
-          }
+          setState(() {
+            _isLoading = false;
+          });
+        }
+        return;
+      }
+
+      // 服务器模式：尝试自动登录
+      final loginResult = await ApiService.autoLogin();
+
+      if (mounted) {
+        if (loginResult.success) {
+          // 自动登录成功，进入首页
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => const HomeScreen()),
+          );
+        } else {
+          // 自动登录失败，进入登录页
+          setState(() {
+            _isLoading = false;
+          });
         }
       }
     } catch (e) {

@@ -329,10 +329,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
             _showToast('登录成功！', const Color(0xFF27ae60));
 
-            // 跳转到首页
+            // 跳转到首页，并清除所有路由栈（强制销毁所有旧页面）
             if (mounted) {
-              Navigator.of(context).pushReplacement(
+              Navigator.of(context).pushAndRemoveUntil(
                 MaterialPageRoute(builder: (context) => const HomeScreen()),
+                (route) => false,
               );
             }
             break;
@@ -362,6 +363,28 @@ class _LoginScreenState extends State<LoginScreen> {
 
       try {
         final newUrl = _subscriptionUrlController.text.trim();
+
+        // 获取并解析订阅内容
+        final response = await http.get(Uri.parse(newUrl));
+
+        if (response.statusCode != 200) {
+          setState(() {
+            _isLoading = false;
+          });
+          _showToast('获取订阅内容失败', const Color(0xFFe74c3c));
+          return;
+        }
+
+        final resources =
+            await SubscriptionService.parseSubscriptionContent(response.body);
+
+        if (resources == null || resources.isEmpty) {
+          setState(() {
+            _isLoading = false;
+          });
+          _showToast('解析订阅内容失败', const Color(0xFFe74c3c));
+          return;
+        }
 
         // 检查是否已有订阅 URL
         final existingUrl = await LocalModeStorageService.getSubscriptionUrl();
@@ -432,28 +455,6 @@ class _LoginScreenState extends State<LoginScreen> {
           });
         }
 
-        // 获取并解析订阅内容
-        final response = await http.get(Uri.parse(newUrl));
-
-        if (response.statusCode != 200) {
-          setState(() {
-            _isLoading = false;
-          });
-          _showToast('获取订阅内容失败', const Color(0xFFe74c3c));
-          return;
-        }
-
-        final resources =
-            await SubscriptionService.parseSubscriptionContent(response.body);
-
-        if (resources == null || resources.isEmpty) {
-          setState(() {
-            _isLoading = false;
-          });
-          _showToast('解析订阅内容失败', const Color(0xFFe74c3c));
-          return;
-        }
-
         // 保存订阅链接和内容
         await LocalModeStorageService.saveSubscriptionUrl(newUrl);
         await LocalModeStorageService.saveSubscriptionContent(resources);
@@ -467,10 +468,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
         _showToast('本地模式登录成功！', const Color(0xFF27ae60));
 
-        // 跳转到首页
+        // 跳转到首页，并清除所有路由栈（强制销毁所有旧页面）
         if (mounted) {
-          Navigator.of(context).pushReplacement(
+          Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(builder: (context) => const HomeScreen()),
+            (route) => false,
           );
         }
       } catch (e) {

@@ -35,6 +35,7 @@ class _UserMenuState extends State<UserMenu> {
   String _version = '';
   bool _preferSpeedTest = true;
   bool _localSearch = false;
+  bool _isLocalMode = false;
 
   @override
   void initState() {
@@ -53,6 +54,7 @@ class _UserMenuState extends State<UserMenu> {
   }
 
   Future<void> _loadUserInfo() async {
+    final isLocalMode = await UserDataService.getIsLocalMode();
     final username = await UserDataService.getUsername();
     final cookies = await UserDataService.getCookies();
     final doubanDataSource =
@@ -65,6 +67,7 @@ class _UserMenuState extends State<UserMenu> {
 
     if (mounted) {
       setState(() {
+        _isLocalMode = isLocalMode;
         _username = username;
         _role = _parseRoleFromCookies(cookies);
         _doubanDataSource = doubanDataSource;
@@ -123,10 +126,15 @@ class _UserMenuState extends State<UserMenu> {
   }
 
   Future<void> _handleLogout() async {
+    // 清空所有页面缓存
+    PageCacheService().clearAllCache();
+    
     // 只清除密码和cookies，保留服务器地址和用户名
     await UserDataService.clearPasswordAndCookies();
 
-    // 跳转到登录页
+    await UserDataService.saveIsLocalMode(false);
+
+    // 跳转到登录页，并移除所有之前的路由（强制销毁所有页面）
     if (mounted) {
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (context) => const LoginScreen()),
@@ -175,9 +183,9 @@ class _UserMenuState extends State<UserMenu> {
       }
 
       final versionInfo = await VersionService.checkForUpdate();
-      
+
       if (!mounted) return;
-      
+
       if (versionInfo != null) {
         // 有新版本，显示更新对话框
         await UpdateDialog.show(context, versionInfo);
@@ -668,37 +676,50 @@ class _UserMenuState extends State<UserMenu> {
                       padding: const EdgeInsets.all(20),
                       child: Column(
                         children: [
-                          // 当前用户标签
-                          Text(
-                            '当前用户',
-                            style: FontUtils.poppins(
-                              fontSize: 12,
-                              color: widget.isDarkMode
-                                  ? const Color(0xFF9ca3af)
-                                  : const Color(0xFF6b7280),
-                              fontWeight: FontWeight.w400,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          // 用户名
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                _username ?? '未知用户',
-                                style: FontUtils.poppins(
-                                  fontSize: 18,
-                                  color: widget.isDarkMode
-                                      ? const Color(0xFFffffff)
-                                      : const Color(0xFF1f2937),
-                                  fontWeight: FontWeight.w600,
-                                ),
+                          // 本地模式下不显示"当前模式"标签
+                          if (!_isLocalMode)
+                            Text(
+                              '当前用户',
+                              style: FontUtils.poppins(
+                                fontSize: 12,
+                                color: widget.isDarkMode
+                                    ? const Color(0xFF9ca3af)
+                                    : const Color(0xFF6b7280),
+                                fontWeight: FontWeight.w400,
                               ),
-                              const SizedBox(width: 8),
-                              // 角色标签
-                              _buildRoleTag(),
-                            ],
-                          ),
+                            ),
+                          if (!_isLocalMode) const SizedBox(height: 8),
+                          // 用户名或本地模式
+                          if (_isLocalMode)
+                            Text(
+                              '本地模式',
+                              style: FontUtils.poppins(
+                                fontSize: 18,
+                                color: widget.isDarkMode
+                                    ? const Color(0xFFffffff)
+                                    : const Color(0xFF1f2937),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            )
+                          else
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  _username ?? '未知用户',
+                                  style: FontUtils.poppins(
+                                    fontSize: 18,
+                                    color: widget.isDarkMode
+                                        ? const Color(0xFFffffff)
+                                        : const Color(0xFF1f2937),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                // 角色标签
+                                _buildRoleTag(),
+                              ],
+                            ),
                         ],
                       ),
                     ),
@@ -785,25 +806,27 @@ class _UserMenuState extends State<UserMenu> {
                       },
                       icon: LucideIcons.zap,
                     ),
-                    // 分割线
-                    Container(
-                      height: 1,
-                      color: widget.isDarkMode
-                          ? const Color(0xFF374151)
-                          : const Color(0xFFe5e7eb),
-                    ),
-                    // 本地搜索选项
-                    _buildToggleOption(
-                      title: '本地搜索',
-                      value: _localSearch,
-                      onChanged: (value) async {
-                        await UserDataService.saveLocalSearch(value);
-                        setState(() {
-                          _localSearch = value;
-                        });
-                      },
-                      icon: LucideIcons.search,
-                    ),
+                    // 本地搜索选项（本地模式下不显示）
+                    if (!_isLocalMode) ...[
+                      // 分割线
+                      Container(
+                        height: 1,
+                        color: widget.isDarkMode
+                            ? const Color(0xFF374151)
+                            : const Color(0xFFe5e7eb),
+                      ),
+                      _buildToggleOption(
+                        title: '本地搜索',
+                        value: _localSearch,
+                        onChanged: (value) async {
+                          await UserDataService.saveLocalSearch(value);
+                          setState(() {
+                            _localSearch = value;
+                          });
+                        },
+                        icon: LucideIcons.search,
+                      ),
+                    ],
                     // 分割线
                     Container(
                       height: 1,

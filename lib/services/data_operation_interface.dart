@@ -50,9 +50,6 @@ abstract class PlayRecordOperationInterface {
   
   /// 根据 source+id 删除播放记录
   Future<DataOperationResult<void>> deletePlayRecord(String source, String id, BuildContext context);
-  
-  /// 后台异步刷新播放记录
-  void refreshPlayRecordsInBackground(BuildContext context);
 
   /// 刷新播放记录（强制从API获取最新数据）
   Future<void> refreshPlayRecords(BuildContext context);
@@ -71,9 +68,6 @@ abstract class FavoriteOperationInterface {
   
   /// 同步检查是否已收藏
   bool isFavoritedSync(String source, String id);
-  
-  /// 后台异步刷新收藏夹
-  void refreshFavoritesInBackground(BuildContext context);
 
   /// 刷新收藏夹（强制从API获取最新数据）
   Future<void> refreshFavorites(BuildContext context);
@@ -92,9 +86,6 @@ abstract class SearchRecordOperationInterface {
   
   /// 清空搜索历史
   Future<DataOperationResult<void>> clearSearchHistory(BuildContext context);
-  
-  /// 后台异步刷新搜索历史
-  void refreshSearchHistoryInBackground(BuildContext context);
 
   /// 刷新搜索历史（强制从API获取最新数据）
   Future<void> refreshSearchHistory(BuildContext context);

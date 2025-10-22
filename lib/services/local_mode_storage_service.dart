@@ -12,6 +12,9 @@ class LocalModeStorageService {
   static const String _playRecordsKey = 'local_mode_play_records';
   static const String _favoritesKey = 'local_mode_favorites';
   static const String _searchHistoryKey = 'local_mode_search_history';
+  
+  // 内存缓存
+  static List<FavoriteItem>? _favoritesCache;
 
   // ==================== 订阅 URL ====================
   
@@ -148,6 +151,7 @@ class LocalModeStorageService {
     
     final jsonString = jsonEncode(favoritesMap);
     await prefs.setString(_favoritesKey, jsonString);
+    _favoritesCache = List.from(favorites); // 同步更新内存缓存
   }
 
   /// 获取收藏夹列表
@@ -156,6 +160,7 @@ class LocalModeStorageService {
     final jsonString = prefs.getString(_favoritesKey);
     
     if (jsonString == null || jsonString.isEmpty) {
+      _favoritesCache = [];
       return [];
     }
     
@@ -169,8 +174,10 @@ class LocalModeStorageService {
       
       // 按保存时间降序排序
       favorites.sort((a, b) => b.saveTime.compareTo(a.saveTime));
+      _favoritesCache = favorites; // 缓存到内存
       return favorites;
     } catch (e) {
+      _favoritesCache = [];
       return [];
     }
   }
@@ -196,16 +203,26 @@ class LocalModeStorageService {
     await saveFavorites(favorites);
   }
 
-  /// 检查是否已收藏
+  /// 检查是否已收藏（异步）
   static Future<bool> isFavorite(String source, String id) async {
     final favorites = await getFavorites();
     return favorites.any((f) => f.source == source && f.id == id);
+  }
+  
+  /// 同步检查是否已收藏（从内存缓存读取）
+  static bool isFavoriteSync(String source, String id) {
+    if (_favoritesCache == null) {
+      getFavorites();
+      return false;
+    }
+    return _favoritesCache!.any((f) => f.source == source && f.id == id);
   }
 
   /// 清除所有收藏
   static Future<void> clearFavorites() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_favoritesKey);
+    _favoritesCache = []; // 同步清除内存缓存
   }
 
   // ==================== 搜索记录 ====================
@@ -247,8 +264,8 @@ class LocalModeStorageService {
     history.insert(0, keyword);
     
     // 限制最多保存 50 条记录
-    if (history.length > 50) {
-      history.removeRange(50, history.length);
+    if (history.length > 20) {
+      history.removeRange(20, history.length);
     }
     
     await saveSearchHistory(history);

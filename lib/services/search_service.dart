@@ -3,6 +3,8 @@ import 'package:http/http.dart' as http;
 import '../models/search_result.dart';
 import 'api_service.dart';
 import 'downstream_service.dart';
+import '../services/user_data_service.dart';
+import '../services/local_mode_storage_service.dart';
 
 /// 搜索服务
 class SearchService {
@@ -10,8 +12,13 @@ class SearchService {
   /// 并发调用所有资源的搜索，返回所有结果
   static Future<List<SearchResult>> searchSync(String query) async {
     try {
+      // 检查是否是本地模式
+      final isLocalMode = await UserDataService.getIsLocalMode();
+
       // 获取搜索资源列表
-      final allResources = await ApiService.getSearchResources();
+      final allResources = isLocalMode
+          ? await LocalModeStorageService.getSubscriptionContent()
+          : await ApiService.getSearchResources();
 
       // 过滤掉被禁用的资源
       final resources =
@@ -52,8 +59,13 @@ class SearchService {
   static Future<List<SearchResult>> getDetailSync(
       String source, String id) async {
     try {
+      // 检查是否是本地模式
+      final isLocalMode = await UserDataService.getIsLocalMode();
+
       // 获取搜索资源列表
-      final allResources = await ApiService.getSearchResources();
+      final allResources = isLocalMode
+          ? await LocalModeStorageService.getSubscriptionContent()
+          : await ApiService.getSearchResources();
 
       // 找到对应 source 的资源
       final apiSite = allResources.firstWhere(
