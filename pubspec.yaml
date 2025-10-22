@@ -65,6 +65,7 @@ dependencies:
   bitsdojo_window: ^0.1.6
   volume_controller: ^3.4.0
   screen_brightness: ^2.1.7
+  gpt_markdown: ^1.1.4
 
 dev_dependencies:
   flutter_test:

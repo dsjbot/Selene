@@ -275,6 +275,14 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  flutter_math_fork:
+    dependency: transitive
+    description:
+      name: flutter_math_fork
+      sha256: "6d5f2f1aa57ae539ffb0a04bb39d2da67af74601d685a161aff7ce5bda5fa407"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.7.4"
   flutter_svg:
     dependency: "direct main"
     description:
@@ -333,6 +341,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "6.3.1"
+  gpt_markdown:
+    dependency: "direct main"
+    description:
+      name: gpt_markdown
+      sha256: "8174983f2ed7d8576d25810913e3afe3f8ffdaa3172c0c823b7cfc289b67f380"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.1.4"
   html:
     dependency: transitive
     description:
@@ -914,6 +930,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.7.6"
+  tuple:
+    dependency: transitive
+    description:
+      name: tuple
+      sha256: a97ce2013f240b2f3807bcbaf218765b6f301c3eff91092bcfa23a039e7dd151
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.0.2"
   typed_data:
     dependency: transitive
     description:

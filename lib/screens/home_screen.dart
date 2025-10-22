@@ -15,6 +15,8 @@ import '../models/play_record.dart';
 import '../models/video_info.dart';
 import '../utils/font_utils.dart';
 import '../services/page_cache_service.dart';
+import '../services/version_service.dart';
+import '../widgets/update_dialog.dart';
 import 'movie_screen.dart';
 import 'tv_screen.dart';
 import 'anime_screen.dart';
@@ -44,6 +46,31 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     // 进入首页时直接刷新播放记录和收藏夹缓存
     _refreshCacheOnHomeEnter();
+    // 检查应用更新
+    _checkForUpdates();
+  }
+  
+  /// 检查应用更新
+  void _checkForUpdates() async {
+    // 延迟3秒后检查更新，避免影响页面加载
+    await Future.delayed(const Duration(seconds: 3));
+    
+    try {
+      final versionInfo = await VersionService.checkForUpdate();
+      
+      if (versionInfo != null && mounted) {
+        final shouldShow = await VersionService.shouldShowUpdatePrompt(
+          versionInfo.latestVersion,
+        );
+        
+        if (shouldShow && mounted) {
+          UpdateDialog.show(context, versionInfo);
+        }
+      }
+    } catch (e) {
+      // 静默失败，不影响用户体验
+      print('检查更新失败: $e');
+    }
   }
 
   @override
