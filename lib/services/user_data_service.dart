@@ -10,6 +10,7 @@ class UserDataService {
   static const String _m3u8ProxyUrlKey = 'm3u8_proxy_url';
   static const String _preferSpeedTestKey = 'prefer_speed_test';
   static const String _localSearchKey = 'local_search';
+  static const String _isLocalModeKey = 'is_local_mode';
 
   // 保存用户登录信息
   static Future<void> saveUserData({
@@ -232,5 +233,17 @@ class UserDataService {
   static Future<bool> getLocalSearch() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getBool(_localSearchKey) ?? false;
+  }
+
+  // 保存本地模式设置
+  static Future<void> saveIsLocalMode(bool isLocalMode) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_isLocalModeKey, isLocalMode);
+  }
+
+  // 获取本地模式设置（默认为 false）
+  static Future<bool> getIsLocalMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_isLocalModeKey) ?? false;
   }
 }
