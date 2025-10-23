@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import '../widgets/continue_watching_section.dart';
 import '../widgets/hot_movies_section.dart';
@@ -178,7 +180,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 default:
                   newTab = '首页';
               }
-              
+
               // 只在标签真正改变时更新状态
               if (_selectedTopTab != newTab) {
                 setState(() {
@@ -472,18 +474,30 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// 处理点击搜索按钮
   void _onSearchTap() {
-    Navigator.push(
-      context,
-      PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) =>
-            const SearchScreen(),
-        transitionDuration: Duration.zero, // 无打开动画
-        reverseTransitionDuration: Duration.zero, // 无关闭动画
-      ),
-    ).then((_) {
-      // 从搜索页面返回时刷新数据
-      _refreshOnResume();
-    });
+    if (Platform.isIOS) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const SearchScreen(),
+        ),
+      ).then((_) {
+        // 从搜索页面返回时刷新数据
+        _refreshOnResume();
+      });
+    } else {
+      Navigator.push(
+        context,
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) =>
+              const SearchScreen(),
+          transitionDuration: Duration.zero, // 无打开动画
+          reverseTransitionDuration: Duration.zero, // 无关闭动画
+        ),
+      ).then((_) {
+        // 从搜索页面返回时刷新数据
+        _refreshOnResume();
+      });
+    }
   }
 
   /// 处理点击 Selene 标题跳转到首页

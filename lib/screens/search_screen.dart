@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
@@ -530,7 +531,7 @@ class _SearchScreenState extends State<SearchScreen>
   Widget build(BuildContext context) {
     return Consumer<ThemeService>(
       builder: (context, themeService, child) {
-        return MainLayout(
+        final ml = MainLayout(
           content: Container(
             color: themeService.isDarkMode
                 ? const Color(0xFF121212)
@@ -597,6 +598,14 @@ class _SearchScreenState extends State<SearchScreen>
             Navigator.pop(context);
           },
         );
+        if (Platform.isIOS) {
+          return PopScope(
+            canPop: true, // 允许返回
+            child: ml,
+          );
+        } else {
+          return ml;
+        }
       },
     );
   }
