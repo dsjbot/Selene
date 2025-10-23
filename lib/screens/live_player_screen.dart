@@ -430,25 +430,15 @@ class _LivePlayerScreenState extends State<LivePlayerScreen> {
                       ),
                     ),
                   ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          '频道列表',
-                          style: FontUtils.poppins(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                            color: themeService.isDarkMode
-                                ? Colors.white
-                                : const Color(0xFF2c3e50),
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                    ],
+                  child: Text(
+                    '频道列表',
+                    style: FontUtils.poppins(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: themeService.isDarkMode
+                          ? Colors.white
+                          : const Color(0xFF2c3e50),
+                    ),
                   ),
                 ),
                 // 内容区域
