@@ -186,9 +186,9 @@ class _FFmpegVideoPlayerWidgetState extends State<FFmpegVideoPlayerWidget>
       await _player!.setRate(_playbackSpeed.value);
       setState(() {
         _hasCompleted = false;
-        _isLoadingVideo = false;
+        // _isLoadingVideo = false;
       });
-      widget.onReady?.call();
+      // widget.onReady?.call();
     } catch (error) {
       debugPrint('FFmpegVideoPlayerWidget: failed to open media $error');
       if (mounted) {
@@ -239,7 +239,7 @@ class _FFmpegVideoPlayerWidgetState extends State<FFmpegVideoPlayerWidget>
 
     _durationSubscription = _player!.stream.duration.listen((duration) {
       if (!mounted) return;
-      if (duration != Duration.zero || widget.live) {
+      if (duration != Duration.zero) {
         if (_isLoadingVideo) {
           setState(() {
             _isLoadingVideo = false;
@@ -287,10 +287,10 @@ class _FFmpegVideoPlayerWidgetState extends State<FFmpegVideoPlayerWidget>
       if (mounted) {
         setState(() {
           _hasCompleted = false;
-          _isLoadingVideo = false;
+          // _isLoadingVideo = false;
         });
       }
-      widget.onReady?.call();
+      // widget.onReady?.call();
     } catch (error) {
       debugPrint('FFmpegVideoPlayerWidget: error while changing source $error');
       if (mounted) {

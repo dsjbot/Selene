@@ -248,20 +248,6 @@ copy_artifacts() {
     else
         log_warning "安卓 armv7a APK 文件未找到"
     fi
-    if [ -f "build/app/outputs/mapping/release/mapping.txt" ]; then
-        cp build/app/outputs/mapping/release/mapping.txt "dist/mapping-${APP_VERSION}.txt"
-        log_success "R8 mapping.txt 已复制到 dist/mapping-${APP_VERSION}.txt"
-    else
-        log_warning "R8 mapping.txt 未找到"
-    fi
-    
-    # 复制 Dart 符号表
-    if [ -d "build/app/outputs/symbols" ]; then
-        cp -r build/app/outputs/symbols "dist/symbols-${APP_VERSION}"
-        log_success "Dart 符号表已复制到 dist/symbols-${APP_VERSION}/"
-    else
-        log_warning "Dart 符号表未找到"
-    fi
 
     # 复制 iOS 构建产物
     if [ -f "ios-build/Runner.ipa" ]; then

@@ -1289,18 +1289,26 @@ class _PlayerScreenState extends State<PlayerScreen>
                   if (videoYear.isNotEmpty && videoYear != 'unknown')
                     const SizedBox(width: 12),
 
-                  // 分类信息（绿色文字样式）
+                  // 分类信息（绿色文字样式，充满可用空间但不与详情按钮重叠）
                   if (currentDetail!.class_ != null &&
                       currentDetail!.class_!.isNotEmpty)
-                    Text(
-                      currentDetail!.class_!,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: const Color(0xFF2ecc71),
-                        fontWeight: FontWeight.w500,
+                    Expanded(
+                      child: Text(
+                        currentDetail!.class_!,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: const Color(0xFF2ecc71),
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
 
-                  const Spacer(),
+                  if (currentDetail!.class_ == null ||
+                      currentDetail!.class_!.isEmpty)
+                    const Spacer(),
+
+                  const SizedBox(width: 12),
 
                   // 详情按钮（平板横屏模式下不显示）
                   if (!(_isTablet && !_isPortraitTablet))
@@ -2486,7 +2494,7 @@ class _PlayerScreenState extends State<PlayerScreen>
     // 检查是否启用本地搜索
     final isLocalSearch = await UserDataService.getLocalSearch();
     final isLocalMode = await UserDataService.getIsLocalMode();
-    
+
     List<SearchResult> results;
     if (isLocalSearch || isLocalMode) {
       // 使用本地搜索
