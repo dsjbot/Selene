@@ -22,6 +22,7 @@ class MobilePlayerControls extends StatefulWidget {
   final int? currentEpisodeIndex;
   final int? totalEpisodes;
   final String? sourceName;
+  final VoidCallback? onExitFullScreen;
   final bool live;
   final ValueNotifier<double> playbackSpeedListenable;
   final Future<void> Function(double speed) onSetSpeed;
@@ -43,6 +44,7 @@ class MobilePlayerControls extends StatefulWidget {
     this.currentEpisodeIndex,
     this.totalEpisodes,
     this.sourceName,
+    this.onExitFullScreen,
     this.live = false,
     required this.playbackSpeedListenable,
     required this.onSetSpeed,
@@ -338,6 +340,8 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
   void _exitFullscreen() {
     widget.state.exitFullscreen();
     widget.onFullscreenChange(false);
+    // 触发退出全屏回调
+    widget.onExitFullScreen?.call();
     _onUserInteraction();
   }
 
@@ -422,7 +426,7 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
             children: [
               CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
               SizedBox(height: 16),
-              Text('视频加载中...',
+              Text('加载中...',
                   style: TextStyle(color: Colors.white, fontSize: 14)),
             ],
           ),

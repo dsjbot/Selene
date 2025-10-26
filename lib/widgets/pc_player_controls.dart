@@ -66,6 +66,7 @@ class PCPlayerControls extends StatefulWidget {
   final Function(bool isFullscreen)? onDLNAButtonPressed;
   final Function(bool isWebFullscreen)? onWebFullscreenChanged;
   final Function(VoidCallback)? onExitWebFullscreenCallbackReady;
+  final VoidCallback? onExitFullScreen;
   final bool live;
   final ValueNotifier<double> playbackSpeedListenable;
   final Future<void> Function(double speed) onSetSpeed;
@@ -88,6 +89,7 @@ class PCPlayerControls extends StatefulWidget {
     this.onDLNAButtonPressed,
     this.onWebFullscreenChanged,
     this.onExitWebFullscreenCallbackReady,
+    this.onExitFullScreen,
     this.live = false,
     required this.playbackSpeedListenable,
     required this.onSetSpeed,
@@ -176,6 +178,10 @@ class _PCPlayerControlsState extends State<PCPlayerControls> {
     try {
       final actualFullscreen = widget.state.isFullscreen();
       if (_isFullscreen != actualFullscreen) {
+        // 检测到从全屏退出
+        if (_isFullscreen && !actualFullscreen) {
+          widget.onExitFullScreen?.call();
+        }
         setState(() {
           _isFullscreen = actualFullscreen;
         });
@@ -355,11 +361,16 @@ class _PCPlayerControlsState extends State<PCPlayerControls> {
   }
 
   void _toggleWebFullscreen() {
+    final wasWebFullscreen = _isWebFullscreen;
     setState(() {
       _isWebFullscreen = !_isWebFullscreen;
     });
     // 通知父组件网页全屏状态变化
     widget.onWebFullscreenChanged?.call(_isWebFullscreen);
+    // 如果从网页全屏退出，触发回调
+    if (wasWebFullscreen && !_isWebFullscreen) {
+      widget.onExitFullScreen?.call();
+    }
     _onUserInteraction();
   }
 
@@ -371,6 +382,8 @@ class _PCPlayerControlsState extends State<PCPlayerControls> {
       });
       // 通知父组件网页全屏状态变化
       widget.onWebFullscreenChanged?.call(false);
+      // 触发退出全屏回调
+      widget.onExitFullScreen?.call();
       _onUserInteraction();
     }
   }
@@ -510,7 +523,7 @@ class _PCPlayerControlsState extends State<PCPlayerControls> {
               ),
               SizedBox(height: 16),
               Text(
-                '视频加载中...',
+                '加载中...',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 14,

@@ -7,12 +7,15 @@ import '../models/live_channel.dart';
 import '../models/live_source.dart';
 import '../models/epg_program.dart';
 import '../services/api_service.dart';
+import '../services/live_service.dart';
 import '../utils/device_utils.dart';
 import '../utils/font_utils.dart';
 import '../services/theme_service.dart';
 import 'package:provider/provider.dart';
 import '../widgets/windows_title_bar.dart';
 import '../widgets/switch_loading_overlay.dart';
+import '../widgets/filter_pill_hover.dart';
+import '../widgets/filter_options_selector.dart';
 
 class LivePlayerScreen extends StatefulWidget {
   final LiveChannel channel;
@@ -37,6 +40,8 @@ class _LivePlayerScreenState extends State<LivePlayerScreen>
   List<EpgProgram>? _programs;
   bool _isLoadingEpg = false;
   List<LiveChannel> _allChannels = [];
+  List<LiveSource> _allSources = [];
+  String _selectedGroup = '全部';
 
   // 缓存设备类型
   late bool _isTablet;
@@ -102,8 +107,27 @@ class _LivePlayerScreenState extends State<LivePlayerScreen>
       _isInitialized = true;
 
       // 加载数据
+      _loadAllSources();
       _loadAllChannels();
       _loadEpgData();
+    }
+  }
+
+  Future<void> _loadAllSources() async {
+    try {
+      final sources = await LiveService.getLiveSources();
+      if (mounted) {
+        setState(() {
+          _allSources = sources;
+        });
+      }
+    } catch (e) {
+      print('加载直播源列表失败: $e');
+      if (mounted) {
+        setState(() {
+          _allSources = [];
+        });
+      }
     }
   }
 
@@ -476,7 +500,6 @@ class _LivePlayerScreenState extends State<LivePlayerScreen>
   /// 构建播放器组件
   Widget _buildPlayerWidget() {
     final videoUrl = _currentChannel.url;
-
     return VideoPlayerWidget(
       surface: DeviceUtils.isPC()
           ? VideoPlayerSurface.desktop
@@ -498,10 +521,10 @@ class _LivePlayerScreenState extends State<LivePlayerScreen>
         setState(() {
           _isWebFullscreen = isWebFullscreen;
         });
+      },
+      onExitFullScreen: () {
         // 退出全屏后，重新滚动到当前节目
-        if (!isWebFullscreen) {
-          _scrollToCurrentProgram();
-        }
+        _scrollToCurrentProgram();
       },
       onReady: _onVideoPlayerReady,
       live: true,
@@ -588,16 +611,7 @@ class _LivePlayerScreenState extends State<LivePlayerScreen>
                     children: [
                       // 顶部栏
                       Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          border: Border(
-                            bottom: BorderSide(
-                              color: themeService.isDarkMode
-                                  ? const Color(0xFF333333)
-                                  : const Color(0xFFe0e0e0),
-                            ),
-                          ),
-                        ),
+                        padding: const EdgeInsets.only(top: 16),
                         child: Text(
                           '频道列表',
                           style: FontUtils.poppins(
@@ -670,43 +684,40 @@ class _LivePlayerScreenState extends State<LivePlayerScreen>
   Widget _buildChannelInfo(ThemeData theme, ThemeService themeService) {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: Colors.transparent,
-        border: Border(
-          bottom: BorderSide(
-            color: themeService.isDarkMode
-                ? const Color(0xFF333333)
-                : const Color(0xFFe0e0e0),
-          ),
-        ),
       ),
       child: Row(
         children: [
-          // 台标
+          // 台标 - 2:1 长方形，高度充满容器
           if (_currentChannel.logo.isNotEmpty)
-            Container(
-              width: 60,
-              height: 60,
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: themeService.isDarkMode
-                    ? const Color(0xFF2a2a2a)
-                    : const Color(0xFFf5f5f5),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: Image.network(
-                  _currentChannel.logo,
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) {
-                    return _buildDefaultLogoIcon();
-                  },
+            SizedBox(
+              height: 56,
+              child: AspectRatio(
+                aspectRatio: 2.0,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: themeService.isDarkMode
+                        ? const Color(0xFF2a2a2a)
+                        : const Color(0xFFc0c0c0),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: Image.network(
+                      _currentChannel.logo,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) {
+                        return _buildDefaultLogoIcon();
+                      },
+                    ),
+                  ),
                 ),
               ),
             )
           else
-            _buildDefaultLogo(),
+            _buildDefaultLogo(themeService),
           const SizedBox(width: 16),
           // 频道信息
           Expanded(
@@ -733,7 +744,7 @@ class _LivePlayerScreenState extends State<LivePlayerScreen>
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  _currentChannel.group,
+                  '${_currentSource.name} > ${_currentChannel.group}',
                   style: FontUtils.poppins(
                     fontSize: 14,
                     color: themeService.isDarkMode
@@ -749,18 +760,24 @@ class _LivePlayerScreenState extends State<LivePlayerScreen>
     );
   }
 
-  Widget _buildDefaultLogo() {
-    return Container(
-      width: 60,
-      height: 60,
-      decoration: BoxDecoration(
-        color: const Color(0xFF27ae60).withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: const Icon(
-        Icons.tv,
-        size: 32,
-        color: Color(0xFF27ae60),
+  Widget _buildDefaultLogo(ThemeService themeService) {
+    return SizedBox(
+      height: 56,
+      child: AspectRatio(
+        aspectRatio: 2.0,
+        child: Container(
+          decoration: BoxDecoration(
+            color: themeService.isDarkMode
+                ? const Color(0xFF2a2a2a)
+                : const Color(0xFFc0c0c0),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Icon(
+            Icons.tv,
+            size: 24,
+            color: Color(0xFF95a5b0),
+          ),
+        ),
       ),
     );
   }
@@ -768,14 +785,16 @@ class _LivePlayerScreenState extends State<LivePlayerScreen>
   Widget _buildDefaultLogoIcon() {
     return const Icon(
       Icons.tv,
-      size: 32,
-      color: Color(0xFF27ae60),
+      size: 24,
+      color: Color(0xFF95a5b0),
     );
   }
 
   /// 构建频道列表
   Widget _buildChannelList(ThemeData theme, ThemeService themeService) {
-    if (_allChannels.isEmpty) {
+    final filteredChannels = _getFilteredChannels();
+
+    if (filteredChannels.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -794,9 +813,9 @@ class _LivePlayerScreenState extends State<LivePlayerScreen>
 
     return ListView.builder(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: _allChannels.length,
+      itemCount: filteredChannels.length,
       itemBuilder: (context, index) {
-        final channel = _allChannels[index];
+        final channel = filteredChannels[index];
         final isSelected = channel.id == _currentChannel.id;
 
         // 只给当前频道添加 key，用于滚动定位
@@ -808,42 +827,46 @@ class _LivePlayerScreenState extends State<LivePlayerScreen>
           selected: isSelected,
           selectedTileColor: const Color(0xFF27ae60).withOpacity(0.1),
           leading: channel.logo.isNotEmpty
-              ? Container(
-                  width: 40,
-                  height: 40,
-                  padding: const EdgeInsets.all(2),
-                  decoration: BoxDecoration(
-                    color: themeService.isDarkMode
-                        ? const Color(0xFF2a2a2a)
-                        : const Color(0xFFf5f5f5),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: Image.network(
-                      channel.logo,
-                      fit: BoxFit.contain,
-                      errorBuilder: (context, error, stackTrace) {
-                        return const Icon(
-                          Icons.tv,
-                          size: 20,
-                          color: Color(0xFF27ae60),
-                        );
-                      },
+              ? AspectRatio(
+                  aspectRatio: 2.0,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: themeService.isDarkMode
+                          ? const Color(0xFF2a2a2a)
+                          : const Color(0xFFc0c0c0),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: Image.network(
+                        channel.logo,
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) {
+                          return const Icon(
+                            Icons.tv,
+                            size: 16,
+                            color: Color(0xFF95a5b0),
+                          );
+                        },
+                      ),
                     ),
                   ),
                 )
-              : Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF27ae60).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: const Icon(
-                    Icons.tv,
-                    size: 20,
-                    color: Color(0xFF27ae60),
+              : AspectRatio(
+                  aspectRatio: 2.0,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: themeService.isDarkMode
+                          ? const Color(0xFF2a2a2a)
+                          : const Color(0xFFc0c0c0),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Icon(
+                      Icons.tv,
+                      size: 16,
+                      color: Color(0xFF95a5b0),
+                    ),
                   ),
                 ),
           title: Text(
@@ -875,26 +898,187 @@ class _LivePlayerScreenState extends State<LivePlayerScreen>
     );
   }
 
-  /// 构建播放源选择器（新结构不再需要多源选择）
+  /// 构建播放源和分组选择器
   Widget _buildSourceSelector(ThemeData theme, ThemeService themeService) {
-    return const SizedBox.shrink();
-  }
+    // 获取所有分组，保持原始顺序
+    final allGroups = ['全部'];
+    final seenGroups = <String>{};
+    for (var channel in _allChannels) {
+      if (channel.group.isNotEmpty && !seenGroups.contains(channel.group)) {
+        seenGroups.add(channel.group);
+        allGroups.add(channel.group);
+      }
+    }
 
-  /// 构建可滚动的节目单（用于平板横屏）
-  Widget _buildProgramGuideScrollable(
-      ThemeData theme, ThemeService themeService) {
+    // 构建分组选项
+    final groupOptions =
+        allGroups.map((g) => SelectorOption(label: g, value: g)).toList();
+
+    // 构建直播源选项
+    final sourceOptions = _allSources
+        .map((s) => SelectorOption(label: s.name, value: s.key))
+        .toList();
+
+    // 判断是否只有一个直播源
+    final showSourceFilter = _allSources.length > 1;
+
     return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.transparent,
         border: Border(
-          top: BorderSide(
+          bottom: BorderSide(
             color: themeService.isDarkMode
                 ? const Color(0xFF333333)
                 : const Color(0xFFe0e0e0),
           ),
         ),
       ),
-      child: _buildProgramList(themeService),
+      child: Row(
+        children: [
+          // 直播源筛选（只有多个源时显示）
+          if (showSourceFilter) ...[
+            _buildFilterPill(
+              '直播源',
+              sourceOptions,
+              _currentSource.key,
+              (value) async {
+                final source = _allSources.firstWhere((s) => s.key == value);
+                setState(() {
+                  _currentSource = source;
+                  _selectedGroup = '全部';
+                  _isLoading = true;
+                  _loadingMessage = '切换直播源...';
+                });
+                await _loadAllChannels();
+                if (mounted && _allChannels.isNotEmpty) {
+                  _switchChannel(_allChannels.first);
+                }
+              },
+              themeService,
+            ),
+            const SizedBox(width: 8),
+          ],
+          // 分组筛选
+          _buildFilterPill(
+            '分组',
+            groupOptions,
+            _selectedGroup,
+            (value) {
+              setState(() {
+                _selectedGroup = value;
+              });
+            },
+            themeService,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterPill(
+    String title,
+    List<SelectorOption> options,
+    String selectedValue,
+    ValueChanged<String> onSelected,
+    ThemeService themeService,
+  ) {
+    final selectedOption = options.firstWhere(
+      (e) => e.value == selectedValue,
+      orElse: () => options.first,
+    );
+    final isDefault = selectedValue == '全部' || selectedValue.isEmpty;
+
+    return FilterPillHover(
+      isPC: DeviceUtils.isPC(),
+      isDefault: isDefault,
+      title: title,
+      selectedOption: selectedOption,
+      onTap: () {
+        showFilterOptionsSelector(
+          context: context,
+          title: title,
+          options: options,
+          selectedValue: selectedValue,
+          onSelected: onSelected,
+        );
+      },
+    );
+  }
+
+  /// 获取筛选后的频道列表
+  List<LiveChannel> _getFilteredChannels() {
+    if (_selectedGroup == '全部') {
+      return _allChannels;
+    } else {
+      return _allChannels.where((c) => c.group == _selectedGroup).toList();
+    }
+  }
+
+  /// 构建可滚动的节目单（用于平板横屏）
+  Widget _buildProgramGuideScrollable(
+      ThemeData theme, ThemeService themeService) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.transparent,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 节目单标题栏
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: Row(
+              children: [
+                Text(
+                  '节目单',
+                  style: FontUtils.poppins(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: themeService.isDarkMode
+                        ? Colors.white
+                        : const Color(0xFF2c3e50),
+                  ),
+                ),
+                const Spacer(),
+                // 滚动到当前节目按钮
+                _buildScrollToCurrentButton(themeService),
+              ],
+            ),
+          ),
+          // 节目列表
+          _buildProgramList(themeService),
+        ],
+      ),
+    );
+  }
+
+  /// 构建滚动到当前节目按钮
+  Widget _buildScrollToCurrentButton(ThemeService themeService) {
+    return _HoverButton(
+      onTap: _scrollToCurrentProgram,
+      child: Container(
+        width: 18,
+        height: 18,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+            color:
+                themeService.isDarkMode ? Colors.grey[400]! : Colors.grey[600]!,
+            width: 1,
+          ),
+        ),
+        child: Center(
+          child: Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color:
+                  themeService.isDarkMode ? Colors.grey[400] : Colors.grey[600],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -948,11 +1132,11 @@ class _LivePlayerScreenState extends State<LivePlayerScreen>
     }
 
     return SizedBox(
-      height: 120,
+      height: 88,
       child: ListView.builder(
         controller: _programScrollController,
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         itemCount: _programs!.length,
         itemBuilder: (context, index) {
           final program = _programs![index];
@@ -1023,13 +1207,13 @@ class _LivePlayerScreenState extends State<LivePlayerScreen>
 
     return Container(
       key: key,
-      width: 180,
-      height: 96,
-      margin: const EdgeInsets.only(right: 12),
-      padding: const EdgeInsets.all(12),
+      width: 120,
+      height: 72,
+      margin: const EdgeInsets.only(right: 8),
+      padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
         color: backgroundColor,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(6),
         border: Border.all(
           color: borderColor,
           width: 1,
@@ -1044,7 +1228,7 @@ class _LivePlayerScreenState extends State<LivePlayerScreen>
               Text(
                 program.timeRange,
                 style: FontUtils.poppins(
-                  fontSize: 11,
+                  fontSize: 9,
                   color: timeColor,
                   fontWeight: FontWeight.w500,
                 ),
@@ -1054,18 +1238,18 @@ class _LivePlayerScreenState extends State<LivePlayerScreen>
                 Row(
                   children: [
                     Container(
-                      width: 6,
-                      height: 6,
+                      width: 4,
+                      height: 4,
                       decoration: BoxDecoration(
                         color: const Color(0xFF27ae60),
                         shape: BoxShape.circle,
                       ),
                     ),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: 2),
                     Text(
-                      '正在播放',
+                      '直播',
                       style: FontUtils.poppins(
-                        fontSize: 10,
+                        fontSize: 8,
                         color: timeColor,
                         fontWeight: FontWeight.w600,
                       ),
@@ -1077,7 +1261,7 @@ class _LivePlayerScreenState extends State<LivePlayerScreen>
           Text(
             program.title,
             style: FontUtils.poppins(
-              fontSize: 13,
+              fontSize: 11,
               fontWeight: FontWeight.w600,
               color: textColor,
             ),
@@ -1097,6 +1281,57 @@ class _LivePlayerScreenState extends State<LivePlayerScreen>
       animationController: _loadingAnimationController,
       onBackPressed:
           _isWebFullscreen ? _exitWebFullscreen : () => Navigator.pop(context),
+    );
+  }
+}
+
+/// 带 hover 效果的按钮组件（PC 端专用）
+class _HoverButton extends StatefulWidget {
+  final Widget child;
+  final VoidCallback? onTap;
+  final bool enabled;
+
+  const _HoverButton({
+    required this.child,
+    this.onTap,
+    this.enabled = true,
+  });
+
+  @override
+  State<_HoverButton> createState() => _HoverButtonState();
+}
+
+class _HoverButtonState extends State<_HoverButton> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final isPC = DeviceUtils.isPC();
+
+    return MouseRegion(
+      cursor: (isPC && widget.enabled && widget.onTap != null)
+          ? SystemMouseCursors.click
+          : MouseCursor.defer,
+      onEnter: isPC ? (_) => setState(() => _isHovered = true) : null,
+      onExit: isPC ? (_) => setState(() => _isHovered = false) : null,
+      child: GestureDetector(
+        onTap: widget.enabled ? widget.onTap : null,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          child: ColorFiltered(
+            colorFilter: (isPC && _isHovered && widget.enabled)
+                ? const ColorFilter.mode(
+                    Colors.green,
+                    BlendMode.modulate,
+                  )
+                : const ColorFilter.mode(
+                    Colors.white,
+                    BlendMode.modulate,
+                  ),
+            child: widget.child,
+          ),
+        ),
+      ),
     );
   }
 }

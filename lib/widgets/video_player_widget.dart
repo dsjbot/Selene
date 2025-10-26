@@ -23,6 +23,7 @@ class VideoPlayerWidget extends StatefulWidget {
   final int? totalEpisodes;
   final String? sourceName;
   final Function(bool isWebFullscreen)? onWebFullscreenChanged;
+  final VoidCallback? onExitFullScreen;
   final bool live;
 
   const VideoPlayerWidget({
@@ -43,6 +44,7 @@ class VideoPlayerWidget extends StatefulWidget {
     this.totalEpisodes,
     this.sourceName,
     this.onWebFullscreenChanged,
+    this.onExitFullScreen,
     this.live = false,
   });
 
@@ -135,6 +137,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    print('init ${widget.url}');
     _currentUrl = widget.url;
     _currentHeaders = widget.headers;
     _initializePlayer();
@@ -163,6 +166,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
       _isInitialized = true;
     });
     if (_currentUrl != null) {
+      print('open $_currentUrl');
       await _openCurrentMedia();
     }
   }
@@ -395,6 +399,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
                         onExitWebFullscreenCallbackReady: (callback) {
                           _exitWebFullscreenCallback = callback;
                         },
+                        onExitFullScreen: widget.onExitFullScreen,
                         live: widget.live,
                         playbackSpeedListenable: _playbackSpeed,
                         onSetSpeed: _setPlaybackSpeed,
@@ -415,6 +420,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
                         currentEpisodeIndex: widget.currentEpisodeIndex,
                         totalEpisodes: widget.totalEpisodes,
                         sourceName: widget.sourceName,
+                        onExitFullScreen: widget.onExitFullScreen,
                         live: widget.live,
                         playbackSpeedListenable: _playbackSpeed,
                         onSetSpeed: _setPlaybackSpeed,
