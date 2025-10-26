@@ -637,6 +637,9 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
           child: GestureDetector(
             onTap: () async {
               _onUserInteraction();
+              if (!widget.live) {
+                widget.player.pause();
+              }
               await _showDLNADialog();
             },
             behavior: HitTestBehavior.opaque,

@@ -390,7 +390,9 @@ class _PCPlayerControlsState extends State<PCPlayerControls> {
 
   Future<void> _showDLNADialog() async {
     if (widget.player.state.playing) {
-      widget.player.pause();
+      if (!widget.live) {
+        widget.player.pause();
+      }
       widget.onPause?.call();
     }
 

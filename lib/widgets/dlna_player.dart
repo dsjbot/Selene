@@ -172,7 +172,6 @@ class _DLNAPlayerState extends State<DLNAPlayer> {
   }
 
   void _stop() {
-    widget.device.stop();
     // 通知父组件停止投屏，并传递当前播放位置
     widget.onStopCasting?.call(_position);
   }

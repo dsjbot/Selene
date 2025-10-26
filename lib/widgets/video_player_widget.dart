@@ -137,7 +137,6 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    print('init ${widget.url}');
     _currentUrl = widget.url;
     _currentHeaders = widget.headers;
     _initializePlayer();
@@ -162,13 +161,12 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     _player = Player();
     _videoController = VideoController(_player!);
     _setupPlayerListeners();
+    if (_currentUrl != null) {
+      await _openCurrentMedia();
+    }
     setState(() {
       _isInitialized = true;
     });
-    if (_currentUrl != null) {
-      print('open $_currentUrl');
-      await _openCurrentMedia();
-    }
   }
 
   Future<void> _openCurrentMedia({Duration? startAt}) async {
