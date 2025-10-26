@@ -6,7 +6,6 @@ import '../widgets/video_player_widget.dart';
 import '../models/live_channel.dart';
 import '../models/live_source.dart';
 import '../models/epg_program.dart';
-import '../services/api_service.dart';
 import '../services/live_service.dart';
 import '../utils/device_utils.dart';
 import '../utils/font_utils.dart';
@@ -59,8 +58,14 @@ class _LivePlayerScreenState extends State<LivePlayerScreen>
   // 当前频道的 GlobalKey，用于滚动定位
   final GlobalKey _currentChannelKey = GlobalKey();
 
-  // 节目单滚动控制器
+  // 节目单滚动控制器（横向）
   final ScrollController _programScrollController = ScrollController();
+
+  // 节目单滚动控制器（纵向，用于弹窗）
+  final ScrollController _verticalProgramScrollController = ScrollController();
+
+  // 频道列表滚动控制器
+  final ScrollController _channelScrollController = ScrollController();
 
   // 网页全屏状态
   bool _isWebFullscreen = false;
@@ -133,7 +138,7 @@ class _LivePlayerScreenState extends State<LivePlayerScreen>
 
   Future<void> _loadAllChannels() async {
     try {
-      final channels = await ApiService.getLiveChannels(_currentSource.key);
+      final channels = await LiveService.getLiveChannels(_currentSource.key);
       if (mounted) {
         setState(() {
           _allChannels = channels;
@@ -171,6 +176,8 @@ class _LivePlayerScreenState extends State<LivePlayerScreen>
     // 恢复原始的系统UI样式
     SystemChrome.setSystemUIOverlayStyle(_originalStyle);
     _programScrollController.dispose();
+    _verticalProgramScrollController.dispose();
+    _channelScrollController.dispose();
     _loadingAnimationController.dispose();
     super.dispose();
   }
@@ -192,8 +199,8 @@ class _LivePlayerScreenState extends State<LivePlayerScreen>
         return;
       }
 
-      // 调用 ApiService 获取 EPG 数据
-      final epgData = await ApiService.getLiveEpg(
+      // 调用 LiveService 获取 EPG 数据
+      final epgData = await LiveService.getLiveEpg(
         _currentChannel.tvgId,
         _currentSource.key,
       );
@@ -239,7 +246,7 @@ class _LivePlayerScreenState extends State<LivePlayerScreen>
     }
   }
 
-  /// 滚动到当前正在播放的节目
+  /// 滚动到当前正在播放的节目（横向列表）
   void _scrollToCurrentProgram() {
     if (_programs == null || _programs!.isEmpty) {
       return;
@@ -284,24 +291,105 @@ class _LivePlayerScreenState extends State<LivePlayerScreen>
     });
   }
 
+  /// 滚动到当前正在播放的节目（纵向列表）
+  void _scrollToCurrentProgramInVerticalList() {
+    if (_programs == null || _programs!.isEmpty) {
+      return;
+    }
+
+    // 找到当前正在播放的节目
+    final currentIndex = _programs!.indexWhere((p) => p.isLive);
+    if (currentIndex == -1) {
+      return;
+    }
+
+    // 使用 postFrameCallback 确保在渲染完成后立即执行
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_verticalProgramScrollController.hasClients) {
+        return;
+      }
+
+      // 估算每个项目的高度（包括 margin）
+      // padding: 12, margin: 4*2 = 8, 总高度约 80
+      const estimatedItemHeight = 80.0;
+      final targetOffset = currentIndex * estimatedItemHeight;
+
+      // 获取可视区域高度
+      final viewportHeight =
+          _verticalProgramScrollController.position.viewportDimension;
+
+      // 计算滚动位置，使目标项显示在屏幕上方 25% 的位置
+      final scrollOffset = targetOffset - (viewportHeight * 0.25);
+
+      // 确保不会滚动到负值或超出最大滚动范围
+      final maxScrollExtent =
+          _verticalProgramScrollController.position.maxScrollExtent;
+      final clampedOffset = scrollOffset.clamp(0.0, maxScrollExtent);
+
+      _verticalProgramScrollController.animateTo(
+        clampedOffset,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+    });
+  }
+
   /// 滚动到当前频道
   void _scrollToCurrentChannel() {
     if (_allChannels.isEmpty) return;
 
-    // 延迟执行，确保列表已经渲染
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      // 使用 Scrollable.ensureVisible 滚动到当前频道
-      final context = _currentChannelKey.currentContext;
-      if (context != null) {
-        Scrollable.ensureVisible(
-          context,
-          duration: const Duration(milliseconds: 500),
-          curve: Curves.easeInOut,
-          alignment: 0.25, // 将当前频道显示在屏幕上方 25% 的位置，留出更多空间显示下方频道
-          alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
-        );
-      }
-    });
+    // 获取筛选后的频道列表
+    final filteredChannels = _getFilteredChannels();
+    if (filteredChannels.isEmpty) return;
+
+    // 找到当前频道的索引
+    final currentIndex =
+        filteredChannels.indexWhere((c) => c.id == _currentChannel.id);
+    if (currentIndex == -1) return;
+
+    // 定义滚动执行函数
+    void performScroll() {
+      if (!mounted || !_channelScrollController.hasClients) return;
+
+      // ListTile 的固定高度（通过 SizedBox 设置）
+      const itemHeight = 68.0;
+      
+      // ListView 的 padding: EdgeInsets.symmetric(vertical: 4)
+      const listPadding = 4.0;
+
+      // 计算目标位置：列表顶部 padding + 前面所有 item 的高度
+      final targetPosition = listPadding + (currentIndex * itemHeight);
+
+      // 获取可视区域高度
+      final viewportHeight =
+          _channelScrollController.position.viewportDimension;
+
+      // 让目标 item 显示在可视区域顶部向下 20% 的位置
+      final scrollOffset = targetPosition - (viewportHeight * 0.2);
+
+      // 限制在有效范围内
+      final maxScrollExtent = _channelScrollController.position.maxScrollExtent;
+      final clampedOffset = scrollOffset.clamp(0.0, maxScrollExtent);
+
+      _channelScrollController.animateTo(
+        clampedOffset,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+    }
+
+    // 等待 ScrollController 准备好
+    if (_channelScrollController.hasClients) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => performScroll());
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_channelScrollController.hasClients) {
+          performScroll();
+        } else {
+          WidgetsBinding.instance.addPostFrameCallback((_) => performScroll());
+        }
+      });
+    }
   }
 
   @override
@@ -547,17 +635,15 @@ class _LivePlayerScreenState extends State<LivePlayerScreen>
         ),
         // 播放器占位
         SizedBox(height: playerHeight),
-        // 可滚动内容区域
+        // 频道信息
+        _buildChannelInfo(theme, themeService),
+        // 正在播放和查看节目单按钮
+        _buildCurrentProgramWithDropdown(theme, themeService),
+        // 播放源和分组筛选
+        _buildSourceSelector(theme, themeService),
+        // 频道列表（占据剩余空间）
         Expanded(
-          child: SingleChildScrollView(
-            child: Column(
-              children: [
-                _buildChannelInfo(theme, themeService),
-                _buildSourceSelector(theme, themeService),
-                _buildProgramGuideScrollable(theme, themeService),
-              ],
-            ),
-          ),
+          child: _buildChannelList(theme, themeService),
         ),
       ],
     );
@@ -664,17 +750,15 @@ class _LivePlayerScreenState extends State<LivePlayerScreen>
         ),
         // 播放器占位
         SizedBox(height: playerHeight),
-        // 可滚动内容区域
+        // 频道信息
+        _buildChannelInfo(theme, themeService),
+        // 正在播放和查看节目单按钮
+        _buildCurrentProgramWithDropdown(theme, themeService),
+        // 播放源和分组筛选
+        _buildSourceSelector(theme, themeService),
+        // 频道列表（占据剩余空间）
         Expanded(
-          child: SingleChildScrollView(
-            child: Column(
-              children: [
-                _buildChannelInfo(theme, themeService),
-                _buildSourceSelector(theme, themeService),
-                _buildProgramGuideScrollable(theme, themeService),
-              ],
-            ),
-          ),
+          child: _buildChannelList(theme, themeService),
         ),
       ],
     );
@@ -683,7 +767,7 @@ class _LivePlayerScreenState extends State<LivePlayerScreen>
   /// 构建频道信息
   Widget _buildChannelInfo(ThemeData theme, ThemeService themeService) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       decoration: const BoxDecoration(
         color: Colors.transparent,
       ),
@@ -812,7 +896,8 @@ class _LivePlayerScreenState extends State<LivePlayerScreen>
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      controller: _channelScrollController,
+      padding: const EdgeInsets.symmetric(vertical: 4),
       itemCount: filteredChannels.length,
       itemBuilder: (context, index) {
         final channel = filteredChannels[index];
@@ -822,11 +907,14 @@ class _LivePlayerScreenState extends State<LivePlayerScreen>
         final itemKey =
             isSelected ? _currentChannelKey : ValueKey('channel_${channel.id}');
 
-        return ListTile(
-          key: itemKey,
-          selected: isSelected,
-          selectedTileColor: const Color(0xFF27ae60).withOpacity(0.1),
-          leading: channel.logo.isNotEmpty
+        return SizedBox(
+          height: 68.0, // 固定高度，从 72 减小到 68
+          child: ListTile(
+            key: itemKey,
+            selected: isSelected,
+            selectedTileColor: const Color(0xFF27ae60).withOpacity(0.1),
+            visualDensity: const VisualDensity(vertical: -1),
+            leading: channel.logo.isNotEmpty
               ? AspectRatio(
                   aspectRatio: 2.0,
                   child: Container(
@@ -893,6 +981,7 @@ class _LivePlayerScreenState extends State<LivePlayerScreen>
             ),
           ),
           onTap: () => _switchChannel(channel),
+          ),
         );
       },
     );
@@ -923,7 +1012,7 @@ class _LivePlayerScreenState extends State<LivePlayerScreen>
     final showSourceFilter = _allSources.length > 1;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
       decoration: BoxDecoration(
         border: Border(
           bottom: BorderSide(
@@ -970,7 +1059,43 @@ class _LivePlayerScreenState extends State<LivePlayerScreen>
             },
             themeService,
           ),
+          const Spacer(),
+          // 滚动到当前频道按钮
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: _buildScrollToCurrentChannelButton(themeService),
+          ),
         ],
+      ),
+    );
+  }
+
+  /// 构建滚动到当前频道按钮
+  Widget _buildScrollToCurrentChannelButton(ThemeService themeService) {
+    return _HoverButton(
+      onTap: _scrollToCurrentChannel,
+      child: Container(
+        width: 18,
+        height: 18,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+            color:
+                themeService.isDarkMode ? Colors.grey[400]! : Colors.grey[600]!,
+            width: 1,
+          ),
+        ),
+        child: Center(
+          child: Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color:
+                  themeService.isDarkMode ? Colors.grey[400] : Colors.grey[600],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -994,15 +1119,123 @@ class _LivePlayerScreenState extends State<LivePlayerScreen>
       title: title,
       selectedOption: selectedOption,
       onTap: () {
-        showFilterOptionsSelector(
-          context: context,
-          title: title,
-          options: options,
-          selectedValue: selectedValue,
-          onSelected: onSelected,
-        );
+        _showFilterOptions(context, title, options, selectedValue, onSelected);
       },
     );
+  }
+
+  void _showFilterOptions(
+      BuildContext context,
+      String title,
+      List<SelectorOption> options,
+      String selectedValue,
+      ValueChanged<String> onSelected) {
+    if (DeviceUtils.isPC()) {
+      // PC端使用 filter_options_selector.dart 中的 PC 组件
+      showFilterOptionsSelector(
+        context: context,
+        title: title,
+        options: options,
+        selectedValue: selectedValue,
+        onSelected: onSelected,
+        useCompactLayout: title == '分组', // 只有标题筛选使用紧凑布局
+      );
+    } else {
+      // 移动端显示底部弹出
+      showModalBottomSheet(
+        context: context,
+        backgroundColor: Colors.transparent,
+        isScrollControlled: true,
+        builder: (context) {
+          final screenWidth = MediaQuery.of(context).size.width;
+          final modalWidth =
+              DeviceUtils.isTablet(context) ? screenWidth * 0.5 : screenWidth;
+          const horizontalPadding = 16.0;
+          const spacing = 10.0;
+          final itemWidth =
+              (modalWidth - horizontalPadding * 2 - spacing * 2) / 3;
+
+          return Container(
+            width: DeviceUtils.isTablet(context)
+                ? modalWidth
+                : double.infinity, // 设置宽度为100%
+            decoration: BoxDecoration(
+              color: Theme.of(context).scaffoldBackgroundColor,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(20),
+                topRight: Radius.circular(20),
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start, // 左对齐
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Center(
+                    child: Text(
+                      title,
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ),
+                ),
+                Container(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(context).size.height * 0.6,
+                    minHeight: 200.0,
+                  ),
+                  child: SingleChildScrollView(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: horizontalPadding, vertical: 8),
+                      child: Wrap(
+                        alignment: WrapAlignment.start, // 左对齐
+                        spacing: spacing,
+                        runSpacing: spacing,
+                        children: options.map((option) {
+                          final isSelected = option.value == selectedValue;
+                          return SizedBox(
+                            width: itemWidth,
+                            child: InkWell(
+                              onTap: () {
+                                onSelected(option.value);
+                                Navigator.pop(context);
+                              },
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 8),
+                                alignment: Alignment.centerLeft, // 内容左对齐
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? const Color(0xFF27AE60)
+                                      : Theme.of(context)
+                                          .chipTheme
+                                          .backgroundColor,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  option.label,
+                                  textAlign: TextAlign.left, // 文字左对齐
+                                  style: TextStyle(
+                                    color: isSelected ? Colors.white : null,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          );
+        },
+      );
+    }
   }
 
   /// 获取筛选后的频道列表
@@ -1012,6 +1245,331 @@ class _LivePlayerScreenState extends State<LivePlayerScreen>
     } else {
       return _allChannels.where((c) => c.group == _selectedGroup).toList();
     }
+  }
+
+  /// 构建当前节目信息和查看节目单按钮（用于平板竖屏和手机）
+  Widget _buildCurrentProgramWithDropdown(
+      ThemeData theme, ThemeService themeService) {
+    // 获取当前正在播放的节目
+    EpgProgram? currentProgram;
+    if (_programs != null && _programs!.isNotEmpty) {
+      try {
+        currentProgram = _programs!.firstWhere((p) => p.isLive);
+      } catch (e) {
+        // 如果没有找到正在播放的节目，使用第一个
+        currentProgram = null;
+      }
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          // 正在播放标签和节目名称
+          Expanded(
+            child: Row(
+              children: [
+                Text(
+                  '正在播放: ',
+                  style: FontUtils.poppins(
+                    fontSize: 14,
+                    color: themeService.isDarkMode
+                        ? const Color(0xFF999999)
+                        : const Color(0xFF7f8c8d),
+                  ),
+                ),
+                Expanded(
+                  child: _isLoadingEpg
+                      ? Text(
+                          '加载中...',
+                          style: FontUtils.poppins(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: themeService.isDarkMode
+                                ? Colors.white
+                                : const Color(0xFF2c3e50),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        )
+                      : currentProgram != null
+                          ? Text(
+                              currentProgram.title,
+                              style: FontUtils.poppins(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: themeService.isDarkMode
+                                    ? Colors.white
+                                    : const Color(0xFF2c3e50),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            )
+                          : Text(
+                              '暂无节目信息',
+                              style: FontUtils.poppins(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: themeService.isDarkMode
+                                    ? const Color(0xFF666666)
+                                    : const Color(0xFF95a5a6),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 20),
+          // 查看节目单按钮
+          _HoverButton(
+            onTap: () => _showProgramListDropdown(theme, themeService),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Transform.translate(
+                  offset: const Offset(0, -1.2),
+                  child: Text(
+                    '查看节目单',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: themeService.isDarkMode
+                          ? Colors.grey[400]
+                          : Colors.grey[600],
+                      fontWeight: FontWeight.w300,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Icon(
+                  Icons.arrow_forward_ios,
+                  size: 14,
+                  color: themeService.isDarkMode
+                      ? Colors.grey[400]
+                      : Colors.grey[600],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 显示节目单下拉列表
+  void _showProgramListDropdown(ThemeData theme, ThemeService themeService) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final statusBarHeight = MediaQuery.of(context).padding.top;
+    final playerHeight = screenWidth / (16 / 9);
+    final panelHeight = screenHeight - statusBarHeight - playerHeight;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black26,
+      builder: (context) {
+        return Container(
+          height: panelHeight,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: theme.scaffoldBackgroundColor,
+          ),
+          child: Column(
+            children: [
+              // 标题栏
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(
+                      color: themeService.isDarkMode
+                          ? const Color(0xFF333333)
+                          : const Color(0xFFe0e0e0),
+                    ),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Text(
+                      '节目单',
+                      style: FontUtils.poppins(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: themeService.isDarkMode
+                            ? Colors.white
+                            : const Color(0xFF2c3e50),
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: Icon(
+                        Icons.close,
+                        color: themeService.isDarkMode
+                            ? Colors.white
+                            : const Color(0xFF2c3e50),
+                      ),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+              // 节目列表
+              Expanded(
+                child: _buildVerticalProgramList(themeService),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    // 显示弹窗后立即触发滚动
+    _scrollToCurrentProgramInVerticalList();
+  }
+
+  /// 构建垂直节目列表
+  Widget _buildVerticalProgramList(ThemeService themeService) {
+    if (_isLoadingEpg) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              Text(
+                '加载节目单中...',
+                style: FontUtils.poppins(
+                  fontSize: 14,
+                  color: themeService.isDarkMode
+                      ? const Color(0xFF999999)
+                      : const Color(0xFF7f8c8d),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_programs == null || _programs!.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.calendar_today_outlined,
+                size: 64,
+                color: themeService.isDarkMode
+                    ? const Color(0xFF666666)
+                    : const Color(0xFF95a5a6),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                '暂无节目单信息',
+                style: FontUtils.poppins(
+                  fontSize: 14,
+                  color: themeService.isDarkMode
+                      ? const Color(0xFF999999)
+                      : const Color(0xFF7f8c8d),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      controller: _verticalProgramScrollController,
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      itemCount: _programs!.length,
+      itemBuilder: (context, index) {
+        final program = _programs![index];
+        // 给当前正在播放的节目添加 key，用于滚动定位
+        final itemKey = program.isLive ? _currentProgramKey : null;
+        return _buildVerticalProgramItem(program, themeService, key: itemKey);
+      },
+    );
+  }
+
+  /// 构建垂直节目列表项
+  Widget _buildVerticalProgramItem(
+    EpgProgram program,
+    ThemeService themeService, {
+    Key? key,
+  }) {
+    final now = DateTime.now();
+    final isLive = program.isLive;
+    final isPast = now.isAfter(program.endTime);
+
+    // 根据节目状态选择颜色
+    Color textColor;
+    Color timeColor;
+
+    if (isLive) {
+      // 正在播放 - 绿色
+      textColor = themeService.isDarkMode
+          ? const Color(0xFF4ade80)
+          : const Color(0xFF16a34a);
+      timeColor = themeService.isDarkMode
+          ? const Color(0xFF4ade80)
+          : const Color(0xFF16a34a);
+    } else if (isPast) {
+      // 过去的节目 - 灰色
+      textColor = themeService.isDarkMode
+          ? const Color(0xFF9ca3af)
+          : const Color(0xFF6b7280);
+      timeColor = themeService.isDarkMode
+          ? const Color(0xFF9ca3af)
+          : const Color(0xFF6b7280);
+    } else {
+      // 未开始的节目 - 蓝色
+      textColor = themeService.isDarkMode
+          ? const Color(0xFF60a5fa)
+          : const Color(0xFF2563eb);
+      timeColor = themeService.isDarkMode
+          ? const Color(0xFF60a5fa)
+          : const Color(0xFF2563eb);
+    }
+
+    return Container(
+      key: key,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.fromLTRB(0, 12, 12, 12),
+      child: Row(
+        children: [
+          // 时间
+          Text(
+            program.timeRange,
+            style: FontUtils.sourceCodePro(
+              fontSize: 13,
+              color: timeColor,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(width: 16),
+          // 节目标题
+          Expanded(
+            child: Text(
+              program.title,
+              style: FontUtils.poppins(
+                fontSize: 14,
+                fontWeight: isLive ? FontWeight.w600 : FontWeight.w400,
+                color: textColor,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   /// 构建可滚动的节目单（用于平板横屏）
@@ -1289,12 +1847,10 @@ class _LivePlayerScreenState extends State<LivePlayerScreen>
 class _HoverButton extends StatefulWidget {
   final Widget child;
   final VoidCallback? onTap;
-  final bool enabled;
 
   const _HoverButton({
     required this.child,
     this.onTap,
-    this.enabled = true,
   });
 
   @override
@@ -1309,17 +1865,17 @@ class _HoverButtonState extends State<_HoverButton> {
     final isPC = DeviceUtils.isPC();
 
     return MouseRegion(
-      cursor: (isPC && widget.enabled && widget.onTap != null)
+      cursor: (isPC && widget.onTap != null)
           ? SystemMouseCursors.click
           : MouseCursor.defer,
       onEnter: isPC ? (_) => setState(() => _isHovered = true) : null,
       onExit: isPC ? (_) => setState(() => _isHovered = false) : null,
       child: GestureDetector(
-        onTap: widget.enabled ? widget.onTap : null,
+        onTap: widget.onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           child: ColorFiltered(
-            colorFilter: (isPC && _isHovered && widget.enabled)
+            colorFilter: (isPC && _isHovered)
                 ? const ColorFilter.mode(
                     Colors.green,
                     BlendMode.modulate,

@@ -2680,7 +2680,6 @@ class _PlayerScreenState extends State<PlayerScreen>
       if (_isTablet && !_isPortraitTablet) {
         // 平板横屏模式：播放器在左侧65%区域
         final screenWidth = MediaQuery.of(context).size.width;
-        final screenHeight = MediaQuery.of(context).size.height;
         final leftWidth = screenWidth * 0.65;
         final playerHeight = leftWidth / (16 / 9);
 

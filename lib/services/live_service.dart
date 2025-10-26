@@ -32,10 +32,9 @@ class LiveService {
   static final Map<String, _CacheItem<M3uContent>> _channelsCache = {};
   static final Map<String, _CacheItem<Map<String, EpgData>>> _epgCache = {};
 
-  // 缓存过期时间配置（统一为一天）
-  static const Duration _sourceCacheDuration = Duration(days: 1);
-  static const Duration _channelCacheDuration = Duration(days: 1);
-  static const Duration _epgCacheDuration = Duration(days: 1);
+  static const Duration _sourceCacheDuration = Duration(hours: 2);
+  static const Duration _channelCacheDuration = Duration(hours: 2);
+  static const Duration _epgCacheDuration = Duration(hours: 2);
 
   /// 获取所有直播源（乐观缓存：过期时先返回旧数据，后台异步刷新）
   static Future<List<LiveSource>> getLiveSources(

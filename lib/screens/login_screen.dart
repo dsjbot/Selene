@@ -339,7 +339,7 @@ class _LoginScreenState extends State<LoginScreen> {
             // 保存模式状态为服务器模式
             await UserDataService.saveIsLocalMode(false);
 
-            _showToast('登录成功！', const Color(0xFF27ae60));
+            // _showToast('登录成功！', const Color(0xFF27ae60));
 
             // 跳转到首页，并清除所有路由栈（强制销毁所有旧页面）
             if (mounted) {
@@ -478,7 +478,7 @@ class _LoginScreenState extends State<LoginScreen> {
           _isLoading = false;
         });
 
-        _showToast('本地模式登录成功！', const Color(0xFF27ae60));
+        // _showToast('本地模式登录成功！', const Color(0xFF27ae60));
 
         // 跳转到首页，并清除所有路由栈（强制销毁所有旧页面）
         if (mounted) {

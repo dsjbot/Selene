@@ -137,7 +137,7 @@ class _LiveScreenState extends State<LiveScreen>
       _isRefreshing = true;
       _errorMessage = null;
     });
-    
+
     // 开始旋转动画
     _refreshIconController.repeat();
 
@@ -218,7 +218,7 @@ class _LiveScreenState extends State<LiveScreen>
           _currentSource = targetSource;
           _isLoading = false;
         });
-        _showMessage('刷新成功');
+        // _showMessage('刷新成功');
       }
     } catch (e) {
       if (mounted) {
@@ -257,8 +257,6 @@ class _LiveScreenState extends State<LiveScreen>
     );
   }
 
-
-
   List<LiveChannel> _getFilteredChannels() {
     if (_selectedGroup == '全部') {
       return _channelGroups.expand((g) => g.channels).toList();
@@ -292,22 +290,21 @@ class _LiveScreenState extends State<LiveScreen>
 
   Widget _buildTopBar(ThemeService themeService) {
     final allGroups = ['全部', ..._channelGroups.map((g) => g.name)];
-    
+
     // 构建分组选项
-    final groupOptions = allGroups
-        .map((g) => SelectorOption(label: g, value: g))
-        .toList();
-    
+    final groupOptions =
+        allGroups.map((g) => SelectorOption(label: g, value: g)).toList();
+
     // 构建直播源选项
     final sourceOptions = _liveSources
         .map((s) => SelectorOption(label: s.name, value: s.key))
         .toList();
-    
+
     // 判断是否只有一个直播源
     final showSourceFilter = _liveSources.length > 1;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
       decoration: BoxDecoration(
         color: themeService.isDarkMode
             ? const Color(0xFF1e1e1e).withValues(alpha: 0.9)
@@ -393,15 +390,123 @@ class _LiveScreenState extends State<LiveScreen>
       title: title,
       selectedOption: selectedOption,
       onTap: () {
-        showFilterOptionsSelector(
-          context: context,
-          title: title,
-          options: options,
-          selectedValue: selectedValue,
-          onSelected: onSelected,
-        );
+        _showFilterOptions(context, title, options, selectedValue, onSelected);
       },
     );
+  }
+
+  void _showFilterOptions(
+      BuildContext context,
+      String title,
+      List<SelectorOption> options,
+      String selectedValue,
+      ValueChanged<String> onSelected) {
+    if (DeviceUtils.isPC()) {
+      // PC端使用 filter_options_selector.dart 中的 PC 组件
+      showFilterOptionsSelector(
+        context: context,
+        title: title,
+        options: options,
+        selectedValue: selectedValue,
+        onSelected: onSelected,
+        useCompactLayout: title == '分组', // 只有标题筛选使用紧凑布局
+      );
+    } else {
+      // 移动端显示底部弹出
+      showModalBottomSheet(
+        context: context,
+        backgroundColor: Colors.transparent,
+        isScrollControlled: true,
+        builder: (context) {
+          final screenWidth = MediaQuery.of(context).size.width;
+          final modalWidth =
+              DeviceUtils.isTablet(context) ? screenWidth * 0.5 : screenWidth;
+          const horizontalPadding = 16.0;
+          const spacing = 10.0;
+          final itemWidth =
+              (modalWidth - horizontalPadding * 2 - spacing * 2) / 3;
+
+          return Container(
+            width: DeviceUtils.isTablet(context)
+                ? modalWidth
+                : double.infinity, // 设置宽度为100%
+            decoration: BoxDecoration(
+              color: Theme.of(context).scaffoldBackgroundColor,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(20),
+                topRight: Radius.circular(20),
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start, // 左对齐
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Center(
+                    child: Text(
+                      title,
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ),
+                ),
+                Container(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(context).size.height * 0.6,
+                    minHeight: 200.0,
+                  ),
+                  child: SingleChildScrollView(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: horizontalPadding, vertical: 8),
+                      child: Wrap(
+                        alignment: WrapAlignment.start, // 左对齐
+                        spacing: spacing,
+                        runSpacing: spacing,
+                        children: options.map((option) {
+                          final isSelected = option.value == selectedValue;
+                          return SizedBox(
+                            width: itemWidth,
+                            child: InkWell(
+                              onTap: () {
+                                onSelected(option.value);
+                                Navigator.pop(context);
+                              },
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 8),
+                                alignment: Alignment.centerLeft, // 内容左对齐
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? const Color(0xFF27AE60)
+                                      : Theme.of(context)
+                                          .chipTheme
+                                          .backgroundColor,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  option.label,
+                                  textAlign: TextAlign.left, // 文字左对齐
+                                  style: TextStyle(
+                                    color: isSelected ? Colors.white : null,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          );
+        },
+      );
+    }
   }
 
   Widget _buildLoadingView(ThemeService themeService) {
@@ -493,7 +598,7 @@ class _LiveScreenState extends State<LiveScreen>
         crossAxisCount: crossAxisCount,
         childAspectRatio: childAspectRatio,
         crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
+        mainAxisSpacing: 16,
       ),
       itemCount: channels.length,
       itemBuilder: (context, index) {
@@ -517,24 +622,27 @@ class _LiveScreenState extends State<LiveScreen>
       },
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
           // 卡片主体 - 2:1 长宽比
-          AspectRatio(
-            aspectRatio: 2.0,
-            child: Container(
-              decoration: BoxDecoration(
-                color: themeService.isDarkMode
-                    ? const Color(0xFF1e1e1e)
-                    : Colors.white,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: _buildChannelLogo(channel, themeService),
-                  ),
-                ],
+          Expanded(
+            child: AspectRatio(
+              aspectRatio: 2.0,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: themeService.isDarkMode
+                      ? const Color(0xFF1e1e1e)
+                      : Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: _buildChannelLogo(channel, themeService),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

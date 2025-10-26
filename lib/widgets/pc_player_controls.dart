@@ -266,6 +266,10 @@ class _PCPlayerControlsState extends State<PCPlayerControls> {
   }
 
   void _onBlankAreaTap() {
+    // live 模式下不响应空白区域点击
+    if (widget.live) {
+      return;
+    }
     // 单击空白区域切换播放/暂停
     if (widget.player.state.playing) {
       widget.player.pause();
