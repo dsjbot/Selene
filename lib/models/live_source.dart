@@ -6,7 +6,6 @@ class LiveSource {
   final String ua;
   final String epg;
   final String from;
-  final int channelNumber;
   final bool disabled;
 
   LiveSource({
@@ -16,7 +15,6 @@ class LiveSource {
     required this.ua,
     required this.epg,
     required this.from,
-    required this.channelNumber,
     required this.disabled,
   });
 
@@ -28,7 +26,6 @@ class LiveSource {
       ua: json['ua'] as String? ?? '',
       epg: json['epg'] as String? ?? '',
       from: json['from'] as String? ?? '',
-      channelNumber: json['channelNumber'] as int? ?? 0,
       disabled: json['disabled'] as bool? ?? false,
     );
   }
@@ -41,7 +38,6 @@ class LiveSource {
       'ua': ua,
       'epg': epg,
       'from': from,
-      'channelNumber': channelNumber,
       'disabled': disabled,
     };
   }

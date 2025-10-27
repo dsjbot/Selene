@@ -118,12 +118,18 @@ class _AppWrapperState extends State<AppWrapper> {
           if (subscriptionUrl != null && subscriptionUrl.isNotEmpty) {
             final response = await http.get(Uri.parse(subscriptionUrl));
             if (response.statusCode == 200) {
-              final resources =
+              final content =
                   await SubscriptionService.parseSubscriptionContent(
                       response.body);
-              if (resources != null && resources.isNotEmpty) {
-                await LocalModeStorageService.saveSubscriptionContent(
-                    resources);
+              if (content != null) {
+                if (content.searchResources != null && content.searchResources!.isNotEmpty) {
+                  await LocalModeStorageService.saveSearchSources(
+                      content.searchResources!);
+                }
+                if (content.liveSources != null && content.liveSources!.isNotEmpty) {
+                  await LocalModeStorageService.saveLiveSources(
+                      content.liveSources!);
+                }
               }
             }
           }

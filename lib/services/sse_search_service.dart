@@ -50,7 +50,7 @@ class SSESearchService {
 
       // 获取搜索资源列表
       final allResources = isLocalMode
-          ? await LocalModeStorageService.getSubscriptionContent()
+          ? await LocalModeStorageService.getSearchSources()
           : await ApiService.getSearchResources();
 
       // 过滤掉被禁用的资源

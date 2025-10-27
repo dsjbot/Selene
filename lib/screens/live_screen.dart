@@ -70,7 +70,7 @@ class _LiveScreenState extends State<LiveScreen>
       if (liveSources.isEmpty) {
         if (mounted) {
           setState(() {
-            _errorMessage = '暂无直播源，请在 MoonTV 添加';
+            _errorMessage = '暂无直播源';
             _isLoading = false;
             _isInitialLoad = false;
             _liveSources = [];
@@ -157,7 +157,7 @@ class _LiveScreenState extends State<LiveScreen>
       if (liveSources.isEmpty) {
         if (mounted) {
           setState(() {
-            _errorMessage = '暂无直播源，请在 MoonTV 添加';
+            _errorMessage = '暂无直播源';
             _liveSources = [];
             _currentSource = null;
           });

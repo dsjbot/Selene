@@ -6,7 +6,6 @@ import 'dart:async';
 import '../services/user_data_service.dart';
 import '../services/local_mode_storage_service.dart';
 import '../services/subscription_service.dart';
-import '../models/search_resource.dart';
 import '../utils/device_utils.dart';
 import '../utils/font_utils.dart';
 import '../widgets/windows_title_bar.dart';
@@ -387,10 +386,12 @@ class _LoginScreenState extends State<LoginScreen> {
           return;
         }
 
-        final resources =
+        final content =
             await SubscriptionService.parseSubscriptionContent(response.body);
 
-        if (resources == null || resources.isEmpty) {
+        if (content == null || 
+            (content.searchResources == null || content.searchResources!.isEmpty) &&
+            (content.liveSources == null || content.liveSources!.isEmpty)) {
           setState(() {
             _isLoading = false;
           });
@@ -469,7 +470,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
         // 保存订阅链接和内容
         await LocalModeStorageService.saveSubscriptionUrl(newUrl);
-        await LocalModeStorageService.saveSubscriptionContent(resources);
+        if (content.searchResources != null && content.searchResources!.isNotEmpty) {
+          await LocalModeStorageService.saveSearchSources(content.searchResources!);
+        }
+        if (content.liveSources != null && content.liveSources!.isNotEmpty) {
+          await LocalModeStorageService.saveLiveSources(content.liveSources!);
+        }
 
         // 保存模式状态为本地模式
         await UserDataService.saveIsLocalMode(true);

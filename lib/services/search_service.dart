@@ -20,7 +20,7 @@ class SearchService {
 
     // 本地模式不使用缓存，直接返回
     if (isLocalMode) {
-      return await LocalModeStorageService.getSubscriptionContent();
+      return await LocalModeStorageService.getSearchSources();
     }
 
     // 服务器模式使用缓存

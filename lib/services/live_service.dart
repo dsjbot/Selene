@@ -1,5 +1,8 @@
 import 'dart:convert';
 
+import 'package:selene/services/local_mode_storage_service.dart';
+import 'package:selene/services/user_data_service.dart';
+
 import '../models/live_channel.dart';
 import '../models/live_source.dart';
 import '../models/epg_program.dart';
@@ -61,7 +64,13 @@ class LiveService {
   /// 获取并缓存直播源
   static Future<List<LiveSource>> _fetchAndCacheLiveSources() async {
     try {
-      final sources = await ApiService.getLiveSources();
+      final isLocalMode = await UserDataService.getIsLocalMode();
+      List<LiveSource> sources;
+      if (isLocalMode) {
+        sources = await LocalModeStorageService.getLiveSources();
+      } else {
+        sources = await ApiService.getLiveSources();
+      }
       _liveSourcesCache = _CacheItem(sources, DateTime.now());
       return sources;
     } catch (e) {

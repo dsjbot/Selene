@@ -98,10 +98,14 @@ class _MainLayoutState extends State<MainLayout> {
   void _fetchSearchSuggestions(String query) async {
     if (query.trim().isEmpty) {
       if (mounted) {
-        setState(() {
-          _searchSuggestions = [];
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            setState(() {
+              _searchSuggestions = [];
+            });
+            _removeOverlay();
+          }
         });
-        _removeOverlay();
       }
       return;
     }
@@ -118,39 +122,56 @@ class _MainLayoutState extends State<MainLayout> {
     }
 
     // 检查搜索框内容是否已变化
-    if (!mounted || widget.searchQuery != currentQuery) {
+    if (!mounted ||
+        widget.searchQuery != currentQuery ||
+        suggestionResults.isEmpty) {
       return;
     }
 
-    if (suggestionResults.isNotEmpty) {
-      // 提取建议文本
-      setState(() {
-        _searchSuggestions = suggestionResults.take(8).toList();
-      });
-      // 使用 post-frame callback 确保在正确的时机显示 overlay
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _searchSuggestions.isNotEmpty) {
-          _showSuggestionsOverlay();
-        }
-      });
-    } else {
-      setState(() {
-        _searchSuggestions = [];
-      });
-      _removeOverlay();
-    }
+    // 使用 post-frame callback 确保在正确的时机更新状态
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || widget.searchQuery != currentQuery) {
+        return;
+      }
+
+      if (suggestionResults.isNotEmpty) {
+        setState(() {
+          _searchSuggestions = suggestionResults.take(8).toList();
+        });
+        // 再次使用 post-frame callback 显示 overlay
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _searchSuggestions.isNotEmpty) {
+            _showSuggestionsOverlay();
+          }
+        });
+      } else {
+        setState(() {
+          _searchSuggestions = [];
+        });
+        _removeOverlay();
+      }
+    });
   }
 
   void _onSearchQueryChanged(String query) {
-    widget.onSearchQueryChanged?.call(query);
+    // 使用 post-frame callback 来调用父组件回调，避免在 build 期间触发 setState
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      widget.onSearchQueryChanged?.call(query);
+    });
 
     // 取消之前的防抖计时器
     _debounceTimer?.cancel();
 
     if (query.trim().isEmpty) {
-      // 直接清除建议，不需要 setState
-      _searchSuggestions = [];
-      _removeOverlay();
+      // 使用 post-frame callback 来清除建议
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            _searchSuggestions = [];
+          });
+          _removeOverlay();
+        }
+      });
       return;
     }
 
@@ -180,84 +201,70 @@ class _MainLayoutState extends State<MainLayout> {
         isTablet ? screenWidth * 0.5 : screenWidth - 32 - 16 - 32 - 12 - 32;
 
     _overlayEntry = OverlayEntry(
-      builder: (context) => Stack(
-        children: [
-          // 全屏透明背景，用于捕获点击外部事件
-          Positioned.fill(
-            child: GestureDetector(
-              onTap: _removeOverlay,
-              behavior: HitTestBehavior.translucent,
-              child: Container(
-                color: Colors.transparent,
-              ),
-            ),
-          ),
-          // 搜索建议框
-          CompositedTransformFollower(
-            link: _layerLink,
-            showWhenUnlinked: false,
-            offset: const Offset(0, 42), // 紧贴搜索框
-            child: SizedBox(
-              width: suggestionWidth,
-              child: Material(
-                elevation: 0,
-                borderRadius: BorderRadius.circular(12),
-                color: themeService.isDarkMode
-                    ? const Color(0xFF1e1e1e)
-                    : Colors.white,
-                child: Container(
-                  constraints: const BoxConstraints(maxHeight: 320),
-                  child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    shrinkWrap: true,
-                    itemCount: _searchSuggestions.length,
-                    itemBuilder: (context, index) {
-                      final suggestion = _searchSuggestions[index];
-                      return InkWell(
-                        onTap: () {
-                          widget.searchController?.text = suggestion;
-                          widget.onSearchSubmitted?.call(suggestion);
-                          _removeOverlay();
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                LucideIcons.search,
-                                size: 16,
-                                color: themeService.isDarkMode
-                                    ? const Color(0xFF666666)
-                                    : const Color(0xFF95a5a6),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  suggestion,
-                                  style: FontUtils.poppins(
-                                    fontSize: 14,
-                                    color: themeService.isDarkMode
-                                        ? const Color(0xFFffffff)
-                                        : const Color(0xFF2c3e50),
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
+      builder: (context) => Positioned(
+        width: suggestionWidth,
+        child: CompositedTransformFollower(
+          link: _layerLink,
+          showWhenUnlinked: false,
+          offset: const Offset(0, 42), // 紧贴搜索框
+          child: Material(
+            elevation: 8,
+            borderRadius: BorderRadius.circular(12),
+            color: themeService.isDarkMode
+                ? const Color(0xFF1e1e1e)
+                : Colors.white,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 320),
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                shrinkWrap: true,
+                itemCount: _searchSuggestions.length,
+                itemBuilder: (context, index) {
+                  final suggestion = _searchSuggestions[index];
+                  return InkWell(
+                    onTap: () {
+                      widget.searchController?.text = suggestion;
+                      widget.onSearchSubmitted?.call(suggestion);
+                      _removeOverlay();
                     },
-                  ),
-                ),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            LucideIcons.search,
+                            size: 16,
+                            color: themeService.isDarkMode
+                                ? const Color(0xFF666666)
+                                : const Color(0xFF95a5a6),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              suggestion,
+                              style: FontUtils.poppins(
+                                fontSize: 14,
+                                color: themeService.isDarkMode
+                                    ? const Color(0xFFffffff)
+                                    : const Color(0xFF2c3e50),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
           ),
-        ],
+        ),
       ),
     );
 
@@ -490,164 +497,179 @@ class _MainLayoutState extends State<MainLayout> {
               themeService.isDarkMode ? const Color(0xFF1e1e1e) : Colors.white,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: TextField(
-          controller: widget.searchController,
-          focusNode: widget.searchFocusNode,
-          autofocus: false,
-          textInputAction: TextInputAction.search,
-          keyboardType: TextInputType.text,
-          textAlignVertical: TextAlignVertical.center,
-          decoration: InputDecoration(
-            hintText: '搜索电影、剧集、动漫...',
-            hintStyle: FontUtils.poppins(
-              color: themeService.isDarkMode
-                  ? const Color(0xFF666666)
-                  : const Color(0xFF95a5a6),
-              fontSize: 14,
-            ),
-            suffixIcon: SizedBox(
-              width: isTablet ? 80 : 80, // 固定宽度确保按钮位置一致
-              child: Stack(
-                alignment: Alignment.centerRight,
-                children: [
-                  // 搜索按钮 - 固定在右侧
-                  Positioned(
-                    right: isTablet ? 8 : 12,
-                    child: MouseRegion(
-                      cursor:
-                          (widget.searchQuery?.trim().isNotEmpty ?? false) &&
-                                  DeviceUtils.isPC()
-                              ? SystemMouseCursors.click
-                              : MouseCursor.defer,
-                      onEnter: DeviceUtils.isPC() &&
-                              (widget.searchQuery?.trim().isNotEmpty ?? false)
-                          ? (_) {
-                              setState(() {
-                                _isSearchSubmitButtonHovered = true;
-                              });
-                            }
-                          : null,
-                      onExit: DeviceUtils.isPC() &&
-                              (widget.searchQuery?.trim().isNotEmpty ?? false)
-                          ? (_) {
-                              setState(() {
-                                _isSearchSubmitButtonHovered = false;
-                              });
-                            }
-                          : null,
-                      child: GestureDetector(
-                        onTap: (widget.searchQuery?.trim().isNotEmpty ?? false)
-                            ? () {
-                                _removeOverlay();
-                                widget.onSearchSubmitted
-                                    ?.call(widget.searchQuery!);
-                              }
-                            : null,
-                        behavior: HitTestBehavior.opaque,
-                        child: Container(
-                          padding: EdgeInsets.all(isTablet ? 6 : 8),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: DeviceUtils.isPC() &&
-                                    _isSearchSubmitButtonHovered &&
-                                    (widget.searchQuery?.trim().isNotEmpty ??
-                                        false)
-                                ? (themeService.isDarkMode
-                                    ? const Color(0xFF333333)
-                                    : const Color(0xFFe0e0e0))
-                                : Colors.transparent,
-                          ),
-                          child: Icon(
-                            LucideIcons.search,
-                            color:
-                                (widget.searchQuery?.trim().isNotEmpty ?? false)
-                                    ? const Color(0xFF27ae60)
-                                    : themeService.isDarkMode
-                                        ? const Color(0xFFb0b0b0)
-                                        : const Color(0xFF7f8c8d),
-                            size: isTablet ? 18 : 16,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  // 清除按钮 - 在搜索按钮左侧（仅在有内容时显示）
-                  if (widget.searchQuery?.isNotEmpty ?? false)
+        child: Focus(
+          onFocusChange: (hasFocus) {
+            if (!hasFocus) {
+              // 失焦时关闭建议框
+              _removeOverlay();
+            }
+          },
+          child: TextField(
+            controller: widget.searchController,
+            focusNode: widget.searchFocusNode,
+            autofocus: false,
+            textInputAction: TextInputAction.search,
+            keyboardType: TextInputType.text,
+            textAlignVertical: TextAlignVertical.center,
+            decoration: InputDecoration(
+              hintText: '搜索电影、剧集、动漫...',
+              hintStyle: FontUtils.poppins(
+                color: themeService.isDarkMode
+                    ? const Color(0xFF666666)
+                    : const Color(0xFF95a5a6),
+                fontSize: 14,
+              ),
+              suffixIcon: SizedBox(
+                width: isTablet ? 80 : 80, // 固定宽度确保按钮位置一致
+                child: Stack(
+                  alignment: Alignment.centerRight,
+                  children: [
+                    // 搜索按钮 - 固定在右侧
                     Positioned(
-                      right: isTablet ? 42 : 44,
+                      right: isTablet ? 8 : 12,
                       child: MouseRegion(
-                        cursor: DeviceUtils.isPC()
-                            ? SystemMouseCursors.click
-                            : MouseCursor.defer,
-                        onEnter: DeviceUtils.isPC()
+                        cursor:
+                            (widget.searchQuery?.trim().isNotEmpty ?? false) &&
+                                    DeviceUtils.isPC()
+                                ? SystemMouseCursors.click
+                                : MouseCursor.defer,
+                        onEnter: DeviceUtils.isPC() &&
+                                (widget.searchQuery?.trim().isNotEmpty ?? false)
                             ? (_) {
                                 setState(() {
-                                  _isClearButtonHovered = true;
+                                  _isSearchSubmitButtonHovered = true;
                                 });
                               }
                             : null,
-                        onExit: DeviceUtils.isPC()
+                        onExit: DeviceUtils.isPC() &&
+                                (widget.searchQuery?.trim().isNotEmpty ?? false)
                             ? (_) {
                                 setState(() {
-                                  _isClearButtonHovered = false;
+                                  _isSearchSubmitButtonHovered = false;
                                 });
                               }
                             : null,
                         child: GestureDetector(
-                          onTap: () {
-                            _removeOverlay();
-                            widget.onClearSearch?.call();
-                          },
+                          onTap:
+                              (widget.searchQuery?.trim().isNotEmpty ?? false)
+                                  ? () {
+                                      _removeOverlay();
+                                      widget.onSearchSubmitted
+                                          ?.call(widget.searchQuery!);
+                                    }
+                                  : null,
                           behavior: HitTestBehavior.opaque,
                           child: Container(
                             padding: EdgeInsets.all(isTablet ? 6 : 8),
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: DeviceUtils.isPC() && _isClearButtonHovered
+                              color: DeviceUtils.isPC() &&
+                                      _isSearchSubmitButtonHovered &&
+                                      (widget.searchQuery?.trim().isNotEmpty ??
+                                          false)
                                   ? (themeService.isDarkMode
                                       ? const Color(0xFF333333)
                                       : const Color(0xFFe0e0e0))
                                   : Colors.transparent,
                             ),
                             child: Icon(
-                              LucideIcons.x,
-                              color: themeService.isDarkMode
-                                  ? const Color(0xFFb0b0b0)
-                                  : const Color(0xFF7f8c8d),
+                              LucideIcons.search,
+                              color: (widget.searchQuery?.trim().isNotEmpty ??
+                                      false)
+                                  ? const Color(0xFF27ae60)
+                                  : themeService.isDarkMode
+                                      ? const Color(0xFFb0b0b0)
+                                      : const Color(0xFF7f8c8d),
                               size: isTablet ? 18 : 16,
                             ),
                           ),
                         ),
                       ),
                     ),
-                ],
+                    // 清除按钮 - 在搜索按钮左侧（仅在有内容时显示）
+                    Positioned(
+                      right: isTablet ? 42 : 44,
+                      child: Visibility(
+                        visible: widget.searchQuery?.isNotEmpty ?? false,
+                        maintainSize: true,
+                        maintainAnimation: true,
+                        maintainState: true,
+                        child: MouseRegion(
+                          cursor: DeviceUtils.isPC()
+                              ? SystemMouseCursors.click
+                              : MouseCursor.defer,
+                          onEnter: DeviceUtils.isPC()
+                              ? (_) {
+                                  setState(() {
+                                    _isClearButtonHovered = true;
+                                  });
+                                }
+                              : null,
+                          onExit: DeviceUtils.isPC()
+                              ? (_) {
+                                  setState(() {
+                                    _isClearButtonHovered = false;
+                                  });
+                                }
+                              : null,
+                          child: GestureDetector(
+                            onTap: () {
+                              _removeOverlay();
+                              widget.onClearSearch?.call();
+                            },
+                            behavior: HitTestBehavior.opaque,
+                            child: Container(
+                              padding: EdgeInsets.all(isTablet ? 6 : 8),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color:
+                                    DeviceUtils.isPC() && _isClearButtonHovered
+                                        ? (themeService.isDarkMode
+                                            ? const Color(0xFF333333)
+                                            : const Color(0xFFe0e0e0))
+                                        : Colors.transparent,
+                              ),
+                              child: Icon(
+                                LucideIcons.x,
+                                color: themeService.isDarkMode
+                                    ? const Color(0xFFb0b0b0)
+                                    : const Color(0xFF7f8c8d),
+                                size: isTablet ? 18 : 16,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 6,
+              ),
+              isDense: true,
             ),
-            border: InputBorder.none,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 6,
+            style: FontUtils.poppins(
+              fontSize: 14,
+              color: themeService.isDarkMode
+                  ? const Color(0xFFffffff)
+                  : const Color(0xFF2c3e50),
+              height: 1.2,
             ),
-            isDense: true,
+            onSubmitted: (value) {
+              _removeOverlay();
+              widget.onSearchSubmitted?.call(value);
+            },
+            onChanged: _onSearchQueryChanged,
+            onTap: () {
+              // 聚焦时如果有内容，显示建议
+              if (widget.searchQuery?.trim().isNotEmpty ?? false) {
+                _fetchSearchSuggestions(widget.searchQuery!);
+              }
+            },
           ),
-          style: FontUtils.poppins(
-            fontSize: 14,
-            color: themeService.isDarkMode
-                ? const Color(0xFFffffff)
-                : const Color(0xFF2c3e50),
-            height: 1.2,
-          ),
-          onSubmitted: (value) {
-            _removeOverlay();
-            widget.onSearchSubmitted?.call(value);
-          },
-          onChanged: _onSearchQueryChanged,
-          onTap: () {
-            // 聚焦时如果有内容，显示建议
-            if (widget.searchQuery?.trim().isNotEmpty ?? false) {
-              _fetchSearchSuggestions(widget.searchQuery!);
-            }
-          },
         ),
       ),
     );
