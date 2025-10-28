@@ -27,6 +27,8 @@ class MobilePlayerControls extends StatefulWidget {
   final bool live;
   final ValueNotifier<double> playbackSpeedListenable;
   final Future<void> Function(double speed) onSetSpeed;
+  final Future<void> Function() onEnterPipMode;
+  final bool isPipMode;
 
   const MobilePlayerControls({
     super.key,
@@ -49,6 +51,8 @@ class MobilePlayerControls extends StatefulWidget {
     this.live = false,
     required this.playbackSpeedListenable,
     required this.onSetSpeed,
+    required this.onEnterPipMode,
+    required this.isPipMode,
   });
 
   @override
@@ -90,6 +94,17 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
     });
   }
 
+  @override
+  void didUpdateWidget(covariant MobilePlayerControls oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 当 PIP 模式停止时，显示控制栏
+    if (oldWidget.isPipMode && !widget.isPipMode) {
+      setState(() => _controlsVisible = true);
+      widget.onControlsVisibilityChanged(true);
+      _startHideTimer();
+    }
+  }
+
   void _initSystemControls() {
     VolumeController.instance.showSystemUI = false;
     VolumeController.instance.getVolume().then((value) {
@@ -97,7 +112,7 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
         setState(() => _currentVolume = value);
       }
     }).catchError((_) {});
-    ScreenBrightness().current.then((value) {
+    ScreenBrightness().application.then((value) {
       if (mounted) {
         setState(() => _currentBrightness = value);
       }
@@ -308,7 +323,7 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
           (_currentBrightness + brightnessChange).clamp(0.0, 1.0);
       _showBrightnessIndicator = true;
     });
-    ScreenBrightness().setScreenBrightness(_currentBrightness);
+    ScreenBrightness().setApplicationScreenBrightness(_currentBrightness);
     _startBrightnessHideTimer();
   }
 
@@ -364,7 +379,13 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
     widget.onFullscreenChange(false);
     // 触发退出全屏回调
     widget.onExitFullScreen?.call();
-    _onUserInteraction();
+    // 确保控制栏可见并重新启动隐藏计时器
+    setState(() {
+      _controlsVisible = true;
+      _isLocked = false;
+    });
+    widget.onControlsVisibilityChanged(true);
+    _startHideTimer();
   }
 
   Future<void> _showDLNADialog() async {
@@ -417,7 +438,8 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
                         color: selected
                             ? Colors.red
                             : (isDark ? Colors.white : Colors.black87),
-                        fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                        fontWeight:
+                            selected ? FontWeight.bold : FontWeight.normal,
                       ),
                     ),
                     onTap: () => Navigator.of(context).pop(speed),
@@ -432,6 +454,16 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
     if (result != null) {
       await widget.onSetSpeed(result);
     }
+  }
+
+  Future<void> _enterPipMode() async {
+    debugPrint('_enterPipMode');
+    // 隐藏控制栏
+    setState(() => _controlsVisible = false);
+    widget.onControlsVisibilityChanged(false);
+    _hideTimer?.cancel();
+    // 调用父层的 PIP 逻辑
+    await widget.onEnterPipMode();
   }
 
   String _formatDuration(Duration duration) {
@@ -801,7 +833,7 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
                   onTap: _togglePlayPause,
                   behavior: HitTestBehavior.opaque,
                   child: Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.fromLTRB(8, 8, 0, 8),
                     child: Icon(
                       _isPlaying ? Icons.pause : Icons.play_arrow,
                       color: Colors.white,
@@ -810,28 +842,25 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
                   ),
                 ),
                 if (!widget.isLastEpisode && !widget.live)
-                  Transform.translate(
-                    offset: const Offset(-8, 0),
-                    child: GestureDetector(
-                      onTap: () {
-                        _onUserInteraction();
-                        widget.onNextEpisode?.call();
-                      },
-                      behavior: HitTestBehavior.opaque,
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        child: Icon(
-                          Icons.skip_next,
-                          color: Colors.white,
-                          size: _isFullscreen ? 28 : 24,
-                        ),
+                  GestureDetector(
+                    onTap: () {
+                      _onUserInteraction();
+                      widget.onNextEpisode?.call();
+                    },
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      child: Icon(
+                        Icons.skip_next,
+                        color: Colors.white,
+                        size: _isFullscreen ? 28 : 24,
                       ),
                     ),
                   ),
                 if (!widget.live)
                   Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                      padding: const EdgeInsets.only(left: 8.0, right: 8.0),
                       child: Text(
                         '${_formatDuration(position)} / ${_formatDuration(duration)}',
                         style:
@@ -841,17 +870,37 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
                   ),
                 if (widget.live) const Spacer(),
                 if (!widget.live)
-                  IconButton(
-                    icon: Icon(
-                      Icons.speed,
-                      color: Colors.white,
-                      size: _isFullscreen ? 22 : 20,
-                    ),
-                    onPressed: () async {
+                  GestureDetector(
+                    onTap: () async {
                       _onUserInteraction();
                       await _showSpeedDialog();
                     },
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
+                      padding: EdgeInsets.only(right: _isFullscreen ? 22 : 10),
+                      child: Icon(
+                        Icons.speed,
+                        color: Colors.white,
+                        size: _isFullscreen ? 22 : 20,
+                      ),
+                    ),
                   ),
+                GestureDetector(
+                  onTap: () async {
+                    print('PIP button clicked!');
+                    _onUserInteraction();
+                    await _enterPipMode();
+                  },
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    child: Icon(
+                      Icons.picture_in_picture_alt,
+                      color: Colors.white,
+                      size: _isFullscreen ? 22 : 20,
+                    ),
+                  ),
+                ),
                 GestureDetector(
                   onTap: () {
                     _onUserInteraction();
@@ -863,7 +912,7 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
                   },
                   behavior: HitTestBehavior.opaque,
                   child: Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: EdgeInsets.only(left: _isFullscreen ? 12 : 5, right: _isFullscreen ? 12 : 8),
                     child: Icon(
                       _isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
                       color: Colors.white,
@@ -1159,23 +1208,23 @@ class _MobileVideoProgressBarState extends State<_MobileVideoProgressBar> {
                 final seekPosition = Duration(
                   milliseconds: (_dragValue * duration.inMilliseconds).round(),
                 );
-                
+
                 setState(() {
                   _isDragging = false;
                   _isSeeking = true; // 标记开始 seek
                 });
-                
+
                 await widget.player.seek(seekPosition);
-                
+
                 // seek 完成后，延迟一小段时间再允许位置更新，确保播放器状态已同步
                 await Future.delayed(const Duration(milliseconds: 100));
-                
+
                 if (mounted) {
                   setState(() {
                     _isSeeking = false; // 标记 seek 完成
                   });
                 }
-                
+
                 widget.onDragEnd?.call();
               }
             },
@@ -1187,22 +1236,22 @@ class _MobileVideoProgressBarState extends State<_MobileVideoProgressBar> {
               final seekPosition = Duration(
                 milliseconds: (_dragValue * duration.inMilliseconds).round(),
               );
-              
+
               setState(() {
                 _isSeeking = true; // 标记开始 seek
               });
-              
+
               await widget.player.seek(seekPosition);
-              
+
               // seek 完成后，延迟一小段时间再允许位置更新，确保播放器状态已同步
               await Future.delayed(const Duration(milliseconds: 100));
-              
+
               if (mounted) {
                 setState(() {
                   _isSeeking = false; // 标记 seek 完成
                 });
               }
-              
+
               widget.onDragEnd?.call();
             },
       child: Container(
