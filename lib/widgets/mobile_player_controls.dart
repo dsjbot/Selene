@@ -1098,13 +1098,14 @@ class _MobileVideoProgressBar extends StatefulWidget {
 class _MobileVideoProgressBarState extends State<_MobileVideoProgressBar> {
   bool _isDragging = false;
   double _dragValue = 0.0;
+  bool _isSeeking = false; // 新增：标记是否正在 seek
   StreamSubscription<Duration>? _positionSubscription;
 
   @override
   void initState() {
     super.initState();
     _positionSubscription = widget.player.stream.position.listen((_) {
-      if (mounted && !_isDragging) {
+      if (mounted && !_isDragging && !_isSeeking) {
         setState(() {});
       }
     });
@@ -1153,25 +1154,55 @@ class _MobileVideoProgressBarState extends State<_MobileVideoProgressBar> {
             },
       onHorizontalDragEnd: widget.live
           ? null
-          : (details) {
+          : (details) async {
               if (_isDragging) {
                 final seekPosition = Duration(
                   milliseconds: (_dragValue * duration.inMilliseconds).round(),
                 );
-                widget.player.seek(seekPosition);
-                setState(() => _isDragging = false);
+                
+                setState(() {
+                  _isDragging = false;
+                  _isSeeking = true; // 标记开始 seek
+                });
+                
+                await widget.player.seek(seekPosition);
+                
+                // seek 完成后，延迟一小段时间再允许位置更新，确保播放器状态已同步
+                await Future.delayed(const Duration(milliseconds: 100));
+                
+                if (mounted) {
+                  setState(() {
+                    _isSeeking = false; // 标记 seek 完成
+                  });
+                }
+                
                 widget.onDragEnd?.call();
               }
             },
       onTapDown: widget.live
           ? null
-          : (details) {
+          : (details) async {
               widget.onDragStart?.call();
               _updateDrag(details.localPosition.dx, context);
               final seekPosition = Duration(
                 milliseconds: (_dragValue * duration.inMilliseconds).round(),
               );
-              widget.player.seek(seekPosition);
+              
+              setState(() {
+                _isSeeking = true; // 标记开始 seek
+              });
+              
+              await widget.player.seek(seekPosition);
+              
+              // seek 完成后，延迟一小段时间再允许位置更新，确保播放器状态已同步
+              await Future.delayed(const Duration(milliseconds: 100));
+              
+              if (mounted) {
+                setState(() {
+                  _isSeeking = false; // 标记 seek 完成
+                });
+              }
+              
               widget.onDragEnd?.call();
             },
       child: Container(
