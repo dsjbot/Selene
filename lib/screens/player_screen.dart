@@ -3083,8 +3083,8 @@ class _EpisodeCardWithHoverState extends State<_EpisodeCardWithHover> {
                     color: widget.isCurrentEpisode
                         ? Colors.green
                         : (widget.isDarkMode ? Colors.white : Colors.black),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w300,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w400,
                   ),
                 ),
               ),

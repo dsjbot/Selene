@@ -441,8 +441,10 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _pip.unregisterStateChangedObserver();
-    _pip.dispose();
+    if (Platform.isAndroid || Platform.isIOS) {
+      _pip.unregisterStateChangedObserver();
+      _pip.dispose();
+    }
     _disposePlayer();
     _playbackSpeed.dispose();
     super.dispose();
