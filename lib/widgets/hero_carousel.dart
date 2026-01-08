@@ -117,7 +117,7 @@ class _HeroCarouselState extends State<HeroCarousel> {
     final errorInfo = currentItem.debugError ?? "无";
     
     // 始终显示完整调试信息
-    setState(() => _debugInfo = '${currentItem.title} (ID:${currentItem.id})\ntrailer: ${trailerUrl != null ? "有" : "无"}\nerror: $errorInfo');
+    setState(() => _debugInfo = '${currentItem.title}\nerror: $errorInfo');
     
     // 如果没有预告片URL或者URL相同，不重新加载
     if (trailerUrl == null || trailerUrl.isEmpty) {
@@ -135,8 +135,8 @@ class _HeroCarouselState extends State<HeroCarousel> {
     
     // 创建新的播放器
     try {
-      final proxiedUrl = _getProxiedVideoUrl(trailerUrl);
-      setState(() => _debugInfo = '${currentItem.title}\n加载中: ${proxiedUrl.substring(0, 50)}...');
+      final proxiedUrl = await _getProxiedVideoUrl(trailerUrl);
+      setState(() => _debugInfo = '${currentItem.title}\n加载视频中...');
       
       _trailerPlayer = Player();
       _trailerController = VideoController(_trailerPlayer!);
@@ -158,8 +158,8 @@ class _HeroCarouselState extends State<HeroCarousel> {
       
       // 监听播放状态
       _trailerPlayer!.stream.playing.listen((playing) {
-        if (mounted) {
-          setState(() => _debugInfo = '${currentItem.title}\n播放状态: $playing');
+        if (mounted && playing) {
+          setState(() => _debugInfo = '${currentItem.title}\n播放中...');
         }
       });
       
@@ -172,9 +172,17 @@ class _HeroCarouselState extends State<HeroCarousel> {
         }
       });
       
-      // 开始播放
-      await _trailerPlayer!.open(Media(proxiedUrl));
-      setState(() => _debugInfo = '${currentItem.title}\n已调用open()');
+      // 获取 cookies 用于视频请求
+      final cookies = await UserDataService.getCookies();
+      final headers = <String, String>{};
+      if (cookies != null && cookies.isNotEmpty) {
+        headers['Cookie'] = cookies;
+      }
+      
+      // 开始播放，带上认证 headers
+      await _trailerPlayer!.open(
+        Media(proxiedUrl, httpHeaders: headers),
+      );
       
       if (mounted) setState(() {});
     } catch (e) {
@@ -185,7 +193,7 @@ class _HeroCarouselState extends State<HeroCarousel> {
 
   /// 获取代理后的视频URL
   /// 所有预告片视频都通过后端代理，以处理防盗链和跨域问题
-  String _getProxiedVideoUrl(String url) {
+  Future<String> _getProxiedVideoUrl(String url) async {
     if (_serverUrl != null && _serverUrl!.isNotEmpty) {
       // 所有预告片视频都走代理，后端会根据域名自动设置正确的 Referer
       return '$_serverUrl/api/video-proxy?url=${Uri.encodeComponent(url)}';
