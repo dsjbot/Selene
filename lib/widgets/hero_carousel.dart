@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../services/user_data_service.dart';
+import '../utils/image_url.dart';
 
 /// 轮播图项目数据
 class CarouselItem {
@@ -52,22 +52,11 @@ class _HeroCarouselState extends State<HeroCarousel> {
   Timer? _autoPlayTimer;
   final PageController _pageController = PageController();
   bool _isUserInteracting = false;
-  String? _serverUrl;
 
   @override
   void initState() {
     super.initState();
-    _loadServerUrl();
     _startAutoPlay();
-  }
-
-  Future<void> _loadServerUrl() async {
-    final url = await UserDataService.getServerUrl();
-    if (mounted) {
-      setState(() {
-        _serverUrl = url;
-      });
-    }
   }
 
   @override
@@ -236,192 +225,206 @@ class _HeroCarouselState extends State<HeroCarousel> {
   }
 
   Widget _buildCarouselItem(CarouselItem item, bool isTablet) {
-    final imageUrl = item.backdrop ?? item.poster;
+    // 优先使用 backdrop，如果为空则使用 poster
+    final backdrop = item.backdrop;
+    final imageUrl = (backdrop != null && backdrop.isNotEmpty) ? backdrop : item.poster;
     
     return GestureDetector(
       onTap: () => widget.onItemTap?.call(item),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          // 背景图片
-          CachedNetworkImage(
-            imageUrl: _getProxiedImageUrl(imageUrl),
-            fit: BoxFit.cover,
-            placeholder: (context, url) => Container(
-              color: Colors.grey[900],
-              child: const Center(
-                child: CircularProgressIndicator(
-                  color: Colors.white54,
-                  strokeWidth: 2,
-                ),
-              ),
-            ),
-            errorWidget: (context, url, error) => Container(
-              color: Colors.grey[900],
-              child: const Icon(Icons.broken_image, color: Colors.white54, size: 48),
-            ),
-          ),
-
-          // 渐变遮罩
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.black.withOpacity(0.3),
-                  Colors.transparent,
-                  Colors.black.withOpacity(0.7),
-                ],
-                stops: const [0.0, 0.4, 1.0],
-              ),
-            ),
-          ),
-
-          // 左侧渐变（增强文字可读性）
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-                colors: [
-                  Colors.black.withOpacity(0.5),
-                  Colors.transparent,
-                ],
-                stops: const [0.0, 0.5],
-              ),
-            ),
-          ),
-
-          // 内容
-          Positioned(
-            left: isTablet ? 32 : 16,
-            right: isTablet ? 32 : 16,
-            bottom: isTablet ? 48 : 36,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // 标题
-                Text(
-                  item.title,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: isTablet ? 28 : 18,
-                    fontWeight: FontWeight.bold,
-                    shadows: const [
-                      Shadow(
-                        offset: Offset(1, 1),
-                        blurRadius: 4,
-                        color: Colors.black87,
-                      ),
-                    ],
+      child: FutureBuilder<String>(
+        future: getImageUrl(imageUrl, 'douban'),
+        builder: (context, snapshot) {
+          final String finalImageUrl = snapshot.data ?? imageUrl;
+          final headers = getImageRequestHeaders(finalImageUrl, 'douban');
+          
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              // 背景图片
+              CachedNetworkImage(
+                imageUrl: finalImageUrl,
+                fit: BoxFit.cover,
+                httpHeaders: headers,
+                placeholder: (context, url) => Container(
+                  color: Colors.grey[900],
+                  child: const Center(
+                    child: CircularProgressIndicator(
+                      color: Colors.white54,
+                      strokeWidth: 2,
+                    ),
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
-                SizedBox(height: isTablet ? 12 : 8),
+                errorWidget: (context, url, error) {
+                  debugPrint('[HeroCarousel] 图片加载失败: $url, 错误: $error');
+                  return Container(
+                    color: Colors.grey[900],
+                    child: const Icon(Icons.broken_image, color: Colors.white54, size: 48),
+                  );
+                },
+              ),
 
-                // 元数据
-                Row(
+              // 渐变遮罩
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withOpacity(0.3),
+                      Colors.transparent,
+                      Colors.black.withOpacity(0.7),
+                    ],
+                    stops: const [0.0, 0.4, 1.0],
+                  ),
+                ),
+              ),
+
+              // 左侧渐变（增强文字可读性）
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: [
+                      Colors.black.withOpacity(0.5),
+                      Colors.transparent,
+                    ],
+                    stops: const [0.0, 0.5],
+                  ),
+                ),
+              ),
+
+              // 内容
+              Positioned(
+                left: isTablet ? 32 : 16,
+                right: isTablet ? 32 : 16,
+                bottom: isTablet ? 48 : 36,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (item.rate != null && item.rate!.isNotEmpty)
-                      Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: isTablet ? 8 : 6,
-                          vertical: isTablet ? 4 : 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.amber.withOpacity(0.9),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.star,
-                              color: Colors.white,
-                              size: isTablet ? 14 : 10,
-                            ),
-                            const SizedBox(width: 2),
-                            Text(
-                              item.rate!,
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: isTablet ? 12 : 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
+                    // 标题
+                    Text(
+                      item.title,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: isTablet ? 28 : 18,
+                        fontWeight: FontWeight.bold,
+                        shadows: const [
+                          Shadow(
+                            offset: Offset(1, 1),
+                            blurRadius: 4,
+                            color: Colors.black87,
+                          ),
+                        ],
                       ),
-                    if (item.year != null && item.year!.isNotEmpty) ...[
-                      SizedBox(width: isTablet ? 12 : 8),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    SizedBox(height: isTablet ? 12 : 8),
+
+                    // 元数据
+                    Row(
+                      children: [
+                        if (item.rate != null && item.rate!.isNotEmpty)
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isTablet ? 8 : 6,
+                              vertical: isTablet ? 4 : 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.withOpacity(0.9),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.star,
+                                  color: Colors.white,
+                                  size: isTablet ? 14 : 10,
+                                ),
+                                const SizedBox(width: 2),
+                                Text(
+                                  item.rate!,
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: isTablet ? 12 : 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        if (item.year != null && item.year!.isNotEmpty) ...[
+                          SizedBox(width: isTablet ? 12 : 8),
+                          Text(
+                            item.year!,
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.9),
+                              fontSize: isTablet ? 14 : 11,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                        SizedBox(width: isTablet ? 12 : 8),
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: isTablet ? 8 : 6,
+                            vertical: isTablet ? 4 : 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: Colors.white.withOpacity(0.3)),
+                          ),
+                          child: Text(
+                            _getTypeLabel(item.type),
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.9),
+                              fontSize: isTablet ? 12 : 10,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    // 描述（手机上显示1行，平板显示2行）
+                    if (item.description != null && item.description!.isNotEmpty) ...[
+                      SizedBox(height: isTablet ? 12 : 6),
                       Text(
-                        item.year!,
+                        item.description!,
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.9),
+                          color: Colors.white.withOpacity(0.85),
                           fontSize: isTablet ? 14 : 11,
-                          fontWeight: FontWeight.w500,
+                          height: 1.4,
                         ),
+                        maxLines: isTablet ? 2 : 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
-                    SizedBox(width: isTablet ? 12 : 8),
-                    Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isTablet ? 8 : 6,
-                        vertical: isTablet ? 4 : 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: Colors.white.withOpacity(0.3)),
-                      ),
-                      child: Text(
-                        _getTypeLabel(item.type),
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.9),
-                          fontSize: isTablet ? 12 : 10,
-                          fontWeight: FontWeight.w500,
+
+                    SizedBox(height: isTablet ? 16 : 12),
+
+                    // 播放按钮
+                    Row(
+                      children: [
+                        _buildActionButton(
+                          icon: Icons.play_arrow,
+                          label: '播放',
+                          isPrimary: true,
+                          isTablet: isTablet,
+                          onTap: () => widget.onItemTap?.call(item),
                         ),
-                      ),
+                      ],
                     ),
                   ],
                 ),
-
-                // 描述（仅平板显示）
-                if (isTablet && item.description != null && item.description!.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    item.description!,
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.85),
-                      fontSize: 14,
-                      height: 1.4,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-
-                SizedBox(height: isTablet ? 16 : 12),
-
-                // 播放按钮
-                Row(
-                  children: [
-                    _buildActionButton(
-                      icon: Icons.play_arrow,
-                      label: '播放',
-                      isPrimary: true,
-                      isTablet: isTablet,
-                      onTap: () => widget.onItemTap?.call(item),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -519,17 +522,5 @@ class _HeroCarouselState extends State<HeroCarousel> {
         );
       }),
     );
-  }
-
-  /// 处理图片URL，使用代理绕过防盗链
-  String _getProxiedImageUrl(String url) {
-    if (url.contains('douban') || url.contains('doubanio')) {
-      // 使用缓存的服务器URL，如果没有则直接返回原URL
-      final serverUrl = _serverUrl;
-      if (serverUrl != null && serverUrl.isNotEmpty) {
-        return '$serverUrl/api/image-proxy?url=${Uri.encodeComponent(url)}';
-      }
-    }
-    return url;
   }
 }

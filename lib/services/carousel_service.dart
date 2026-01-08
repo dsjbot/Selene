@@ -128,48 +128,71 @@ class CarouselService {
   /// 获取豆瓣详情（背景图、简介、预告片）
   /// 优先通过后端API获取，失败则使用本地DoubanService作为备用
   static Future<Map<String, String?>?> _getDoubanDetails(BuildContext context, String doubanId) async {
+    String? backdrop;
+    String? plotSummary;
+    String? trailerUrl;
+    
     // 方案1：尝试通过后端API获取（包含backdrop和trailerUrl）
     try {
       final serverUrl = await UserDataService.getServerUrl();
+      debugPrint('[CarouselService] 服务器URL: $serverUrl');
+      
       if (serverUrl != null && serverUrl.isNotEmpty) {
         final url = '$serverUrl/api/douban/details?id=$doubanId';
+        debugPrint('[CarouselService] 请求后端API: $url');
         final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 8));
+        
+        debugPrint('[CarouselService] 后端API响应状态: ${response.statusCode}');
         
         if (response.statusCode == 200) {
           final data = json.decode(response.body);
+          debugPrint('[CarouselService] 后端API响应code: ${data['code']}');
+          
           if (data['code'] == 200 && data['data'] != null) {
             final detailData = data['data'];
-            final backdrop = detailData['backdrop'] as String?;
-            final plotSummary = detailData['plot_summary'] as String?;
-            final trailerUrl = detailData['trailerUrl'] as String?;
+            backdrop = detailData['backdrop'] as String?;
+            plotSummary = detailData['plot_summary'] as String?;
+            trailerUrl = detailData['trailerUrl'] as String?;
             
-            // 如果后端返回了有效数据，直接使用
-            if (backdrop != null || plotSummary != null || trailerUrl != null) {
-              return {
-                'backdrop': backdrop,
-                'plot_summary': plotSummary,
-                'trailerUrl': trailerUrl,
-              };
-            }
+            // 过滤空字符串
+            if (backdrop != null && backdrop.isEmpty) backdrop = null;
+            if (plotSummary != null && plotSummary.isEmpty) plotSummary = null;
+            if (trailerUrl != null && trailerUrl.isEmpty) trailerUrl = null;
+            
+            debugPrint('[CarouselService] 后端返回 $doubanId - backdrop: ${backdrop != null ? "有" : "无"}, summary: ${plotSummary != null ? "有" : "无"}, trailer: ${trailerUrl != null ? "有" : "无"}');
           }
         }
+      } else {
+        debugPrint('[CarouselService] 服务器URL为空，跳过后端API');
       }
     } catch (e) {
       debugPrint('[CarouselService] 后端API获取详情失败: $doubanId - $e');
     }
     
-    // 方案2：使用本地DoubanService作为备用（只能获取summary，没有backdrop和trailerUrl）
-    try {
-      final result = await DoubanService.getDoubanDetails(context, doubanId: doubanId);
-      if (result.success && result.data != null) {
-        return {
-          'backdrop': null, // 本地方法无法获取backdrop
-          'plot_summary': result.data!.summary,
-          'trailerUrl': null, // 本地方法无法获取trailerUrl
-        };
+    // 方案2：如果后端没有返回summary，使用本地DoubanService作为备用
+    if (plotSummary == null) {
+      try {
+        debugPrint('[CarouselService] 尝试本地DoubanService获取详情: $doubanId');
+        final result = await DoubanService.getDoubanDetails(context, doubanId: doubanId);
+        if (result.success && result.data != null) {
+          final localSummary = result.data!.summary;
+          if (localSummary != null && localSummary.isNotEmpty) {
+            plotSummary = localSummary;
+            debugPrint('[CarouselService] 本地获取成功: $doubanId - summary长度: ${plotSummary.length}');
+          }
+        }
+      } catch (e) {
+        debugPrint('[CarouselService] 本地获取详情失败: $doubanId - $e');
       }
-    } catch (e) {
-      debugPrint('[CarouselService] 本地获取详情失败: $doubanId - $e');
+    }
+    
+    // 返回结果
+    if (backdrop != null || plotSummary != null || trailerUrl != null) {
+      return {
+        'backdrop': backdrop,
+        'plot_summary': plotSummary,
+        'trailerUrl': trailerUrl,
+      };
     }
     
     return null;

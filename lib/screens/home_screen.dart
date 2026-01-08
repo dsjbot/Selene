@@ -97,7 +97,18 @@ class _HomeScreenState extends State<HomeScreen> {
         _isLoadingCarousel = true;
       });
       
+      debugPrint('[HomeScreen] 开始加载轮播图数据...');
       final items = await CarouselService.getCarouselItems(context);
+      debugPrint('[HomeScreen] 轮播图数据加载完成，共 ${items.length} 项');
+      
+      // 打印每个项目的详情
+      for (int i = 0; i < items.length; i++) {
+        final item = items[i];
+        debugPrint('[HomeScreen] 轮播图[$i]: ${item.title}');
+        debugPrint('  - backdrop: ${item.backdrop?.substring(0, item.backdrop!.length > 50 ? 50 : item.backdrop!.length) ?? "null"}...');
+        debugPrint('  - description: ${item.description?.substring(0, item.description!.length > 30 ? 30 : item.description!.length) ?? "null"}...');
+        debugPrint('  - trailerUrl: ${item.trailerUrl ?? "null"}');
+      }
       
       if (mounted) {
         setState(() {
@@ -106,6 +117,7 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
     } catch (e) {
+      debugPrint('[HomeScreen] 轮播图数据加载失败: $e');
       if (mounted) {
         setState(() {
           _isLoadingCarousel = false;
