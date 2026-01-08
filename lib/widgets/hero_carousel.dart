@@ -10,6 +10,7 @@ class CarouselItem {
   final String poster;
   final String? backdrop;
   final String? description;
+  final String? trailerUrl;
   final String? year;
   final String? rate;
   final String type; // movie, tv, variety, anime
@@ -20,6 +21,7 @@ class CarouselItem {
     required this.poster,
     this.backdrop,
     this.description,
+    this.trailerUrl,
     this.year,
     this.rate,
     required this.type,
