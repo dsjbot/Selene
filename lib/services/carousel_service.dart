@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/douban_movie.dart';
 import '../widgets/hero_carousel.dart';
 import 'douban_service.dart';
@@ -8,9 +9,124 @@ import 'user_data_service.dart';
 
 /// 轮播图数据服务
 class CarouselService {
-  /// 获取轮播图数据
+  static const String _cacheKey = 'carousel_items_cache';
+  static const String _cacheTimeKey = 'carousel_items_cache_time';
+  static const Duration _cacheDuration = Duration(hours: 1); // 缓存1小时
+  
+  // 内存缓存
+  static List<CarouselItem>? _memoryCache;
+  static DateTime? _memoryCacheTime;
+  
+  /// 获取轮播图数据（带缓存）
   /// 从热门电影、剧集、综艺、动漫中获取数据，并获取详情（背景图、简介、预告片）
-  static Future<List<CarouselItem>> getCarouselItems(BuildContext context) async {
+  static Future<List<CarouselItem>> getCarouselItems(BuildContext context, {bool forceRefresh = false}) async {
+    // 1. 如果不强制刷新，先尝试从内存缓存获取
+    if (!forceRefresh && _memoryCache != null && _memoryCacheTime != null) {
+      if (DateTime.now().difference(_memoryCacheTime!) < _cacheDuration) {
+        debugPrint('[CarouselService] 使用内存缓存，共 ${_memoryCache!.length} 项');
+        return _memoryCache!;
+      }
+    }
+    
+    // 2. 如果不强制刷新，尝试从本地存储获取缓存
+    if (!forceRefresh) {
+      final cachedItems = await _loadFromCache();
+      if (cachedItems != null && cachedItems.isNotEmpty) {
+        debugPrint('[CarouselService] 使用本地缓存，共 ${cachedItems.length} 项');
+        _memoryCache = cachedItems;
+        _memoryCacheTime = DateTime.now();
+        return cachedItems;
+      }
+    }
+    
+    // 3. 从网络获取数据
+    final items = await _fetchFromNetwork(context);
+    
+    // 4. 保存到缓存
+    if (items.isNotEmpty) {
+      _memoryCache = items;
+      _memoryCacheTime = DateTime.now();
+      await _saveToCache(items);
+    }
+    
+    return items;
+  }
+  
+  /// 清除缓存
+  static Future<void> clearCache() async {
+    _memoryCache = null;
+    _memoryCacheTime = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_cacheKey);
+    await prefs.remove(_cacheTimeKey);
+    debugPrint('[CarouselService] 缓存已清除');
+  }
+  
+  /// 从本地存储加载缓存
+  static Future<List<CarouselItem>?> _loadFromCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cacheTimeStr = prefs.getString(_cacheTimeKey);
+      
+      if (cacheTimeStr == null) return null;
+      
+      final cacheTime = DateTime.tryParse(cacheTimeStr);
+      if (cacheTime == null) return null;
+      
+      // 检查缓存是否过期
+      if (DateTime.now().difference(cacheTime) > _cacheDuration) {
+        debugPrint('[CarouselService] 本地缓存已过期');
+        return null;
+      }
+      
+      final cacheJson = prefs.getString(_cacheKey);
+      if (cacheJson == null) return null;
+      
+      final List<dynamic> jsonList = json.decode(cacheJson);
+      return jsonList.map((item) => CarouselItem(
+        id: item['id'] as String,
+        title: item['title'] as String,
+        poster: item['poster'] as String,
+        backdrop: item['backdrop'] as String?,
+        description: item['description'] as String?,
+        trailerUrl: item['trailerUrl'] as String?,
+        year: item['year'] as String?,
+        rate: item['rate'] as String?,
+        type: item['type'] as String,
+      )).toList();
+    } catch (e) {
+      debugPrint('[CarouselService] 加载缓存失败: $e');
+      return null;
+    }
+  }
+  
+  /// 保存到本地存储
+  static Future<void> _saveToCache(List<CarouselItem> items) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      final jsonList = items.map((item) => {
+        'id': item.id,
+        'title': item.title,
+        'poster': item.poster,
+        'backdrop': item.backdrop,
+        'description': item.description,
+        'trailerUrl': item.trailerUrl,
+        'year': item.year,
+        'rate': item.rate,
+        'type': item.type,
+      }).toList();
+      
+      await prefs.setString(_cacheKey, json.encode(jsonList));
+      await prefs.setString(_cacheTimeKey, DateTime.now().toIso8601String());
+      debugPrint('[CarouselService] 缓存已保存，共 ${items.length} 项');
+    } catch (e) {
+      debugPrint('[CarouselService] 保存缓存失败: $e');
+    }
+  }
+  
+  /// 从网络获取数据
+  static Future<List<CarouselItem>> _fetchFromNetwork(BuildContext context) async {
     final List<CarouselItem> items = [];
 
     try {

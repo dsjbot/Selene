@@ -92,24 +92,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// 加载轮播图数据
-  Future<void> _loadCarouselData() async {
+  Future<void> _loadCarouselData({bool forceRefresh = false}) async {
     try {
       setState(() {
         _isLoadingCarousel = true;
       });
       
-      debugPrint('[HomeScreen] 开始加载轮播图数据...');
-      final items = await CarouselService.getCarouselItems(context);
+      debugPrint('[HomeScreen] 开始加载轮播图数据... (forceRefresh: $forceRefresh)');
+      final items = await CarouselService.getCarouselItems(context, forceRefresh: forceRefresh);
       debugPrint('[HomeScreen] 轮播图数据加载完成，共 ${items.length} 项');
-      
-      // 打印每个项目的详情
-      for (int i = 0; i < items.length; i++) {
-        final item = items[i];
-        debugPrint('[HomeScreen] 轮播图[$i]: ${item.title}');
-        debugPrint('  - backdrop: ${item.backdrop?.substring(0, item.backdrop!.length > 50 ? 50 : item.backdrop!.length) ?? "null"}...');
-        debugPrint('  - description: ${item.description?.substring(0, item.description!.length > 30 ? 30 : item.description!.length) ?? "null"}...');
-        debugPrint('  - trailerUrl: ${item.trailerUrl ?? "null"}');
-      }
       
       if (mounted) {
         setState(() {
@@ -167,8 +158,8 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       // 调用各个组件的刷新方法
       if (mounted) {
-        // 刷新轮播图
-        _loadCarouselData();
+        // 刷新轮播图（强制刷新，忽略缓存）
+        _loadCarouselData(forceRefresh: true);
 
         // 刷新继续观看组件
         await ContinueWatchingSection.refreshPlayRecords();
