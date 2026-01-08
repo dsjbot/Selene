@@ -1,33 +1,49 @@
-import 'dart:math';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import '../models/danmaku.dart';
 
-/// 弹幕轨道信息
-class _DanmakuTrack {
-  double endTime;
-  _DanmakuTrack({this.endTime = 0});
-}
-
-/// 活跃弹幕信息
-class _ActiveDanmaku {
-  final DanmakuItem item;
-  final int track;
-  final double startTime;
+/// 弹幕渲染数据（预计算）
+class _RenderDanmaku {
+  final String text;
+  final double time;
   final double duration;
+  final int track;
   final double width;
   final Color color;
+  final int mode;
+  ui.Paragraph? _paragraph;
 
-  _ActiveDanmaku({
-    required this.item,
-    required this.track,
-    required this.startTime,
+  _RenderDanmaku({
+    required this.text,
+    required this.time,
     required this.duration,
+    required this.track,
     required this.width,
     required this.color,
+    required this.mode,
   });
+
+  ui.Paragraph getParagraph(double fontSize) {
+    if (_paragraph == null) {
+      final builder = ui.ParagraphBuilder(ui.ParagraphStyle(
+        textDirection: TextDirection.ltr,
+      ))
+        ..pushStyle(ui.TextStyle(
+          color: color,
+          fontSize: fontSize,
+          fontWeight: FontWeight.w500,
+          shadows: [
+            const ui.Shadow(offset: Offset(1, 1), blurRadius: 1, color: Colors.black),
+          ],
+        ))
+        ..addText(text);
+      _paragraph = builder.build()..layout(const ui.ParagraphConstraints(width: double.infinity));
+    }
+    return _paragraph!;
+  }
 }
 
-/// 弹幕层组件 - 使用 CustomPainter 优化性能
+/// 弹幕层 - 高性能实现
 class DanmakuLayer extends StatefulWidget {
   final List<DanmakuItem> danmakuList;
   final Duration currentPosition;
@@ -45,7 +61,7 @@ class DanmakuLayer extends StatefulWidget {
     required this.isPlaying,
     this.enabled = true,
     this.opacity = 1.0,
-    this.fontSize = 18.0,
+    this.fontSize = 20.0,
     this.speed = 1.0,
     this.areaHeight = 0.5,
   });
@@ -54,81 +70,69 @@ class DanmakuLayer extends StatefulWidget {
   State<DanmakuLayer> createState() => _DanmakuLayerState();
 }
 
-class _DanmakuLayerState extends State<DanmakuLayer>
-    with SingleTickerProviderStateMixin {
+class _DanmakuLayerState extends State<DanmakuLayer> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-  final List<_ActiveDanmaku> _activeDanmakus = [];
-  final List<_DanmakuTrack> _tracks = [];
-  int _lastProcessedIndex = 0;
-  double _lastPosition = 0;
-  final Random _random = Random();
-
-  static const double _baseDuration = 8.0;
-  static const double _trackHeight = 30.0;
-  static const int _maxActiveDanmakus = 30; // 减少同时显示数量
+  final List<_RenderDanmaku> _visibleDanmakus = [];
+  final List<double> _trackEndTimes = [];
+  int _nextIndex = 0;
+  double _lastTime = -1;
+  
+  static const double _duration = 8.0;
+  static const double _trackHeight = 32.0;
+  static const int _maxVisible = 40;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 1),
-    )..addListener(_onTick);
-    
-    if (widget.isPlaying && widget.enabled) {
-      _controller.repeat();
-    }
+    _controller = AnimationController.unbounded(vsync: this);
+    _startAnimation();
   }
 
-  void _onTick() {
-    if (!mounted || !widget.enabled || widget.danmakuList.isEmpty) return;
-    _updateDanmakus();
+  void _startAnimation() {
+    if (widget.isPlaying && widget.enabled && widget.danmakuList.isNotEmpty) {
+      _controller.repeat();
+    }
   }
 
   @override
   void didUpdateWidget(DanmakuLayer oldWidget) {
     super.didUpdateWidget(oldWidget);
-
+    
+    // 弹幕列表变化
     if (widget.danmakuList != oldWidget.danmakuList) {
       _reset();
     }
-
-    final currentSeconds = widget.currentPosition.inMilliseconds / 1000.0;
-    if ((currentSeconds - _lastPosition).abs() > 2.0) {
-      _onSeek(currentSeconds);
+    
+    // 检测 seek
+    final time = widget.currentPosition.inMilliseconds / 1000.0;
+    if ((_lastTime - time).abs() > 2.0) {
+      _onSeek(time);
     }
-    _lastPosition = currentSeconds;
-
-    if (widget.isPlaying && widget.enabled) {
-      if (!_controller.isAnimating) {
+    
+    // 播放状态变化
+    if (widget.isPlaying != oldWidget.isPlaying || widget.enabled != oldWidget.enabled) {
+      if (widget.isPlaying && widget.enabled) {
         _controller.repeat();
+      } else {
+        _controller.stop();
       }
-    } else {
-      _controller.stop();
     }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
   }
 
   void _reset() {
-    _activeDanmakus.clear();
-    _lastProcessedIndex = 0;
-    _lastPosition = 0;
-    _tracks.clear();
+    _visibleDanmakus.clear();
+    _trackEndTimes.clear();
+    _nextIndex = 0;
+    _lastTime = -1;
   }
 
-  void _onSeek(double newPosition) {
-    _activeDanmakus.clear();
-    _lastProcessedIndex = _findDanmakuIndex(newPosition);
-  }
-
-  int _findDanmakuIndex(double time) {
-    int left = 0;
-    int right = widget.danmakuList.length;
+  void _onSeek(double time) {
+    _visibleDanmakus.clear();
+    for (int i = 0; i < _trackEndTimes.length; i++) {
+      _trackEndTimes[i] = 0;
+    }
+    // 二分查找
+    int left = 0, right = widget.danmakuList.length;
     while (left < right) {
       int mid = (left + right) ~/ 2;
       if (widget.danmakuList[mid].time < time) {
@@ -137,88 +141,13 @@ class _DanmakuLayerState extends State<DanmakuLayer>
         right = mid;
       }
     }
-    return left;
+    _nextIndex = left;
   }
 
-  void _updateDanmakus() {
-    if (_tracks.isEmpty) return;
-
-    final currentTime = widget.currentPosition.inMilliseconds / 1000.0;
-    final duration = _baseDuration / widget.speed;
-
-    // 移除过期弹幕
-    _activeDanmakus.removeWhere((d) => currentTime > d.startTime + d.duration);
-
-    // 添加新弹幕
-    int addedCount = 0;
-    while (_lastProcessedIndex < widget.danmakuList.length &&
-        _activeDanmakus.length < _maxActiveDanmakus &&
-        addedCount < 3) { // 每帧最多添加3条
-      final danmaku = widget.danmakuList[_lastProcessedIndex];
-
-      if (danmaku.time > currentTime + 0.1) break;
-
-      if (danmaku.time < currentTime - duration) {
-        _lastProcessedIndex++;
-        continue;
-      }
-
-      if (_tryAddDanmaku(danmaku, currentTime, duration)) {
-        addedCount++;
-      }
-      _lastProcessedIndex++;
-    }
-  }
-
-  bool _tryAddDanmaku(DanmakuItem danmaku, double currentTime, double duration) {
-    if (_tracks.isEmpty) return false;
-
-    final textWidth = _estimateTextWidth(danmaku.text, widget.fontSize);
-    
-    int? track = _findAvailableTrack(currentTime);
-    if (track == null) return false;
-
-    Color color;
-    try {
-      final colorStr = danmaku.color.replaceFirst('#', '');
-      color = Color(int.parse('FF$colorStr', radix: 16));
-    } catch (e) {
-      color = Colors.white;
-    }
-
-    _activeDanmakus.add(_ActiveDanmaku(
-      item: danmaku,
-      track: track,
-      startTime: danmaku.time,
-      duration: duration,
-      width: textWidth,
-      color: color,
-    ));
-
-    _tracks[track].endTime = danmaku.time + duration * 0.35;
-    return true;
-  }
-
-  int? _findAvailableTrack(double currentTime) {
-    if (_tracks.isEmpty) return null;
-    final startTrack = _random.nextInt(_tracks.length);
-
-    for (int i = 0; i < _tracks.length; i++) {
-      final trackIndex = (startTrack + i) % _tracks.length;
-      if (currentTime > _tracks[trackIndex].endTime) {
-        return trackIndex;
-      }
-    }
-    return null;
-  }
-
-  double _estimateTextWidth(String text, double fontSize) {
-    double width = 0;
-    for (int i = 0; i < text.length; i++) {
-      final code = text.codeUnitAt(i);
-      width += code > 127 ? fontSize : fontSize * 0.5;
-    }
-    return width + 16;
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 
   @override
@@ -227,44 +156,91 @@ class _DanmakuLayerState extends State<DanmakuLayer>
       return const SizedBox.shrink();
     }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final availableHeight = constraints.maxHeight * widget.areaHeight;
-        final trackCount = (availableHeight / _trackHeight).floor();
+    return LayoutBuilder(builder: (context, constraints) {
+      // 初始化轨道
+      final trackCount = (constraints.maxHeight * widget.areaHeight / _trackHeight).floor();
+      while (_trackEndTimes.length < trackCount) _trackEndTimes.add(0);
+      while (_trackEndTimes.length > trackCount) _trackEndTimes.removeLast();
 
-        while (_tracks.length < trackCount) {
-          _tracks.add(_DanmakuTrack());
-        }
-        while (_tracks.length > trackCount) {
-          _tracks.removeLast();
-        }
+      return AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) {
+          final currentTime = widget.currentPosition.inMilliseconds / 1000.0;
+          _lastTime = currentTime;
+          final dur = _duration / widget.speed;
 
-        return RepaintBoundary(
-          child: AnimatedBuilder(
-            animation: _controller,
-            builder: (context, child) {
-              return CustomPaint(
-                size: Size(constraints.maxWidth, constraints.maxHeight),
-                painter: _DanmakuPainter(
-                  danmakus: List.from(_activeDanmakus),
-                  currentTime: widget.currentPosition.inMilliseconds / 1000.0,
-                  screenWidth: constraints.maxWidth,
-                  trackHeight: _trackHeight,
-                  fontSize: widget.fontSize,
-                  opacity: widget.opacity,
-                ),
-              );
-            },
-          ),
-        );
-      },
-    );
+          // 移除过期弹幕
+          _visibleDanmakus.removeWhere((d) => currentTime > d.time + d.duration);
+
+          // 添加新弹幕
+          while (_nextIndex < widget.danmakuList.length && _visibleDanmakus.length < _maxVisible) {
+            final item = widget.danmakuList[_nextIndex];
+            if (item.time > currentTime + 0.5) break;
+            if (item.time >= currentTime - dur) {
+              _tryAdd(item, currentTime, dur, constraints.maxWidth);
+            }
+            _nextIndex++;
+          }
+
+          return CustomPaint(
+            size: Size(constraints.maxWidth, constraints.maxHeight),
+            painter: _DanmakuPainter(
+              danmakus: _visibleDanmakus,
+              currentTime: currentTime,
+              screenWidth: constraints.maxWidth,
+              trackHeight: _trackHeight,
+              fontSize: widget.fontSize,
+              opacity: widget.opacity,
+            ),
+          );
+        },
+      );
+    });
+  }
+
+  void _tryAdd(DanmakuItem item, double currentTime, double dur, double screenWidth) {
+    if (_trackEndTimes.isEmpty) return;
+    
+    // 估算宽度
+    double w = 0;
+    for (int i = 0; i < item.text.length; i++) {
+      w += item.text.codeUnitAt(i) > 127 ? widget.fontSize : widget.fontSize * 0.5;
+    }
+    w += 20;
+
+    // 找可用轨道
+    int? track;
+    for (int i = 0; i < _trackEndTimes.length; i++) {
+      if (currentTime >= _trackEndTimes[i]) {
+        track = i;
+        break;
+      }
+    }
+    if (track == null) return;
+
+    // 解析颜色
+    Color color = Colors.white;
+    try {
+      final hex = item.color.replaceFirst('#', '');
+      color = Color(int.parse('FF$hex', radix: 16));
+    } catch (_) {}
+
+    _visibleDanmakus.add(_RenderDanmaku(
+      text: item.text,
+      time: item.time,
+      duration: dur,
+      track: track,
+      width: w,
+      color: color,
+      mode: item.mode,
+    ));
+
+    _trackEndTimes[track] = item.time + dur * 0.3;
   }
 }
 
-/// 弹幕绘制器 - 使用 Canvas 直接绘制，性能更好
 class _DanmakuPainter extends CustomPainter {
-  final List<_ActiveDanmaku> danmakus;
+  final List<_RenderDanmaku> danmakus;
   final double currentTime;
   final double screenWidth;
   final double trackHeight;
@@ -282,47 +258,32 @@ class _DanmakuPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    for (final danmaku in danmakus) {
-      final elapsed = currentTime - danmaku.startTime;
-      final progress = (elapsed / danmaku.duration).clamp(0.0, 1.0);
-
-      double left;
-      if (danmaku.item.mode == 1 || danmaku.item.mode == 2) {
-        left = (screenWidth - danmaku.width) / 2;
+    for (final d in danmakus) {
+      final progress = ((currentTime - d.time) / d.duration).clamp(0.0, 1.0);
+      
+      double x;
+      if (d.mode == 1 || d.mode == 2) {
+        x = (screenWidth - d.width) / 2;
       } else {
-        left = screenWidth - (screenWidth + danmaku.width) * progress;
+        x = screenWidth - (screenWidth + d.width) * progress;
       }
-
-      final top = danmaku.track * trackHeight;
-
-      // 绘制文字阴影
-      final shadowPaint = Paint()
-        ..color = Colors.black.withOpacity(opacity * 0.8)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
-
-      final textStyle = TextStyle(
-        color: danmaku.color.withOpacity(opacity),
-        fontSize: fontSize,
-        fontWeight: FontWeight.w500,
-      );
-
-      final textSpan = TextSpan(text: danmaku.item.text, style: textStyle);
-      final textPainter = TextPainter(
-        text: textSpan,
-        textDirection: TextDirection.ltr,
-      )..layout();
-
-      // 绘制阴影
-      canvas.drawRect(
-        Rect.fromLTWH(left + 1, top + 1, textPainter.width, textPainter.height),
-        shadowPaint,
-      );
-
-      // 绘制文字
-      textPainter.paint(canvas, Offset(left, top));
+      
+      final y = d.track * trackHeight;
+      final paragraph = d.getParagraph(fontSize);
+      
+      canvas.save();
+      canvas.translate(x, y);
+      if (opacity < 1.0) {
+        canvas.saveLayer(Rect.fromLTWH(0, 0, d.width, trackHeight), Paint()..color = Colors.white.withOpacity(opacity));
+      }
+      canvas.drawParagraph(paragraph, Offset.zero);
+      if (opacity < 1.0) {
+        canvas.restore();
+      }
+      canvas.restore();
     }
   }
 
   @override
-  bool shouldRepaint(_DanmakuPainter oldDelegate) => true;
+  bool shouldRepaint(_DanmakuPainter old) => true;
 }
