@@ -169,11 +169,11 @@ class _HeroCarouselState extends State<HeroCarousel> {
   }
 
   /// 获取代理后的视频URL
+  /// 所有预告片视频都通过后端代理，以处理防盗链和跨域问题
   String _getProxiedVideoUrl(String url) {
     if (_serverUrl != null && _serverUrl!.isNotEmpty) {
-      if (url.contains('douban') || url.contains('doubanio')) {
-        return '$_serverUrl/api/video-proxy?url=${Uri.encodeComponent(url)}';
-      }
+      // 所有预告片视频都走代理，后端会根据域名自动设置正确的 Referer
+      return '$_serverUrl/api/video-proxy?url=${Uri.encodeComponent(url)}';
     }
     return url;
   }
