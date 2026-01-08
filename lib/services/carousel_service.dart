@@ -30,12 +30,14 @@ class CarouselService {
       // 处理电影数据（取前3个）- 立即获取详情
       if (moviesResult.success && moviesResult.data != null) {
         final movies = moviesResult.data!.take(3).toList();
+        debugPrint('[CarouselService] 电影数据: ${movies.map((m) => "${m.title}(${m.id})").join(", ")}');
         final detailsFutures = movies.map((movie) => _getDoubanDetails(context, movie.id));
         final detailsList = await Future.wait(detailsFutures);
         
         for (int i = 0; i < movies.length; i++) {
           final movie = movies[i];
           final details = detailsList[i];
+          debugPrint('[CarouselService] 添加电影: ${movie.title}, trailerUrl: ${details?['trailerUrl']}');
           items.add(CarouselItem(
             id: movie.id,
             title: movie.title,
@@ -135,12 +137,12 @@ class CarouselService {
     // 方案1：尝试通过后端API获取（包含backdrop和trailerUrl）
     try {
       final serverUrl = await UserDataService.getServerUrl();
-      debugPrint('[CarouselService] 服务器URL: $serverUrl');
+      debugPrint('[CarouselService] 服务器URL: $serverUrl, doubanId: $doubanId');
       
       if (serverUrl != null && serverUrl.isNotEmpty) {
         final url = '$serverUrl/api/douban/details?id=$doubanId';
         debugPrint('[CarouselService] 请求后端API: $url');
-        final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 8));
+        final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 15));
         
         debugPrint('[CarouselService] 后端API响应状态: ${response.statusCode}');
         
@@ -159,8 +161,15 @@ class CarouselService {
             if (plotSummary != null && plotSummary.isEmpty) plotSummary = null;
             if (trailerUrl != null && trailerUrl.isEmpty) trailerUrl = null;
             
-            debugPrint('[CarouselService] 后端返回 $doubanId - backdrop: ${backdrop != null ? "有" : "无"}, summary: ${plotSummary != null ? "有" : "无"}, trailer: ${trailerUrl != null ? "有" : "无"}');
+            debugPrint('[CarouselService] 后端返回 $doubanId:');
+            debugPrint('  - backdrop: ${backdrop != null ? "有" : "无"}');
+            debugPrint('  - summary: ${plotSummary != null ? "有(${plotSummary.length}字)" : "无"}');
+            debugPrint('  - trailerUrl: ${trailerUrl ?? "无"}');
+          } else {
+            debugPrint('[CarouselService] 后端返回code不是200或data为null');
           }
+        } else {
+          debugPrint('[CarouselService] 后端API响应非200: ${response.body.substring(0, response.body.length > 200 ? 200 : response.body.length)}');
         }
       } else {
         debugPrint('[CarouselService] 服务器URL为空，跳过后端API');
@@ -187,6 +196,8 @@ class CarouselService {
     }
     
     // 返回结果
+    debugPrint('[CarouselService] 最终返回 $doubanId - backdrop: ${backdrop != null}, summary: ${plotSummary != null}, trailer: ${trailerUrl != null}');
+    
     if (backdrop != null || plotSummary != null || trailerUrl != null) {
       return {
         'backdrop': backdrop,
