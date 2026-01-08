@@ -10,6 +10,7 @@ import '../widgets/main_layout.dart';
 import '../widgets/top_tab_switcher.dart';
 import '../widgets/favorites_grid.dart';
 import '../widgets/history_grid.dart';
+import '../widgets/hero_carousel.dart';
 import 'search_screen.dart';
 import '../widgets/video_menu_bottom_sheet.dart';
 import '../widgets/custom_refresh_indicator.dart';
@@ -18,6 +19,7 @@ import '../models/video_info.dart';
 import '../utils/font_utils.dart';
 import '../services/page_cache_service.dart';
 import '../services/version_service.dart';
+import '../services/carousel_service.dart';
 import '../widgets/update_dialog.dart';
 import 'movie_screen.dart';
 import 'tv_screen.dart';
@@ -38,6 +40,10 @@ class _HomeScreenState extends State<HomeScreen> {
   String _selectedTopTab = '首页';
   late PageController _pageController;
   late PageController _bottomNavPageController;
+  
+  // 轮播图数据
+  List<CarouselItem> _carouselItems = [];
+  bool _isLoadingCarousel = true;
 
   @override
   void initState() {
@@ -48,6 +54,8 @@ class _HomeScreenState extends State<HomeScreen> {
     _bottomNavPageController = PageController(initialPage: 0);
     // 进入首页时直接刷新播放记录和收藏夹缓存
     _refreshCacheOnHomeEnter();
+    // 加载轮播图数据
+    _loadCarouselData();
     // 检查应用更新
     _checkForUpdates();
   }
@@ -80,6 +88,30 @@ class _HomeScreenState extends State<HomeScreen> {
     _pageController.dispose();
     _bottomNavPageController.dispose();
     super.dispose();
+  }
+
+  /// 加载轮播图数据
+  Future<void> _loadCarouselData() async {
+    try {
+      setState(() {
+        _isLoadingCarousel = true;
+      });
+      
+      final items = await CarouselService.getCarouselItems(context);
+      
+      if (mounted) {
+        setState(() {
+          _carouselItems = items;
+          _isLoadingCarousel = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingCarousel = false;
+        });
+      }
+    }
   }
 
   /// 进入首页时刷新缓存
@@ -122,6 +154,9 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       // 调用各个组件的刷新方法
       if (mounted) {
+        // 刷新轮播图
+        _loadCarouselData();
+
         // 刷新继续观看组件
         await ContinueWatchingSection.refreshPlayRecords();
 
@@ -212,6 +247,26 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           children: [
             const SizedBox(height: 8),
+            // 轮播图
+            if (_carouselItems.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: HeroCarousel(
+                  items: _carouselItems,
+                  autoPlayInterval: const Duration(seconds: 6),
+                  onItemTap: (item) {
+                    _navigateToPlayer(
+                      PlayerScreen(
+                        title: item.title,
+                        year: item.year,
+                        stype: item.type == 'movie' ? 'movie' : null,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            if (_carouselItems.isNotEmpty)
+              const SizedBox(height: 12),
             // 继续观看组件
             ContinueWatchingSection(
               onVideoTap: _onVideoTap,
