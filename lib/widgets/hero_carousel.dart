@@ -52,13 +52,14 @@ class HeroCarousel extends StatefulWidget {
   State<HeroCarousel> createState() => _HeroCarouselState();
 }
 
-class _HeroCarouselState extends State<HeroCarousel> {
+class _HeroCarouselState extends State<HeroCarousel> with WidgetsBindingObserver, RouteAware {
   int _currentIndex = 0;
   Timer? _autoPlayTimer;
   final PageController _pageController = PageController();
   bool _isAutoPlayPaused = false; // 手动滑动后暂停自动播放
   bool _isAutoSwitching = false; // 标记是否是自动切换
   bool _isDisposed = false; // 标记是否已经 dispose
+  bool _isVisible = true; // 标记轮播图是否可见（用于暂停视频）
   
   // 预告片播放器 - 复用同一个实例
   Player? _trailerPlayer;
@@ -76,6 +77,7 @@ class _HeroCarouselState extends State<HeroCarousel> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initPlayer();
     _loadServerUrl();
     _startAutoPlay();
@@ -122,9 +124,48 @@ class _HeroCarouselState extends State<HeroCarousel> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (_isDisposed) return;
+    
+    switch (state) {
+      case AppLifecycleState.paused:
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.hidden:
+        // 应用进入后台，暂停视频
+        _pauseVideo();
+        break;
+      case AppLifecycleState.resumed:
+        // 应用恢复前台，如果可见则恢复视频
+        if (_isVisible) {
+          _resumeVideo();
+        }
+        break;
+      case AppLifecycleState.detached:
+        break;
+    }
+  }
+
+  /// 暂停视频播放
+  void _pauseVideo() {
+    if (_trailerPlayer != null && !_isDisposed) {
+      _trailerPlayer!.pause();
+    }
+  }
+
+  /// 恢复视频播放
+  void _resumeVideo() {
+    if (_trailerPlayer != null && !_isDisposed && _isVideoLoaded) {
+      _trailerPlayer!.play();
+    }
+  }
+
+  @override
   void dispose() {
     debugPrint('[HeroCarousel] dispose called');
     _isDisposed = true;
+    
+    WidgetsBinding.instance.removeObserver(this);
     
     _autoPlayTimer?.cancel();
     _autoPlayTimer = null;
