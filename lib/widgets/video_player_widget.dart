@@ -14,6 +14,7 @@ import '../models/danmaku.dart';
 import '../models/skip_config.dart';
 import '../services/danmaku_service.dart';
 import '../services/skip_config_service.dart';
+import '../services/ad_filter_service.dart';
 
 class VideoPlayerWidget extends StatefulWidget {
   final VideoPlayerSurface surface;
@@ -236,9 +237,19 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
       _isLoadingVideo = true;
     });
     try {
+      // 处理广告过滤
+      String processedUrl = _currentUrl!;
+      if (AdFilterService.isEnabled) {
+        processedUrl = await AdFilterService.processM3U8Url(
+          _currentUrl!,
+          headers: _currentHeaders,
+          sourceKey: widget.videoSource,
+        );
+      }
+      
       await _player!.open(
         Media(
-          _currentUrl!,
+          processedUrl,
           start: startAt,
           httpHeaders: _currentHeaders ?? const <String, String>{},
         ),
@@ -359,10 +370,20 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     });
 
     try {
+      // 处理广告过滤
+      String processedUrl = url;
+      if (AdFilterService.isEnabled) {
+        processedUrl = await AdFilterService.processM3U8Url(
+          url,
+          headers: _currentHeaders,
+          sourceKey: widget.videoSource,
+        );
+      }
+      
       final currentSpeed = _player!.state.rate;
       await _player!.open(
         Media(
-          url,
+          processedUrl,
           start: startAt,
           httpHeaders: _currentHeaders ?? const <String, String>{},
         ),

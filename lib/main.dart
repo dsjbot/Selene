@@ -9,6 +9,7 @@ import 'services/theme_service.dart';
 import 'services/douban_cache_service.dart';
 import 'services/local_mode_storage_service.dart';
 import 'services/subscription_service.dart';
+import 'services/ad_filter_service.dart';
 import 'dart:io' show Platform;
 import 'package:macos_window_utils/macos_window_utils.dart';
 import 'package:media_kit/media_kit.dart';
@@ -36,6 +37,9 @@ void main() async {
 
   // 启动定期清理
   cacheService.startPeriodicCleanup();
+
+  // 初始化广告过滤服务
+  await AdFilterService.init();
 
   runApp(const SeleneApp());
 

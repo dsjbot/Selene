@@ -4,6 +4,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/user_data_service.dart';
+import '../services/ad_filter_service.dart';
 import '../screens/login_screen.dart';
 import '../services/douban_cache_service.dart';
 import '../services/page_cache_service.dart';
@@ -38,6 +39,7 @@ class _UserMenuState extends State<UserMenu> {
   bool _preferSpeedTest = true;
   bool _localSearch = false;
   bool _isLocalMode = false;
+  bool _adFilterEnabled = true;
 
   @override
   void initState() {
@@ -77,6 +79,7 @@ class _UserMenuState extends State<UserMenu> {
         _m3u8ProxyUrl = m3u8ProxyUrl;
         _preferSpeedTest = preferSpeedTest;
         _localSearch = localSearch;
+        _adFilterEnabled = AdFilterService.isEnabled;
       });
     }
   }
@@ -809,6 +812,25 @@ class _UserMenuState extends State<UserMenu> {
                         });
                       },
                       icon: LucideIcons.zap,
+                    ),
+                    // 分割线
+                    Container(
+                      height: 1,
+                      color: widget.isDarkMode
+                          ? const Color(0xFF374151)
+                          : const Color(0xFFe5e7eb),
+                    ),
+                    // 去广告选项
+                    _buildToggleOption(
+                      title: '去广告',
+                      value: _adFilterEnabled,
+                      onChanged: (value) async {
+                        await AdFilterService.setEnabled(value);
+                        setState(() {
+                          _adFilterEnabled = value;
+                        });
+                      },
+                      icon: LucideIcons.shieldOff,
                     ),
                     // 本地搜索选项（本地模式下不显示）
                     if (!_isLocalMode) ...[
