@@ -40,24 +40,33 @@ jobs:
     name: Build ${{ matrix.name }}
 
     outputs:
-      version: ${{ steps.get_version.outputs.version }}
+      version: ${{ steps.get_version_unix.outputs.version || steps.get_version_windows.outputs.version }}
 
     steps:
       - name: Clone repository
         uses: actions/checkout@v4
 
-      - name: Get version from pubspec.yaml
-        id: get_version
+      - name: Get version from pubspec.yaml (Unix)
+        if: runner.os != 'Windows'
+        id: get_version_unix
         run: |
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            VERSION=$(powershell -Command "(Get-Content pubspec.yaml | Select-String '^version:' | ForEach-Object {\$_ -replace 'version: ', ''}).trim()")
-          else
-            VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | tr -d ' ')
-          fi
+          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | tr -d ' ')
           VERSION=$(echo "$VERSION" | cut -d'+' -f1)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Extracted version: $VERSION"
         shell: bash
+
+      - name: Get version from pubspec.yaml (Windows)
+        if: runner.os == 'Windows'
+        id: get_version_windows
+        run: |
+          $content = Get-Content pubspec.yaml
+          $versionLine = $content | Select-String '^version:'
+          $version = ($versionLine -replace 'version: ', '').Trim()
+          $version = $version.Split('+')[0]
+          echo "version=$version" >> $env:GITHUB_OUTPUT
+          Write-Host "Extracted version: $version"
+        shell: pwsh
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -105,17 +114,21 @@ jobs:
 
       - name: Write sign info
         if: matrix.name == 'android'
+        env:
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+          KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          ALIAS: ${{ secrets.ALIAS }}
         run: |
-          if [ ! -z "${{ secrets.SIGNING_KEY }}" ]; then
+          if [ ! -z "$SIGNING_KEY" ]; then
             echo "Writing signing configuration..."
-            echo ${{ secrets.SIGNING_KEY }} | base64 --decode > ${{ github.workspace }}/key.jks
-            cat > android/key.properties << EOF
-          storePassword=${{ secrets.KEY_STORE_PASSWORD }}
-          keyPassword=${{ secrets.KEY_PASSWORD }}
-          keyAlias=${{ secrets.ALIAS }}
-          storeFile=${{ github.workspace }}/key.jks
-          EOF
+            echo "$SIGNING_KEY" | base64 --decode > ${{ github.workspace }}/key.jks
+            echo "storePassword=$KEY_STORE_PASSWORD" > android/key.properties
+            echo "keyPassword=$KEY_PASSWORD" >> android/key.properties
+            echo "keyAlias=$ALIAS" >> android/key.properties
+            echo "storeFile=${{ github.workspace }}/key.jks" >> android/key.properties
             echo "Signing configuration written successfully"
+            cat android/key.properties
           else
             echo "WARNING: SIGNING_KEY secret is not set!"
           fi
@@ -134,7 +147,7 @@ jobs:
         continue-on-error: true
         shell: pwsh
         run: |
-          $version = "${{ steps.get_version.outputs.version }}"
+          $version = "${{ steps.get_version_windows.outputs.version }}"
           Write-Host "Building version: $version" -ForegroundColor Green
           
           flutter pub get
