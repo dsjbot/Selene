@@ -55,14 +55,12 @@ class HeroCarousel extends StatefulWidget {
 class _HeroCarouselState extends State<HeroCarousel> {
   int _currentIndex = 0;
   Timer? _autoPlayTimer;
-  Timer? _resumeAutoPlayTimer; // 滑动后恢复自动播放的定时器
   final PageController _pageController = PageController();
   bool _isUserInteracting = false;
-  bool _isPausedAfterSwipe = false; // 滑动后暂停自动播放
+  bool _isAutoPlayPaused = false; // 手动滑动后暂停自动播放
   
   // 滑动手势相关
   double? _touchStartX;
-  static const double _minSwipeDistance = 50.0;
   
   // 预告片播放器 - 复用同一个实例
   Player? _trailerPlayer;
@@ -124,7 +122,6 @@ class _HeroCarouselState extends State<HeroCarousel> {
   @override
   void dispose() {
     _autoPlayTimer?.cancel();
-    _resumeAutoPlayTimer?.cancel();
     _pageController.dispose();
     _trailerPlayer?.dispose();
     super.dispose();
@@ -211,24 +208,15 @@ class _HeroCarouselState extends State<HeroCarousel> {
     if (widget.items.length <= 1) return;
     
     _autoPlayTimer = Timer.periodic(widget.autoPlayInterval, (_) {
-      if (!_isUserInteracting && !_isPausedAfterSwipe && mounted) {
+      if (!_isUserInteracting && !_isAutoPlayPaused && mounted) {
         _goToNext();
       }
     });
   }
 
-  /// 滑动后暂停自动播放一段时间
-  void _pauseAutoPlayAfterSwipe() {
-    _isPausedAfterSwipe = true;
-    _resumeAutoPlayTimer?.cancel();
-    // 滑动后暂停5秒再恢复自动播放
-    _resumeAutoPlayTimer = Timer(const Duration(seconds: 5), () {
-      if (mounted) {
-        setState(() {
-          _isPausedAfterSwipe = false;
-        });
-      }
-    });
+  /// 恢复自动播放（供外部调用）
+  void resumeAutoPlay() {
+    _isAutoPlayPaused = false;
   }
 
   void _goToNext() {
@@ -279,8 +267,8 @@ class _HeroCarouselState extends State<HeroCarousel> {
     _onUserInteractionEnd();
     
     if (_touchStartX != null) {
-      // 滑动后暂停自动播放
-      _pauseAutoPlayAfterSwipe();
+      // 手动滑动后永久暂停自动播放
+      _isAutoPlayPaused = true;
     }
     _touchStartX = null;
   }

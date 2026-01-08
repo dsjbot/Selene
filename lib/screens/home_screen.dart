@@ -200,52 +200,60 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// 构建首页内容（带 PageView 支持滑动切换）
   Widget _buildHomeContentWithPageView() {
-    return Column(
-      children: [
-        // 顶部导航栏
-        TopTabSwitcher(
-          selectedTab: _selectedTopTab,
-          onTabChanged: _onTopTabChanged,
-        ),
-        // PageView 支持左右滑动
-        Expanded(
-          child: PageView(
-            controller: _pageController,
-            onPageChanged: (index) {
-              // 根据页面索引更新选中的标签
-              String newTab;
-              switch (index) {
-                case 0:
-                  newTab = '首页';
-                  break;
-                case 1:
-                  newTab = '播放历史';
-                  break;
-                case 2:
-                  newTab = '收藏夹';
-                  break;
-                default:
-                  newTab = '首页';
-              }
-
-              // 只在标签真正改变时更新状态
-              if (_selectedTopTab != newTab) {
-                setState(() {
-                  _selectedTopTab = newTab;
-                });
-              }
-            },
-            children: [
-              // 首页内容
-              _buildHomeTabContent(),
-              // 播放历史内容
-              _buildHistoryTabContent(),
-              // 收藏夹内容
-              _buildFavoritesTabContent(),
-            ],
+    return NestedScrollView(
+      headerSliverBuilder: (context, innerBoxIsScrolled) {
+        return [
+          // 轮播图作为 Sliver 头部，可以跟随滚动
+          SliverToBoxAdapter(
+            child: _buildCarousel(),
           ),
-        ),
-      ],
+          // 顶部导航栏固定
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: _TopTabSwitcherDelegate(
+              child: TopTabSwitcher(
+                selectedTab: _selectedTopTab,
+                onTabChanged: _onTopTabChanged,
+              ),
+            ),
+          ),
+        ];
+      },
+      body: PageView(
+        controller: _pageController,
+        onPageChanged: (index) {
+          // 根据页面索引更新选中的标签
+          String newTab;
+          switch (index) {
+            case 0:
+              newTab = '首页';
+              break;
+            case 1:
+              newTab = '播放历史';
+              break;
+            case 2:
+              newTab = '收藏夹';
+              break;
+            default:
+              newTab = '首页';
+          }
+
+          // 只在标签真正改变时更新状态
+          if (_selectedTopTab != newTab) {
+            setState(() {
+              _selectedTopTab = newTab;
+            });
+          }
+        },
+        children: [
+          // 首页内容
+          _buildHomeTabContent(),
+          // 播放历史内容
+          _buildHistoryTabContent(),
+          // 收藏夹内容
+          _buildFavoritesTabContent(),
+        ],
+      ),
     );
   }
 
@@ -281,8 +289,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: SingleChildScrollView(
         child: Column(
           children: [
-            // 轮播图
-            _buildCarousel(),
+            const SizedBox(height: 8),
             // 继续观看组件
             ContinueWatchingSection(
               onVideoTap: _onVideoTap,
@@ -405,8 +412,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: SingleChildScrollView(
         child: Column(
           children: [
-            // 轮播图
-            _buildCarousel(),
+            const SizedBox(height: 8),
             HistoryGrid(
               onVideoTap: _onVideoTap,
               onGlobalMenuAction: _onGlobalMenuAction,
@@ -426,8 +432,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: SingleChildScrollView(
         child: Column(
           children: [
-            // 轮播图
-            _buildCarousel(),
+            const SizedBox(height: 8),
             FavoritesGrid(
               onVideoTap: _onVideoTap,
               onGlobalMenuAction:
@@ -913,5 +918,31 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (e) {
       // 错误处理，静默处理
     }
+  }
+}
+
+/// TopTabSwitcher 的 SliverPersistentHeaderDelegate
+class _TopTabSwitcherDelegate extends SliverPersistentHeaderDelegate {
+  final Widget child;
+
+  _TopTabSwitcherDelegate({required this.child});
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return Container(
+      color: Theme.of(context).scaffoldBackgroundColor,
+      child: child,
+    );
+  }
+
+  @override
+  double get maxExtent => 60.0; // TopTabSwitcher 的高度 (32 + margin 20 + 8)
+
+  @override
+  double get minExtent => 60.0;
+
+  @override
+  bool shouldRebuild(covariant _TopTabSwitcherDelegate oldDelegate) {
+    return child != oldDelegate.child;
   }
 }
