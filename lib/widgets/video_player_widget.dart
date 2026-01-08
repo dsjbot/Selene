@@ -565,13 +565,30 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     return Container(
       color: Colors.black,
       child: _isInitialized && _videoController != null
-          ? Stack(
-              children: [
-                // 视频层
-                Video(
-                  controller: _videoController!,
-                  controls: (state) {
-                    return widget.surface == VideoPlayerSurface.desktop
+          ? Video(
+              controller: _videoController!,
+              controls: (state) {
+                // 弹幕层需要放在controls里面，这样全屏时也能显示
+                return Stack(
+                  children: [
+                    // 弹幕层（放在控制层下面）
+                    if (!widget.live && !_isPipMode)
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          child: DanmakuLayer(
+                            danmakuList: _danmakuList,
+                            currentPosition: _currentPosition,
+                            isPlaying: _player?.state.playing ?? false,
+                            enabled: _danmakuSettings.enabled,
+                            opacity: _danmakuSettings.opacity,
+                            fontSize: _danmakuSettings.fontSize,
+                            speed: _danmakuSettings.speed,
+                            areaHeight: _danmakuSettings.areaHeight,
+                          ),
+                        ),
+                      ),
+                    // 控制层
+                    widget.surface == VideoPlayerSurface.desktop
                         ? PCPlayerControls(
                             state: state,
                             player: _player!,
@@ -623,26 +640,10 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
                             danmakuCount: _danmakuList.length,
                             danmakuSettings: _danmakuSettings,
                             onDanmakuSettingsChanged: _updateDanmakuSettings,
-                          );
-                  },
-                ),
-                // 弹幕层
-                if (!widget.live && !_isPipMode)
-                  Positioned.fill(
-                    child: IgnorePointer(
-                      child: DanmakuLayer(
-                        danmakuList: _danmakuList,
-                        currentPosition: _currentPosition,
-                        isPlaying: _player?.state.playing ?? false,
-                        enabled: _danmakuSettings.enabled,
-                        opacity: _danmakuSettings.opacity,
-                        fontSize: _danmakuSettings.fontSize,
-                        speed: _danmakuSettings.speed,
-                        areaHeight: _danmakuSettings.areaHeight,
-                      ),
-                    ),
-                  ),
-              ],
+                          ),
+                  ],
+                );
+              },
             )
           : const Center(
               child: CircularProgressIndicator(
