@@ -65,6 +65,7 @@ class _DanmakuLayerState extends State<DanmakuLayer>
   double _lastPosition = 0;
   Timer? _updateTimer;
   final Random _random = Random();
+  bool _isInitialized = false; // 标记是否已初始化轨道
 
   // 弹幕配置
   static const double _baseDuration = 8.0; // 基础持续时间（秒）
@@ -119,12 +120,14 @@ class _DanmakuLayerState extends State<DanmakuLayer>
     _activeDanmakus.clear();
     _lastProcessedIndex = 0;
     _lastPosition = 0;
+    _isInitialized = false;
     _initTracks();
   }
 
   void _onSeek(double newPosition) {
     _activeDanmakus.clear();
-    _initTracks();
+    // 不清空轨道，只重置弹幕索引
+    // _initTracks();
 
     // 找到新位置对应的弹幕索引
     _lastProcessedIndex = _findDanmakuIndex(newPosition);
@@ -161,7 +164,7 @@ class _DanmakuLayerState extends State<DanmakuLayer>
   }
 
   void _updateDanmakus() {
-    if (!mounted || widget.danmakuList.isEmpty) return;
+    if (!mounted || widget.danmakuList.isEmpty || _tracks.isEmpty || !_isInitialized) return;
 
     final currentTime = widget.currentPosition.inMilliseconds / 1000.0;
     final duration = _baseDuration / widget.speed;
@@ -308,6 +311,11 @@ class _DanmakuLayerState extends State<DanmakuLayer>
         }
         while (_tracks.length > trackCount) {
           _tracks.removeLast();
+        }
+
+        // 标记已初始化
+        if (!_isInitialized && _tracks.isNotEmpty) {
+          _isInitialized = true;
         }
 
         final currentTime = widget.currentPosition.inMilliseconds / 1000.0;

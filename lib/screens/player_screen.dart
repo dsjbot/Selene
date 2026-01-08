@@ -1058,6 +1058,7 @@ class _PlayerScreenState extends State<PlayerScreen>
                 _isWebFullscreen = isWebFullscreen;
               });
             },
+            doubanId: videoDoubanID > 0 ? videoDoubanID.toString() : null,
           ),
         if (_isCasting && _dlnaDevice != null)
           DLNAPlayer(

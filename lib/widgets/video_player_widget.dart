@@ -381,8 +381,11 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
   /// 加载弹幕数据
   Future<void> _loadDanmaku() async {
     if (widget.videoTitle == null || widget.videoTitle!.isEmpty) {
+      debugPrint('[弹幕] 视频标题为空，跳过加载');
       return;
     }
+
+    debugPrint('[弹幕] 开始加载弹幕: title=${widget.videoTitle}, episode=${widget.currentEpisodeIndex}, doubanId=${widget.doubanId}');
 
     setState(() {
       _isLoadingDanmaku = true;
@@ -405,14 +408,14 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
           _isLoadingDanmaku = false;
           if (response.success) {
             _danmakuList = response.danmakuList;
-            debugPrint('弹幕加载成功: ${_danmakuList.length} 条');
+            debugPrint('[弹幕] 加载成功: ${_danmakuList.length} 条');
           } else {
-            debugPrint('弹幕加载失败: ${response.error}');
+            debugPrint('[弹幕] 加载失败: ${response.error}');
           }
         });
       }
     } catch (e) {
-      debugPrint('弹幕加载异常: $e');
+      debugPrint('[弹幕] 加载异常: $e');
       if (mounted) {
         setState(() {
           _isLoadingDanmaku = false;

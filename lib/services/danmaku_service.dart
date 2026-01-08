@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/danmaku.dart';
 import 'user_data_service.dart';
@@ -19,6 +20,7 @@ class DanmakuService {
     try {
       final baseUrl = await UserDataService.getServerUrl();
       if (baseUrl == null) {
+        debugPrint('[弹幕] 服务器地址未配置');
         return DanmakuResponse.error('服务器地址未配置');
       }
 
@@ -38,6 +40,8 @@ class DanmakuService {
       final uri = Uri.parse('$baseUrl/api/danmu-external')
           .replace(queryParameters: queryParams);
 
+      debugPrint('[弹幕] 请求URL: $uri');
+
       final response = await http.get(
         uri,
         headers: {
@@ -46,13 +50,18 @@ class DanmakuService {
         },
       ).timeout(_timeout);
 
+      debugPrint('[弹幕] 响应状态码: ${response.statusCode}');
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
+        debugPrint('[弹幕] 响应数据keys: ${data.keys.toList()}');
         return _parseDanmakuResponse(data);
       } else {
+        debugPrint('[弹幕] 请求失败: ${response.body}');
         return DanmakuResponse.error('获取弹幕失败: ${response.statusCode}');
       }
     } catch (e) {
+      debugPrint('[弹幕] 请求异常: $e');
       return DanmakuResponse.error('获取弹幕异常: $e');
     }
   }
@@ -71,6 +80,7 @@ class DanmakuService {
         // 新格式 - 后端实际返回格式
         final list = data['danmu'] as List<dynamic>? ?? [];
         count = data['total'] ?? list.length;
+        debugPrint('[弹幕] 解析danmu格式, 原始数量: ${list.length}');
         danmakuList = list.map((e) => DanmakuItem.fromJson(e as Map<String, dynamic>)).toList();
         success = danmakuList.isNotEmpty;
       } else if (data.containsKey('danmakuList')) {
@@ -78,17 +88,26 @@ class DanmakuService {
         success = data['success'] ?? false;
         count = data['count'] ?? 0;
         final list = data['danmakuList'] as List<dynamic>? ?? [];
+        debugPrint('[弹幕] 解析danmakuList格式, 原始数量: ${list.length}');
         danmakuList = list.map((e) => DanmakuItem.fromJson(e as Map<String, dynamic>)).toList();
       } else if (data.containsKey('danmuku')) {
         // 弹弹play格式
         success = (data['code'] ?? -1) == 0;
         count = data['danum'] ?? 0;
         final list = data['danmuku'] as List<dynamic>? ?? [];
+        debugPrint('[弹幕] 解析danmuku格式, 原始数量: ${list.length}');
         danmakuList = list.map((e) => _parseDanmukuItem(e)).toList();
+      } else {
+        debugPrint('[弹幕] 未识别的响应格式: ${data.keys.toList()}');
       }
 
       // 按时间排序
       danmakuList.sort((a, b) => a.time.compareTo(b.time));
+
+      debugPrint('[弹幕] 解析完成, 弹幕数量: ${danmakuList.length}');
+      if (danmakuList.isNotEmpty) {
+        debugPrint('[弹幕] 第一条弹幕: ${danmakuList.first.text} @ ${danmakuList.first.time}s');
+      }
 
       return DanmakuResponse(
         success: success || danmakuList.isNotEmpty,
@@ -96,6 +115,7 @@ class DanmakuService {
         danmakuList: danmakuList,
       );
     } catch (e) {
+      debugPrint('[弹幕] 解析异常: $e');
       return DanmakuResponse.error('解析弹幕数据失败: $e');
     }
   }
