@@ -9,8 +9,11 @@ import 'pc_player_controls.dart';
 import 'video_player_surface.dart';
 import 'danmaku_layer.dart';
 import 'danmaku_settings_panel.dart';
+import 'skip_prompt_widget.dart';
 import '../models/danmaku.dart';
+import '../models/skip_config.dart';
 import '../services/danmaku_service.dart';
+import '../services/skip_config_service.dart';
 
 class VideoPlayerWidget extends StatefulWidget {
   final VideoPlayerSurface surface;
@@ -33,6 +36,8 @@ class VideoPlayerWidget extends StatefulWidget {
   final bool live;
   final Function(bool isPipMode)? onPipModeChanged;
   final String? doubanId; // 豆瓣ID，用于获取弹幕
+  final String? videoSource; // 视频源标识，用于跳过配置
+  final String? videoId; // 视频ID，用于跳过配置
 
   const VideoPlayerWidget({
     super.key,
@@ -55,6 +60,8 @@ class VideoPlayerWidget extends StatefulWidget {
     this.onExitFullScreen,
     this.live = false,
     this.onPipModeChanged,
+    this.videoSource,
+    this.videoId,
     this.doubanId,
   });
 
@@ -151,6 +158,14 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
   List<DanmakuItem> _danmakuList = [];
   DanmakuSettings _danmakuSettings = DanmakuSettings();
   bool _isLoadingDanmaku = false;
+
+  // 跳过片头片尾相关状态
+  EpisodeSkipConfig? _skipConfig;
+  SkipController? _skipController;
+  bool _showIntroPrompt = false;
+  bool _showEndingCountdown = false;
+  SkipSegment? _currentIntroSegment;
+  SkipSegment? _currentEndingSegment;
   Duration _currentPosition = Duration.zero;
 
   @override
@@ -164,9 +179,10 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     _setupPip();
     _registerPipObserver();
     widget.onControllerCreated?.call(VideoPlayerWidgetController._(this));
-    // 加载弹幕
+    // 加载弹幕和跳过配置
     if (!widget.live) {
       _loadDanmaku();
+      _loadSkipConfig();
     }
   }
 
@@ -187,6 +203,13 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
             widget.doubanId != oldWidget.doubanId)) {
       debugPrint('[VideoPlayerWidget] 触发弹幕重新加载');
       _loadDanmaku();
+    }
+    // 视频源或ID变化时重新加载跳过配置
+    if (!widget.live &&
+        (widget.videoSource != oldWidget.videoSource ||
+            widget.videoId != oldWidget.videoId)) {
+      debugPrint('[VideoPlayerWidget] 触发跳过配置重新加载');
+      _loadSkipConfig();
     }
   }
 
@@ -252,6 +275,8 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
         setState(() {
           _currentPosition = position;
         });
+        // 检测片头片尾跳过
+        _checkSkipSegments(position);
       }
       for (final listener in List<VoidCallback>.from(_progressListeners)) {
         try {
@@ -439,6 +464,134 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
   void _updateDanmakuSettings(DanmakuSettings settings) {
     setState(() {
       _danmakuSettings = settings;
+    });
+  }
+
+  /// 加载跳过配置
+  Future<void> _loadSkipConfig() async {
+    if (widget.videoSource == null || widget.videoId == null) {
+      debugPrint('[跳过配置] 视频源或ID为空，跳过加载');
+      return;
+    }
+
+    debugPrint('[跳过配置] 开始加载: source=${widget.videoSource}, id=${widget.videoId}');
+
+    try {
+      final config = await SkipConfigService.getSkipConfig(
+        source: widget.videoSource!,
+        id: widget.videoId!,
+      );
+
+      if (mounted) {
+        setState(() {
+          _skipConfig = config;
+          _skipController = SkipController(
+            config: config,
+            videoDuration: _player?.state.duration ?? Duration.zero,
+            isLastEpisode: widget.isLastEpisode,
+          );
+          // 重置跳过状态
+          _showIntroPrompt = false;
+          _showEndingCountdown = false;
+          _currentIntroSegment = null;
+          _currentEndingSegment = null;
+        });
+        debugPrint('[跳过配置] 加载完成: ${config?.segments.length ?? 0} 个片段');
+      }
+    } catch (e) {
+      debugPrint('[跳过配置] 加载异常: $e');
+    }
+  }
+
+  /// 检测跳过片段
+  void _checkSkipSegments(Duration position) {
+    if (_skipController == null || widget.live || _isPipMode) return;
+
+    // 更新视频时长
+    final duration = _player?.state.duration ?? Duration.zero;
+    if (duration != Duration.zero && _skipController!.videoDuration != duration) {
+      _skipController = SkipController(
+        config: _skipConfig,
+        videoDuration: duration,
+        isLastEpisode: widget.isLastEpisode,
+      );
+    }
+
+    // 检测片头
+    final introSegment = _skipController!.checkIntro(position);
+    if (introSegment != null && _currentIntroSegment == null) {
+      _currentIntroSegment = introSegment;
+      if (_skipController!.shouldAutoSkipIntro(introSegment)) {
+        // 自动跳过
+        _skipIntro();
+      } else {
+        // 显示手动跳过提示
+        setState(() {
+          _showIntroPrompt = true;
+        });
+      }
+    } else if (introSegment == null && _showIntroPrompt) {
+      // 离开片头区间，隐藏提示
+      setState(() {
+        _showIntroPrompt = false;
+        _currentIntroSegment = null;
+      });
+    }
+
+    // 检测片尾
+    final endingSegment = _skipController!.checkEnding(position);
+    if (endingSegment != null && _currentEndingSegment == null) {
+      _currentEndingSegment = endingSegment;
+      if (_skipController!.shouldAutoNextEpisode(endingSegment)) {
+        // 显示倒计时
+        setState(() {
+          _showEndingCountdown = true;
+        });
+      }
+    }
+  }
+
+  /// 跳过片头
+  void _skipIntro() {
+    if (_currentIntroSegment == null || _player == null) return;
+
+    final target = _skipController?.getIntroSkipTarget(_currentIntroSegment!);
+    if (target != null) {
+      debugPrint('[跳过配置] 跳过片头到: ${target.inSeconds}s');
+      _player!.seek(target);
+    }
+
+    _skipController?.markIntroSkipped();
+    setState(() {
+      _showIntroPrompt = false;
+      _currentIntroSegment = null;
+    });
+  }
+
+  /// 关闭片头提示
+  void _dismissIntroPrompt() {
+    _skipController?.markIntroDismissed();
+    setState(() {
+      _showIntroPrompt = false;
+    });
+  }
+
+  /// 触发下一集
+  void _triggerNextEpisode() {
+    debugPrint('[跳过配置] 自动播放下一集');
+    _skipController?.markEndingTriggered();
+    setState(() {
+      _showEndingCountdown = false;
+      _currentEndingSegment = null;
+    });
+    widget.onNextEpisode?.call();
+  }
+
+  /// 取消片尾倒计时
+  void _cancelEndingCountdown() {
+    _skipController?.markEndingCancelled();
+    setState(() {
+      _showEndingCountdown = false;
     });
   }
 
@@ -641,6 +794,31 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
                             danmakuSettings: _danmakuSettings,
                             onDanmakuSettingsChanged: _updateDanmakuSettings,
                           ),
+                    // 片头跳过提示
+                    if (_showIntroPrompt && !_isPipMode)
+                      Positioned(
+                        left: 16,
+                        top: 60,
+                        child: SkipIntroPrompt(
+                          onSkip: _skipIntro,
+                          onDismiss: _dismissIntroPrompt,
+                        ),
+                      ),
+                    // 片尾倒计时
+                    if (_showEndingCountdown && !_isPipMode)
+                      Positioned(
+                        top: 16,
+                        left: 0,
+                        right: 0,
+                        child: Center(
+                          child: SkipEndingCountdown(
+                            countdownSeconds: 5,
+                            onNextEpisode: _triggerNextEpisode,
+                            onCancel: _cancelEndingCountdown,
+                            isLastEpisode: widget.isLastEpisode,
+                          ),
+                        ),
+                      ),
                   ],
                 );
               },

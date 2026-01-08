@@ -1059,6 +1059,8 @@ class _PlayerScreenState extends State<PlayerScreen>
               });
             },
             doubanId: videoDoubanID > 0 ? videoDoubanID.toString() : null,
+            videoSource: currentSource.isNotEmpty ? currentSource : null,
+            videoId: currentID.isNotEmpty ? currentID : null,
           ),
         if (_isCasting && _dlnaDevice != null)
           DLNAPlayer(
