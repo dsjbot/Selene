@@ -60,21 +60,27 @@ class DanmakuService {
   /// 解析弹幕响应
   static DanmakuResponse _parseDanmakuResponse(Map<String, dynamic> data) {
     try {
-      // 后端返回格式: { success: true, count: number, danmakuList: [...] }
+      // 后端返回格式: { danmu: [...], platforms: [...], total: number }
       // 或者: { code: 0, name: string, danum: number, danmuku: [...] }
       
       List<DanmakuItem> danmakuList = [];
       int count = 0;
       bool success = false;
 
-      if (data.containsKey('danmakuList')) {
-        // 新格式
+      if (data.containsKey('danmu')) {
+        // 新格式 - 后端实际返回格式
+        final list = data['danmu'] as List<dynamic>? ?? [];
+        count = data['total'] ?? list.length;
+        danmakuList = list.map((e) => DanmakuItem.fromJson(e as Map<String, dynamic>)).toList();
+        success = danmakuList.isNotEmpty;
+      } else if (data.containsKey('danmakuList')) {
+        // 备用格式
         success = data['success'] ?? false;
         count = data['count'] ?? 0;
         final list = data['danmakuList'] as List<dynamic>? ?? [];
-        danmakuList = list.map((e) => DanmakuItem.fromJson(e)).toList();
+        danmakuList = list.map((e) => DanmakuItem.fromJson(e as Map<String, dynamic>)).toList();
       } else if (data.containsKey('danmuku')) {
-        // 旧格式（弹弹play格式）
+        // 弹弹play格式
         success = (data['code'] ?? -1) == 0;
         count = data['danum'] ?? 0;
         final list = data['danmuku'] as List<dynamic>? ?? [];
