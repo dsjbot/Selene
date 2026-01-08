@@ -146,3 +146,9 @@ $RECYCLE.BIN/
 *.temp
 *.bak
 *.backup
+
+# Signing keys
+*.jks
+*.keystore
+signing_key_base64.txt
+key.properties
