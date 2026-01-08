@@ -143,12 +143,25 @@ class CarouselService {
     // 方案1：尝试通过后端API获取（包含backdrop和trailerUrl）
     try {
       final serverUrl = await UserDataService.getServerUrl();
-      debugPrint('[CarouselService] 服务器URL: $serverUrl, doubanId: $doubanId');
+      final cookies = await UserDataService.getCookies();
+      debugPrint('[CarouselService] 服务器URL: $serverUrl, doubanId: $doubanId, hasCookies: ${cookies != null}');
       
       if (serverUrl != null && serverUrl.isNotEmpty) {
         final url = '$serverUrl/api/douban/details?id=$doubanId';
         debugPrint('[CarouselService] 请求后端API: $url');
-        final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 15));
+        
+        // 构建请求头，包含认证 cookies
+        final headers = <String, String>{
+          'Accept': 'application/json',
+        };
+        if (cookies != null && cookies.isNotEmpty) {
+          headers['Cookie'] = cookies;
+        }
+        
+        final response = await http.get(
+          Uri.parse(url),
+          headers: headers,
+        ).timeout(const Duration(seconds: 15));
         
         debugPrint('[CarouselService] 后端API响应状态: ${response.statusCode}');
         
