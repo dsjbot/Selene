@@ -58,19 +58,50 @@ class _HeroCarouselState extends State<HeroCarousel> {
   final PageController _pageController = PageController();
   bool _isUserInteracting = false;
   
-  // 预告片播放器
+  // 预告片播放器 - 复用同一个实例
   Player? _trailerPlayer;
   VideoController? _trailerController;
   bool _isVideoLoaded = false;
   bool _isMuted = true;
   String? _currentTrailerUrl;
   String? _serverUrl;
+  bool _isLoadingVideo = false; // 防止重复加载
 
   @override
   void initState() {
     super.initState();
+    _initPlayer();
     _loadServerUrl();
     _startAutoPlay();
+  }
+
+  /// 初始化播放器（只创建一次）
+  void _initPlayer() {
+    if (!widget.enableVideo) return;
+    _trailerPlayer = Player();
+    _trailerController = VideoController(_trailerPlayer!);
+    
+    // 设置静音和循环
+    _trailerPlayer!.setVolume(0);
+    _trailerPlayer!.setPlaylistMode(PlaylistMode.loop);
+    
+    // 监听视频宽高变化（表示视频已加载）
+    _trailerPlayer!.stream.width.listen((width) {
+      if (mounted && width != null && width > 0 && !_isVideoLoaded) {
+        setState(() {
+          _isVideoLoaded = true;
+        });
+      }
+    });
+    
+    _trailerPlayer!.stream.error.listen((error) {
+      debugPrint('[HeroCarousel] 预告片播放错误: $error');
+      if (mounted) {
+        setState(() {
+          _isVideoLoaded = false;
+        });
+      }
+    });
   }
 
   Future<void> _loadServerUrl() async {
@@ -88,90 +119,45 @@ class _HeroCarouselState extends State<HeroCarousel> {
   void dispose() {
     _autoPlayTimer?.cancel();
     _pageController.dispose();
-    _disposeTrailerPlayer();
+    _trailerPlayer?.dispose();
     super.dispose();
-  }
-
-  void _disposeTrailerPlayer() {
-    final player = _trailerPlayer;
-    _trailerPlayer = null;
-    _trailerController = null;
-    _isVideoLoaded = false;
-    _currentTrailerUrl = null;
-    
-    // 异步释放播放器，避免阻塞 UI
-    if (player != null) {
-      Future.microtask(() async {
-        try {
-          await player.stop();
-          await player.dispose();
-        } catch (e) {
-          debugPrint('[HeroCarousel] 释放播放器时出错: $e');
-        }
-      });
-    }
   }
 
   /// 加载当前项目的预告片
   Future<void> _loadTrailerForCurrentItem() async {
-    if (!widget.enableVideo || widget.items.isEmpty) {
+    if (!widget.enableVideo || widget.items.isEmpty || _trailerPlayer == null) {
       return;
     }
+    
+    // 防止重复加载
+    if (_isLoadingVideo) return;
     
     final currentItem = widget.items[_currentIndex];
     final trailerUrl = currentItem.trailerUrl;
     
-    // 如果没有预告片URL，释放播放器
+    // 如果没有预告片URL，停止播放
     if (trailerUrl == null || trailerUrl.isEmpty) {
-      _disposeTrailerPlayer();
+      setState(() {
+        _isVideoLoaded = false;
+        _currentTrailerUrl = null;
+      });
+      await _trailerPlayer!.stop();
       return;
     }
     
-    // 如果URL相同且播放器存在，不重新加载
-    if (trailerUrl == _currentTrailerUrl && _trailerPlayer != null) {
+    // 如果URL相同，不重新加载
+    if (trailerUrl == _currentTrailerUrl) {
       return;
     }
     
-    // 先释放旧的播放器
-    _disposeTrailerPlayer();
+    _isLoadingVideo = true;
+    setState(() {
+      _isVideoLoaded = false;
+    });
     
-    // 等待一帧，确保旧播放器已释放
-    await Future.delayed(const Duration(milliseconds: 100));
-    
-    if (!mounted) return;
-    
-    // 创建新的播放器
     try {
       final proxiedUrl = await _getProxiedVideoUrl(trailerUrl);
-      
-      final newPlayer = Player();
-      final newController = VideoController(newPlayer);
-      
-      _trailerPlayer = newPlayer;
-      _trailerController = newController;
       _currentTrailerUrl = trailerUrl;
-      
-      // 设置静音和循环
-      await newPlayer.setVolume(_isMuted ? 0 : 100);
-      await newPlayer.setPlaylistMode(PlaylistMode.loop);
-      
-      // 监听视频宽高变化（表示视频已加载）
-      newPlayer.stream.width.listen((width) {
-        if (mounted && width != null && width > 0 && !_isVideoLoaded && _trailerPlayer == newPlayer) {
-          setState(() {
-            _isVideoLoaded = true;
-          });
-        }
-      });
-      
-      newPlayer.stream.error.listen((error) {
-        debugPrint('[HeroCarousel] 预告片播放错误: $error');
-        if (mounted && _trailerPlayer == newPlayer) {
-          setState(() {
-            _isVideoLoaded = false;
-          });
-        }
-      });
       
       // 获取 cookies 用于视频请求
       final cookies = await UserDataService.getCookies();
@@ -180,15 +166,18 @@ class _HeroCarouselState extends State<HeroCarousel> {
         headers['Cookie'] = cookies;
       }
       
-      // 开始播放，带上认证 headers
-      await newPlayer.open(
+      // 切换视频源
+      await _trailerPlayer!.open(
         Media(proxiedUrl, httpHeaders: headers),
       );
       
-      if (mounted) setState(() {});
     } catch (e) {
       debugPrint('[HeroCarousel] 加载预告片失败: $e');
-      _disposeTrailerPlayer();
+      setState(() {
+        _isVideoLoaded = false;
+      });
+    } finally {
+      _isLoadingVideo = false;
     }
   }
 
