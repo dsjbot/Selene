@@ -98,11 +98,23 @@ class _HeroCarouselState extends State<HeroCarousel> {
   }
 
   void _disposeTrailerPlayer() {
-    _trailerPlayer?.dispose();
+    final player = _trailerPlayer;
     _trailerPlayer = null;
     _trailerController = null;
     _isVideoLoaded = false;
     _currentTrailerUrl = null;
+    
+    // 异步释放播放器，避免阻塞 UI
+    if (player != null) {
+      Future.microtask(() async {
+        try {
+          await player.stop();
+          await player.dispose();
+        } catch (e) {
+          debugPrint('[HeroCarousel] 释放播放器时出错: $e');
+        }
+      });
+    }
   }
 
   /// 加载当前项目的预告片
@@ -119,36 +131,44 @@ class _HeroCarouselState extends State<HeroCarousel> {
     // 始终显示完整调试信息
     setState(() => _debugInfo = '${currentItem.title}\nerror: $errorInfo');
     
-    // 如果没有预告片URL或者URL相同，不重新加载
+    // 如果没有预告片URL，释放播放器
     if (trailerUrl == null || trailerUrl.isEmpty) {
       _disposeTrailerPlayer();
-      if (mounted) setState(() {});
       return;
     }
     
+    // 如果URL相同且播放器存在，不重新加载
     if (trailerUrl == _currentTrailerUrl && _trailerPlayer != null) {
       return;
     }
     
-    // 释放旧的播放器
+    // 先释放旧的播放器
     _disposeTrailerPlayer();
+    
+    // 等待一帧，确保旧播放器已释放
+    await Future.delayed(const Duration(milliseconds: 100));
+    
+    if (!mounted) return;
     
     // 创建新的播放器
     try {
       final proxiedUrl = await _getProxiedVideoUrl(trailerUrl);
       setState(() => _debugInfo = '${currentItem.title}\n加载视频中...');
       
-      _trailerPlayer = Player();
-      _trailerController = VideoController(_trailerPlayer!);
+      final newPlayer = Player();
+      final newController = VideoController(newPlayer);
+      
+      _trailerPlayer = newPlayer;
+      _trailerController = newController;
       _currentTrailerUrl = trailerUrl;
       
       // 设置静音和循环
-      await _trailerPlayer!.setVolume(_isMuted ? 0 : 100);
-      await _trailerPlayer!.setPlaylistMode(PlaylistMode.loop);
+      await newPlayer.setVolume(_isMuted ? 0 : 100);
+      await newPlayer.setPlaylistMode(PlaylistMode.loop);
       
       // 监听视频宽高变化（表示视频已加载）
-      _trailerPlayer!.stream.width.listen((width) {
-        if (mounted && width != null && width > 0 && !_isVideoLoaded) {
+      newPlayer.stream.width.listen((width) {
+        if (mounted && width != null && width > 0 && !_isVideoLoaded && _trailerPlayer == newPlayer) {
           setState(() {
             _isVideoLoaded = true;
             _debugInfo = '${currentItem.title}\n视频已加载 宽度:$width';
@@ -157,14 +177,14 @@ class _HeroCarouselState extends State<HeroCarousel> {
       });
       
       // 监听播放状态
-      _trailerPlayer!.stream.playing.listen((playing) {
-        if (mounted && playing) {
+      newPlayer.stream.playing.listen((playing) {
+        if (mounted && playing && _trailerPlayer == newPlayer) {
           setState(() => _debugInfo = '${currentItem.title}\n播放中...');
         }
       });
       
-      _trailerPlayer!.stream.error.listen((error) {
-        if (mounted) {
+      newPlayer.stream.error.listen((error) {
+        if (mounted && _trailerPlayer == newPlayer) {
           setState(() {
             _isVideoLoaded = false;
             _debugInfo = '${currentItem.title}\n播放错误: $error';
@@ -180,13 +200,15 @@ class _HeroCarouselState extends State<HeroCarousel> {
       }
       
       // 开始播放，带上认证 headers
-      await _trailerPlayer!.open(
+      await newPlayer.open(
         Media(proxiedUrl, httpHeaders: headers),
       );
       
       if (mounted) setState(() {});
     } catch (e) {
-      setState(() => _debugInfo = '${currentItem.title}\n加载失败: $e');
+      if (mounted) {
+        setState(() => _debugInfo = '${currentItem.title}\n加载失败: $e');
+      }
       _disposeTrailerPlayer();
     }
   }
