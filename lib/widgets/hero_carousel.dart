@@ -56,11 +56,8 @@ class _HeroCarouselState extends State<HeroCarousel> {
   int _currentIndex = 0;
   Timer? _autoPlayTimer;
   final PageController _pageController = PageController();
-  bool _isUserInteracting = false;
   bool _isAutoPlayPaused = false; // 手动滑动后暂停自动播放
-  
-  // 滑动手势相关
-  double? _touchStartX;
+  bool _isAutoSwitching = false; // 标记是否是自动切换
   
   // 预告片播放器 - 复用同一个实例
   Player? _trailerPlayer;
@@ -208,7 +205,7 @@ class _HeroCarouselState extends State<HeroCarousel> {
     if (widget.items.length <= 1) return;
     
     _autoPlayTimer = Timer.periodic(widget.autoPlayInterval, (_) {
-      if (!_isUserInteracting && !_isAutoPlayPaused && mounted) {
+      if (!_isAutoPlayPaused && mounted) {
         _goToNext();
       }
     });
@@ -222,6 +219,7 @@ class _HeroCarouselState extends State<HeroCarousel> {
   void _goToNext() {
     if (!mounted || widget.items.isEmpty) return;
     final nextIndex = (_currentIndex + 1) % widget.items.length;
+    _isAutoSwitching = true; // 标记为自动切换
     _pageController.animateToPage(
       nextIndex,
       duration: const Duration(milliseconds: 500),
@@ -232,6 +230,7 @@ class _HeroCarouselState extends State<HeroCarousel> {
   void _goToPrevious() {
     if (!mounted || widget.items.isEmpty) return;
     final prevIndex = (_currentIndex - 1 + widget.items.length) % widget.items.length;
+    _isAutoSwitching = true; // 标记为自动切换（导航按钮也算自动）
     _pageController.animateToPage(
       prevIndex,
       duration: const Duration(milliseconds: 500),
@@ -240,37 +239,18 @@ class _HeroCarouselState extends State<HeroCarousel> {
   }
 
   void _onPageChanged(int index) {
+    // 如果不是自动切换，说明是用户手动滑动，暂停自动播放
+    if (!_isAutoSwitching) {
+      _isAutoPlayPaused = true;
+    }
+    _isAutoSwitching = false; // 重置标记
+    
     setState(() {
       _currentIndex = index;
       _isVideoLoaded = false;
     });
     // 加载新页面的预告片
     _loadTrailerForCurrentItem();
-  }
-
-  void _onUserInteractionStart() {
-    _isUserInteracting = true;
-  }
-
-  void _onUserInteractionEnd() {
-    _isUserInteracting = false;
-  }
-
-  /// 触摸开始
-  void _onTouchStart(DragStartDetails details) {
-    _touchStartX = details.globalPosition.dx;
-    _onUserInteractionStart();
-  }
-
-  /// 触摸结束，判断是否为滑动
-  void _onTouchEnd(DragEndDetails details) {
-    _onUserInteractionEnd();
-    
-    if (_touchStartX != null) {
-      // 手动滑动后永久暂停自动播放
-      _isAutoPlayPaused = true;
-    }
-    _touchStartX = null;
   }
 
   String _getTypeLabel(String type) {
@@ -305,18 +285,14 @@ class _HeroCarouselState extends State<HeroCarousel> {
         child: Stack(
           children: [
             // 轮播内容
-            GestureDetector(
-              onHorizontalDragStart: _onTouchStart,
-              onHorizontalDragEnd: _onTouchEnd,
-              child: PageView.builder(
-                controller: _pageController,
-                onPageChanged: _onPageChanged,
-                itemCount: widget.items.length,
-                itemBuilder: (context, index) {
-                  final item = widget.items[index];
-                  return _buildCarouselItem(item, isTablet, index);
-                },
-              ),
+            PageView.builder(
+              controller: _pageController,
+              onPageChanged: _onPageChanged,
+              itemCount: widget.items.length,
+              itemBuilder: (context, index) {
+                final item = widget.items[index];
+                return _buildCarouselItem(item, isTablet, index);
+              },
             ),
 
             // 左右导航按钮（仅平板显示）
