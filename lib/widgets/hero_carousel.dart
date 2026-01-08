@@ -1,7 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:media_kit/media_kit.dart';
+import 'package:media_kit_video/media_kit_video.dart';
 import '../utils/image_url.dart';
+import '../services/user_data_service.dart';
 
 /// 轮播图项目数据
 class CarouselItem {
@@ -34,6 +37,7 @@ class HeroCarousel extends StatefulWidget {
   final Duration autoPlayInterval;
   final Function(CarouselItem)? onItemTap;
   final bool showIndicators;
+  final bool enableVideo; // 是否启用预告片视频
 
   const HeroCarousel({
     super.key,
@@ -41,6 +45,7 @@ class HeroCarousel extends StatefulWidget {
     this.autoPlayInterval = const Duration(seconds: 6),
     this.onItemTap,
     this.showIndicators = true,
+    this.enableVideo = true,
   });
 
   @override
@@ -52,18 +57,133 @@ class _HeroCarouselState extends State<HeroCarousel> {
   Timer? _autoPlayTimer;
   final PageController _pageController = PageController();
   bool _isUserInteracting = false;
+  
+  // 预告片播放器
+  Player? _trailerPlayer;
+  VideoController? _trailerController;
+  bool _isVideoLoaded = false;
+  bool _isMuted = true;
+  String? _currentTrailerUrl;
+  String? _serverUrl;
 
   @override
   void initState() {
     super.initState();
+    _loadServerUrl();
     _startAutoPlay();
+  }
+
+  Future<void> _loadServerUrl() async {
+    final url = await UserDataService.getServerUrl();
+    if (mounted) {
+      setState(() {
+        _serverUrl = url;
+      });
+      // 服务器URL加载完成后，尝试加载当前项目的预告片
+      _loadTrailerForCurrentItem();
+    }
   }
 
   @override
   void dispose() {
     _autoPlayTimer?.cancel();
     _pageController.dispose();
+    _disposeTrailerPlayer();
     super.dispose();
+  }
+
+  void _disposeTrailerPlayer() {
+    _trailerPlayer?.dispose();
+    _trailerPlayer = null;
+    _trailerController = null;
+    _isVideoLoaded = false;
+    _currentTrailerUrl = null;
+  }
+
+  /// 加载当前项目的预告片
+  Future<void> _loadTrailerForCurrentItem() async {
+    if (!widget.enableVideo || widget.items.isEmpty) return;
+    
+    final currentItem = widget.items[_currentIndex];
+    final trailerUrl = currentItem.trailerUrl;
+    
+    // 如果没有预告片URL或者URL相同，不重新加载
+    if (trailerUrl == null || trailerUrl.isEmpty) {
+      _disposeTrailerPlayer();
+      if (mounted) setState(() {});
+      return;
+    }
+    
+    if (trailerUrl == _currentTrailerUrl && _trailerPlayer != null) {
+      return;
+    }
+    
+    // 释放旧的播放器
+    _disposeTrailerPlayer();
+    
+    // 创建新的播放器
+    try {
+      final proxiedUrl = _getProxiedVideoUrl(trailerUrl);
+      debugPrint('[HeroCarousel] 加载预告片: $proxiedUrl');
+      
+      _trailerPlayer = Player();
+      _trailerController = VideoController(_trailerPlayer!);
+      _currentTrailerUrl = trailerUrl;
+      
+      // 设置静音和循环
+      await _trailerPlayer!.setVolume(_isMuted ? 0 : 100);
+      await _trailerPlayer!.setPlaylistMode(PlaylistMode.loop);
+      
+      // 监听视频宽高变化（表示视频已加载）
+      _trailerPlayer!.stream.width.listen((width) {
+        if (mounted && width != null && width > 0 && !_isVideoLoaded) {
+          debugPrint('[HeroCarousel] 预告片视频已加载，宽度: $width');
+          setState(() {
+            _isVideoLoaded = true;
+          });
+        }
+      });
+      
+      // 监听播放状态
+      _trailerPlayer!.stream.playing.listen((playing) {
+        debugPrint('[HeroCarousel] 预告片播放状态: $playing');
+      });
+      
+      _trailerPlayer!.stream.error.listen((error) {
+        debugPrint('[HeroCarousel] 预告片播放错误: $error');
+        if (mounted) {
+          setState(() {
+            _isVideoLoaded = false;
+          });
+        }
+      });
+      
+      // 开始播放
+      await _trailerPlayer!.open(Media(proxiedUrl));
+      
+      if (mounted) setState(() {});
+    } catch (e) {
+      debugPrint('[HeroCarousel] 加载预告片失败: $e');
+      _disposeTrailerPlayer();
+    }
+  }
+
+  /// 获取代理后的视频URL
+  String _getProxiedVideoUrl(String url) {
+    if (_serverUrl != null && _serverUrl!.isNotEmpty) {
+      if (url.contains('douban') || url.contains('doubanio')) {
+        return '$_serverUrl/api/video-proxy?url=${Uri.encodeComponent(url)}';
+      }
+    }
+    return url;
+  }
+
+  /// 切换静音状态
+  void _toggleMute() {
+    setState(() {
+      _isMuted = !_isMuted;
+    });
+    _trailerPlayer?.setVolume(_isMuted ? 0 : 100);
   }
 
   void _startAutoPlay() {
@@ -100,7 +220,10 @@ class _HeroCarouselState extends State<HeroCarousel> {
   void _onPageChanged(int index) {
     setState(() {
       _currentIndex = index;
+      _isVideoLoaded = false;
     });
+    // 加载新页面的预告片
+    _loadTrailerForCurrentItem();
   }
 
   void _onUserInteractionStart() {
@@ -154,7 +277,7 @@ class _HeroCarouselState extends State<HeroCarousel> {
                 itemCount: widget.items.length,
                 itemBuilder: (context, index) {
                   final item = widget.items[index];
-                  return _buildCarouselItem(item, isTablet);
+                  return _buildCarouselItem(item, isTablet, index);
                 },
               ),
             ),
@@ -224,10 +347,14 @@ class _HeroCarouselState extends State<HeroCarousel> {
     );
   }
 
-  Widget _buildCarouselItem(CarouselItem item, bool isTablet) {
+  Widget _buildCarouselItem(CarouselItem item, bool isTablet, int index) {
     // 优先使用 backdrop，如果为空则使用 poster
     final backdrop = item.backdrop;
     final imageUrl = (backdrop != null && backdrop.isNotEmpty) ? backdrop : item.poster;
+    final isCurrentItem = index == _currentIndex;
+    final hasTrailer = item.trailerUrl != null && item.trailerUrl!.isNotEmpty;
+    // 只要是当前项目且有预告片URL，就渲染视频层（通过opacity控制显示）
+    final shouldRenderVideo = widget.enableVideo && isCurrentItem && hasTrailer && _trailerController != null;
     
     return GestureDetector(
       onTap: () => widget.onItemTap?.call(item),
@@ -240,7 +367,7 @@ class _HeroCarouselState extends State<HeroCarousel> {
           return Stack(
             fit: StackFit.expand,
             children: [
-              // 背景图片
+              // 背景图片（始终显示，作为视频的占位符）
               CachedNetworkImage(
                 imageUrl: finalImageUrl,
                 fit: BoxFit.cover,
@@ -255,13 +382,24 @@ class _HeroCarouselState extends State<HeroCarousel> {
                   ),
                 ),
                 errorWidget: (context, url, error) {
-                  debugPrint('[HeroCarousel] 图片加载失败: $url, 错误: $error');
                   return Container(
                     color: Colors.grey[900],
                     child: const Icon(Icons.broken_image, color: Colors.white54, size: 48),
                   );
                 },
               ),
+
+              // 预告片视频层（淡入显示）
+              if (shouldRenderVideo)
+                AnimatedOpacity(
+                  opacity: _isVideoLoaded ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 500),
+                  child: Video(
+                    controller: _trailerController!,
+                    fit: BoxFit.cover,
+                    controls: NoVideoControls,
+                  ),
+                ),
 
               // 渐变遮罩
               Container(
@@ -422,6 +560,30 @@ class _HeroCarouselState extends State<HeroCarousel> {
                   ],
                 ),
               ),
+
+              // 音量控制按钮（仅当预告片视频加载完成时显示）
+              if (shouldRenderVideo && _isVideoLoaded)
+                Positioned(
+                  bottom: isTablet ? 48 : 36,
+                  right: isTablet ? 32 : 16,
+                  child: GestureDetector(
+                    onTap: _toggleMute,
+                    child: Container(
+                      width: isTablet ? 40 : 32,
+                      height: isTablet ? 40 : 32,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.5),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white.withOpacity(0.5)),
+                      ),
+                      child: Icon(
+                        _isMuted ? Icons.volume_off : Icons.volume_up,
+                        color: Colors.white,
+                        size: isTablet ? 20 : 16,
+                      ),
+                    ),
+                  ),
+                ),
             ],
           );
         },
