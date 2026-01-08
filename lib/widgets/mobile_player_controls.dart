@@ -8,6 +8,8 @@ import 'package:screen_brightness/screen_brightness.dart';
 import 'package:volume_controller/volume_controller.dart';
 import 'dlna_device_dialog.dart';
 import 'danmaku_settings_panel.dart';
+import 'skip_settings_panel.dart';
+import '../models/skip_config.dart';
 
 class MobilePlayerControls extends StatefulWidget {
   final Player player;
@@ -34,6 +36,11 @@ class MobilePlayerControls extends StatefulWidget {
   final int danmakuCount;
   final DanmakuSettings danmakuSettings;
   final ValueChanged<DanmakuSettings> onDanmakuSettingsChanged;
+  // 跳过设置相关
+  final String? videoSource;
+  final String? videoId;
+  final EpisodeSkipConfig? skipConfig;
+  final ValueChanged<EpisodeSkipConfig?> onSkipConfigChanged;
 
   const MobilePlayerControls({
     super.key,
@@ -61,6 +68,10 @@ class MobilePlayerControls extends StatefulWidget {
     this.danmakuCount = 0,
     required this.danmakuSettings,
     required this.onDanmakuSettingsChanged,
+    this.videoSource,
+    this.videoId,
+    this.skipConfig,
+    required this.onSkipConfigChanged,
   });
 
   @override
@@ -638,6 +649,17 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
     );
   }
 
+  Future<void> _showSkipSettingsDialog() async {
+    await showSkipSettingsDialog(
+      context: context,
+      videoSource: widget.videoSource,
+      videoId: widget.videoId,
+      videoTitle: widget.videoTitle,
+      currentConfig: widget.skipConfig,
+      onConfigChanged: widget.onSkipConfigChanged,
+    );
+  }
+
   Future<void> _enterPipMode() async {
     debugPrint('_enterPipMode');
     // 隐藏控制栏
@@ -1084,6 +1106,42 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
                                 ),
                               ),
                             ),
+                        ],
+                      ),
+                    ),
+                  ),
+                // 跳过设置按钮
+                if (!widget.live)
+                  GestureDetector(
+                    onTap: () async {
+                      _onUserInteraction();
+                      await _showSkipSettingsDialog();
+                    },
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
+                      padding: EdgeInsets.only(right: _isFullscreen ? 16 : 8),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.skip_next_outlined,
+                            color: widget.skipConfig != null
+                                ? Colors.white
+                                : Colors.white.withValues(alpha: 0.5),
+                            size: _isFullscreen ? 20 : 18,
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 2),
+                            child: Text(
+                              '跳过',
+                              style: TextStyle(
+                                color: widget.skipConfig != null
+                                    ? Colors.white
+                                    : Colors.white.withValues(alpha: 0.5),
+                                fontSize: _isFullscreen ? 11 : 10,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),

@@ -595,6 +595,24 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     });
   }
 
+  /// 更新跳过配置（从设置面板保存后调用）
+  void _updateSkipConfig(EpisodeSkipConfig? config) {
+    setState(() {
+      _skipConfig = config;
+      _skipController = SkipController(
+        config: config,
+        videoDuration: _player?.state.duration ?? Duration.zero,
+        isLastEpisode: widget.isLastEpisode,
+      );
+      // 重置跳过状态
+      _showIntroPrompt = false;
+      _showEndingCountdown = false;
+      _currentIntroSegment = null;
+      _currentEndingSegment = null;
+    });
+    debugPrint('[跳过配置] 配置已更新: ${config?.segments.length ?? 0} 个片段');
+  }
+
   void _setupPip() {
     if (!Platform.isAndroid && !Platform.isIOS) {
       return;
@@ -767,6 +785,10 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
                             danmakuCount: _danmakuList.length,
                             danmakuSettings: _danmakuSettings,
                             onDanmakuSettingsChanged: _updateDanmakuSettings,
+                            videoSource: widget.videoSource,
+                            videoId: widget.videoId,
+                            skipConfig: _skipConfig,
+                            onSkipConfigChanged: _updateSkipConfig,
                           )
                         : MobilePlayerControls(
                             player: _player!,
@@ -793,6 +815,10 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
                             danmakuCount: _danmakuList.length,
                             danmakuSettings: _danmakuSettings,
                             onDanmakuSettingsChanged: _updateDanmakuSettings,
+                            videoSource: widget.videoSource,
+                            videoId: widget.videoId,
+                            skipConfig: _skipConfig,
+                            onSkipConfigChanged: _updateSkipConfig,
                           ),
                     // 片头跳过提示
                     if (_showIntroPrompt && !_isPipMode)

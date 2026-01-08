@@ -5,6 +5,8 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'dlna_device_dialog.dart';
 import 'danmaku_settings_panel.dart';
+import 'skip_settings_panel.dart';
+import '../models/skip_config.dart';
 
 // 带 hover 效果的按钮组件
 class HoverButton extends StatefulWidget {
@@ -74,6 +76,11 @@ class PCPlayerControls extends StatefulWidget {
   final int danmakuCount;
   final DanmakuSettings danmakuSettings;
   final ValueChanged<DanmakuSettings> onDanmakuSettingsChanged;
+  // 跳过设置相关
+  final String? videoSource;
+  final String? videoId;
+  final EpisodeSkipConfig? skipConfig;
+  final ValueChanged<EpisodeSkipConfig?> onSkipConfigChanged;
 
   const PCPlayerControls({
     super.key,
@@ -100,6 +107,10 @@ class PCPlayerControls extends StatefulWidget {
     this.danmakuCount = 0,
     required this.danmakuSettings,
     required this.onDanmakuSettingsChanged,
+    this.videoSource,
+    this.videoId,
+    this.skipConfig,
+    required this.onSkipConfigChanged,
   });
 
   @override
@@ -980,6 +991,45 @@ class _PCPlayerControlsState extends State<PCPlayerControls> {
                                     ],
                                   ),
                                 ),
+                              ),
+                            ),
+                          // 跳过设置按钮
+                          if (!widget.live)
+                            HoverButton(
+                              onTap: () {
+                                _onUserInteraction();
+                                showSkipSettingsDialog(
+                                  context: context,
+                                  videoSource: widget.videoSource,
+                                  videoId: widget.videoId,
+                                  videoTitle: widget.videoTitle,
+                                  currentConfig: widget.skipConfig,
+                                  onConfigChanged: widget.onSkipConfigChanged,
+                                );
+                              },
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.skip_next_outlined,
+                                    color: widget.skipConfig != null
+                                        ? Colors.white
+                                        : Colors.white.withValues(alpha: 0.5),
+                                    size: effectiveFullscreen ? 22 : 20,
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: 2),
+                                    child: Text(
+                                      '跳过',
+                                      style: TextStyle(
+                                        color: widget.skipConfig != null
+                                            ? Colors.white
+                                            : Colors.white.withValues(alpha: 0.5),
+                                        fontSize: effectiveFullscreen ? 12 : 11,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           if (!widget.live)
