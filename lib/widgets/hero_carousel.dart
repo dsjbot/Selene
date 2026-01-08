@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../services/api_service.dart';
+import '../services/user_data_service.dart';
 
 /// 轮播图项目数据
 class CarouselItem {
@@ -50,11 +50,22 @@ class _HeroCarouselState extends State<HeroCarousel> {
   Timer? _autoPlayTimer;
   final PageController _pageController = PageController();
   bool _isUserInteracting = false;
+  String? _serverUrl;
 
   @override
   void initState() {
     super.initState();
+    _loadServerUrl();
     _startAutoPlay();
+  }
+
+  Future<void> _loadServerUrl() async {
+    final url = await UserDataService.getServerUrl();
+    if (mounted) {
+      setState(() {
+        _serverUrl = url;
+      });
+    }
   }
 
   @override
@@ -511,7 +522,11 @@ class _HeroCarouselState extends State<HeroCarousel> {
   /// 处理图片URL，使用代理绕过防盗链
   String _getProxiedImageUrl(String url) {
     if (url.contains('douban') || url.contains('doubanio')) {
-      return '${ApiService.baseUrl}/api/image-proxy?url=${Uri.encodeComponent(url)}';
+      // 使用缓存的服务器URL，如果没有则直接返回原URL
+      final serverUrl = _serverUrl;
+      if (serverUrl != null && serverUrl.isNotEmpty) {
+        return '$serverUrl/api/image-proxy?url=${Uri.encodeComponent(url)}';
+      }
     }
     return url;
   }

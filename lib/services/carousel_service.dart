@@ -3,8 +3,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/douban_movie.dart';
 import '../widgets/hero_carousel.dart';
-import 'api_service.dart';
 import 'douban_service.dart';
+import 'user_data_service.dart';
 
 /// 轮播图数据服务
 class CarouselService {
@@ -85,7 +85,10 @@ class CarouselService {
   /// 获取TMDB背景图
   static Future<String?> _getBackdropImage(String title, String year, String type) async {
     try {
-      final url = '${ApiService.baseUrl}/api/tmdb/backdrop?title=${Uri.encodeComponent(title)}&year=$year&type=$type';
+      final serverUrl = await UserDataService.getServerUrl();
+      if (serverUrl == null || serverUrl.isEmpty) return null;
+      
+      final url = '$serverUrl/api/tmdb/backdrop?title=${Uri.encodeComponent(title)}&year=$year&type=$type';
       final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 5));
       
       if (response.statusCode == 200) {
