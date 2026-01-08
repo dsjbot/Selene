@@ -215,95 +215,109 @@ class _SkipSettingsPanelState extends State<SkipSettingsPanel> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textColor = isDark ? Colors.white : Colors.black87;
     final subTextColor = isDark ? Colors.white70 : Colors.black54;
+    final screenHeight = MediaQuery.of(context).size.height;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 标题
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('跳过设置', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
-              IconButton(
-                icon: Icon(Icons.close, color: subTextColor),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // 片头设置
-          _buildSectionTitle('片头跳过', _introEnabled, (v) => setState(() => _introEnabled = v), textColor),
-          if (_introEnabled) ...[
-            const SizedBox(height: 8),
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: screenHeight * 0.7),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 标题（固定在顶部）
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Expanded(child: _buildTimeField('开始', _introStartController, subTextColor)),
-                const SizedBox(width: 16),
-                Expanded(child: _buildTimeField('结束', _introEndController, subTextColor)),
+                Text('跳过设置', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
+                IconButton(
+                  icon: Icon(Icons.close, color: subTextColor),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
               ],
             ),
-            const SizedBox(height: 8),
-            _buildSwitch('自动跳过', _autoSkipIntro, (v) => setState(() => _autoSkipIntro = v), subTextColor),
-          ],
+            const SizedBox(height: 16),
 
-          const SizedBox(height: 16),
-          Divider(color: subTextColor.withOpacity(0.3)),
-          const SizedBox(height: 16),
+            // 可滚动内容区域
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 片头设置
+                    _buildSectionTitle('片头跳过', _introEnabled, (v) => setState(() => _introEnabled = v), textColor),
+                    if (_introEnabled) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(child: _buildTimeField('开始', _introStartController, subTextColor)),
+                          const SizedBox(width: 16),
+                          Expanded(child: _buildTimeField('结束', _introEndController, subTextColor)),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      _buildSwitch('自动跳过', _autoSkipIntro, (v) => setState(() => _autoSkipIntro = v), subTextColor),
+                    ],
 
-          // 片尾设置
-          _buildSectionTitle('片尾跳过', _outroEnabled, (v) => setState(() => _outroEnabled = v), textColor),
-          if (_outroEnabled) ...[
-            const SizedBox(height: 8),
-            _buildSwitch(
-              '剩余时间模式',
-              _outroRemainingMode,
-              (v) => setState(() => _outroRemainingMode = v),
-              subTextColor,
-              subtitle: _outroRemainingMode ? '视频结束前触发' : '从指定时间点触发',
-            ),
-            const SizedBox(height: 8),
-            _buildTimeField(
-              _outroRemainingMode ? '剩余时间' : '开始时间',
-              _outroTimeController,
-              subTextColor,
-            ),
-            const SizedBox(height: 8),
-            _buildSwitch('自动下一集', _autoNextEpisode, (v) => setState(() => _autoNextEpisode = v), subTextColor),
-          ],
+                    const SizedBox(height: 16),
+                    Divider(color: subTextColor.withOpacity(0.3)),
+                    const SizedBox(height: 16),
 
-          const SizedBox(height: 24),
-
-          // 按钮
-          Row(
-            children: [
-              if (widget.currentConfig != null)
-                TextButton(
-                  onPressed: _deleteConfig,
-                  child: const Text('删除配置', style: TextStyle(color: Colors.red)),
+                    // 片尾设置
+                    _buildSectionTitle('片尾跳过', _outroEnabled, (v) => setState(() => _outroEnabled = v), textColor),
+                    if (_outroEnabled) ...[
+                      const SizedBox(height: 8),
+                      _buildSwitch(
+                        '剩余时间模式',
+                        _outroRemainingMode,
+                        (v) => setState(() => _outroRemainingMode = v),
+                        subTextColor,
+                        subtitle: _outroRemainingMode ? '视频结束前触发' : '从指定时间点触发',
+                      ),
+                      const SizedBox(height: 8),
+                      _buildTimeField(
+                        _outroRemainingMode ? '剩余时间' : '开始时间',
+                        _outroTimeController,
+                        subTextColor,
+                      ),
+                      const SizedBox(height: 8),
+                      _buildSwitch('自动下一集', _autoNextEpisode, (v) => setState(() => _autoNextEpisode = v), subTextColor),
+                    ],
+                  ],
                 ),
-              const Spacer(),
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: Text('取消', style: TextStyle(color: subTextColor)),
               ),
-              const SizedBox(width: 8),
-              ElevatedButton(
-                onPressed: _isSaving ? null : _saveConfig,
-                child: _isSaving
-                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Text('保存'),
-              ),
-            ],
-          ),
-        ],
+            ),
+
+            const SizedBox(height: 16),
+
+            // 按钮（固定在底部）
+            Row(
+              children: [
+                if (widget.currentConfig != null)
+                  TextButton(
+                    onPressed: _deleteConfig,
+                    child: const Text('删除配置', style: TextStyle(color: Colors.red)),
+                  ),
+                const Spacer(),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text('取消', style: TextStyle(color: subTextColor)),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: _isSaving ? null : _saveConfig,
+                  child: _isSaving
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Text('保存'),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
-
   Widget _buildSectionTitle(String title, bool enabled, ValueChanged<bool> onChanged, Color textColor) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 import '../models/danmaku.dart';
 
 /// 单条弹幕Widget - 使用独立动画
@@ -11,6 +10,7 @@ class _DanmakuItem extends StatefulWidget {
   final double duration;
   final double top;
   final int mode;
+  final double screenWidth;
 
   const _DanmakuItem({
     super.key,
@@ -21,6 +21,7 @@ class _DanmakuItem extends StatefulWidget {
     required this.duration,
     required this.top,
     required this.mode,
+    required this.screenWidth,
   });
 
   @override
@@ -48,41 +49,57 @@ class _DanmakuItemState extends State<_DanmakuItem>
 
   @override
   Widget build(BuildContext context) {
+    final textWidget = Text(
+      widget.text,
+      style: TextStyle(
+        color: widget.color.withOpacity(widget.opacity),
+        fontSize: widget.fontSize,
+        fontWeight: FontWeight.w500,
+        shadows: const [
+          Shadow(offset: Offset(1, 1), blurRadius: 2, color: Colors.black87),
+        ],
+      ),
+    );
+
+    // 固定弹幕（顶部/底部）- 居中显示
+    if (widget.mode != 0) {
+      return Positioned(
+        top: widget.top,
+        left: 0,
+        right: 0,
+        child: Center(child: textWidget),
+      );
+    }
+
+    // 滚动弹幕 - 从右到左
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
+        final progress = _controller.value;
+        // 从右边进入，到左边消失
+        final estimatedWidth = widget.text.length * widget.fontSize * 0.6;
+        final left = widget.screenWidth - (widget.screenWidth + estimatedWidth) * progress;
         return Positioned(
           top: widget.top,
-          right: widget.mode == 0
-              ? null
-              : null, // 固定弹幕居中处理
-          left: widget.mode == 0
-              ? _calculateLeft(context)
-              : null,
-          child: widget.mode == 0
-              ? child!
-              : Center(child: child),
+          left: left,
+          child: child!,
         );
       },
-      child: Text(
-        widget.text,
-        style: TextStyle(
-          color: widget.color.withOpacity(widget.opacity),
-          fontSize: widget.fontSize,
-          fontWeight: FontWeight.w500,
-          shadows: const [
-            Shadow(offset: Offset(1, 1), blurRadius: 2, color: Colors.black87),
-          ],
-        ),
-      ),
+      child: textWidget,
     );
   }
+}
 
-  double _calculateLeft(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    // 从右边进入，到左边消失
-    final progress = _controller.value;
-    return screenWidth - (screenWidth + 300) * progress;
+/// 轨道信息 - 记录每条轨道上弹幕的占用情况
+class _TrackInfo {
+  double lastDanmakuEndTime; // 上一条弹幕完全离开屏幕的时间
+  double lastDanmakuEnterTime; // 上一条弹幕完全进入屏幕的时间（尾部离开右边缘）
+  
+  _TrackInfo() : lastDanmakuEndTime = 0, lastDanmakuEnterTime = 0;
+  
+  void reset() {
+    lastDanmakuEndTime = 0;
+    lastDanmakuEnterTime = 0;
   }
 }
 
@@ -93,6 +110,7 @@ class _PendingDanmaku {
   final double duration;
   final Color color;
   final Key key;
+  final double startTime;
 
   _PendingDanmaku({
     required this.item,
@@ -100,6 +118,7 @@ class _PendingDanmaku {
     required this.duration,
     required this.color,
     required this.key,
+    required this.startTime,
   });
 }
 
@@ -132,14 +151,14 @@ class DanmakuLayer extends StatefulWidget {
 
 class _DanmakuLayerState extends State<DanmakuLayer> {
   final List<_PendingDanmaku> _visibleDanmakus = [];
-  final List<double> _trackEndTimes = [];
+  final List<_TrackInfo> _tracks = [];
   int _nextIndex = 0;
   double _lastTime = -999;
   int _keyCounter = 0;
+  double _screenWidth = 0;
 
   static const double _baseDuration = 8.0;
-  static const double _trackHeight = 30.0;
-  static const int _maxVisible = 30;
+  static const double _trackHeight = 32.0;
 
   @override
   void didUpdateWidget(DanmakuLayer oldWidget) {
@@ -169,7 +188,9 @@ class _DanmakuLayerState extends State<DanmakuLayer> {
   void _reset() {
     setState(() {
       _visibleDanmakus.clear();
-      _trackEndTimes.clear();
+      for (var track in _tracks) {
+        track.reset();
+      }
       _nextIndex = 0;
       _lastTime = -999;
     });
@@ -177,9 +198,10 @@ class _DanmakuLayerState extends State<DanmakuLayer> {
 
   void _onSeek(double time) {
     _visibleDanmakus.clear();
-    for (int i = 0; i < _trackEndTimes.length; i++) {
-      _trackEndTimes[i] = 0;
+    for (var track in _tracks) {
+      track.reset();
     }
+    // 二分查找定位到目标时间
     int left = 0, right = widget.danmakuList.length;
     while (left < right) {
       int mid = (left + right) ~/ 2;
@@ -196,16 +218,21 @@ class _DanmakuLayerState extends State<DanmakuLayer> {
     final duration = _baseDuration / widget.speed;
     bool changed = false;
 
-    while (_nextIndex < widget.danmakuList.length &&
-        _visibleDanmakus.length < _maxVisible) {
+    while (_nextIndex < widget.danmakuList.length) {
       final item = widget.danmakuList[_nextIndex];
 
+      // 还没到显示时间
       if (item.time > currentTime + 0.1) break;
 
-      if (item.time >= currentTime - 0.5) {
-        if (_tryAddDanmaku(item, currentTime, duration)) {
-          changed = true;
-        }
+      // 已经过期的弹幕跳过
+      if (item.time < currentTime - 0.5) {
+        _nextIndex++;
+        continue;
+      }
+
+      // 尝试添加弹幕
+      if (_tryAddDanmaku(item, currentTime, duration)) {
+        changed = true;
       }
       _nextIndex++;
     }
@@ -218,23 +245,35 @@ class _DanmakuLayerState extends State<DanmakuLayer> {
   void _removeExpiredDanmakus(double currentTime) {
     final duration = _baseDuration / widget.speed;
     final before = _visibleDanmakus.length;
-    _visibleDanmakus.removeWhere((d) => currentTime > d.item.time + duration + 0.5);
+    _visibleDanmakus.removeWhere((d) => currentTime > d.startTime + duration + 0.5);
     if (_visibleDanmakus.length != before) {
       setState(() {});
     }
   }
 
   bool _tryAddDanmaku(DanmakuItem item, double currentTime, double duration) {
-    if (_trackEndTimes.isEmpty) return false;
+    if (_tracks.isEmpty || _screenWidth <= 0) return false;
+
+    // 估算弹幕宽度
+    final textWidth = item.text.length * widget.fontSize * 0.6;
+    // 弹幕完全进入屏幕所需时间（尾部离开右边缘）
+    final enterTime = duration * (textWidth / (_screenWidth + textWidth));
+    // 弹幕完全离开屏幕的时间
+    final exitTime = duration;
 
     int? track;
-    for (int i = 0; i < _trackEndTimes.length; i++) {
-      if (currentTime >= _trackEndTimes[i]) {
+    for (int i = 0; i < _tracks.length; i++) {
+      final trackInfo = _tracks[i];
+      // 检查是否会与上一条弹幕重叠：
+      // 1. 上一条弹幕已经完全进入屏幕（新弹幕不会追尾）
+      // 2. 或者上一条弹幕已经完全离开屏幕
+      if (currentTime >= trackInfo.lastDanmakuEnterTime) {
         track = i;
         break;
       }
     }
-    if (track == null) return false;
+
+    if (track == null) return false; // 所有轨道都被占用
 
     Color color = Colors.white;
     try {
@@ -250,9 +289,13 @@ class _DanmakuLayerState extends State<DanmakuLayer> {
       duration: duration,
       color: color,
       key: ValueKey(_keyCounter++),
+      startTime: currentTime,
     ));
 
-    _trackEndTimes[track] = currentTime + duration * 0.4;
+    // 更新轨道占用信息
+    _tracks[track].lastDanmakuEnterTime = currentTime + enterTime;
+    _tracks[track].lastDanmakuEndTime = currentTime + exitTime;
+
     return true;
   }
 
@@ -264,13 +307,16 @@ class _DanmakuLayerState extends State<DanmakuLayer> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
+        _screenWidth = constraints.maxWidth;
         final availableHeight = constraints.maxHeight * widget.areaHeight;
         final trackCount = (availableHeight / _trackHeight).floor();
-        while (_trackEndTimes.length < trackCount) {
-          _trackEndTimes.add(0);
+        
+        // 调整轨道数量
+        while (_tracks.length < trackCount) {
+          _tracks.add(_TrackInfo());
         }
-        while (_trackEndTimes.length > trackCount) {
-          _trackEndTimes.removeLast();
+        while (_tracks.length > trackCount) {
+          _tracks.removeLast();
         }
 
         return ClipRect(
@@ -289,6 +335,7 @@ class _DanmakuLayerState extends State<DanmakuLayer> {
                   duration: d.duration,
                   top: d.track * _trackHeight,
                   mode: d.item.mode,
+                  screenWidth: constraints.maxWidth,
                 );
               }).toList(),
             ),
