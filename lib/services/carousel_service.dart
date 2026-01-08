@@ -37,7 +37,8 @@ class CarouselService {
         for (int i = 0; i < movies.length; i++) {
           final movie = movies[i];
           final details = detailsList[i];
-          debugPrint('[CarouselService] 添加电影: ${movie.title}, trailerUrl: ${details?['trailerUrl']}');
+          final error = details?['_error'];
+          debugPrint('[CarouselService] 添加电影: ${movie.title}, trailerUrl: ${details?['trailerUrl']}, error: $error');
           items.add(CarouselItem(
             id: movie.id,
             title: movie.title,
@@ -48,6 +49,7 @@ class CarouselService {
             year: movie.year,
             rate: movie.rate,
             type: 'movie',
+            debugError: error,
           ));
         }
       }
@@ -71,6 +73,7 @@ class CarouselService {
             year: show.year,
             rate: show.rate,
             type: 'tv',
+            debugError: details?['_error'],
           ));
         }
       }
@@ -94,6 +97,7 @@ class CarouselService {
             year: show.year,
             rate: show.rate,
             type: 'variety',
+            debugError: details?['_error'],
           ));
         }
       }
@@ -117,6 +121,7 @@ class CarouselService {
             year: anime.year,
             rate: anime.rate,
             type: 'anime',
+            debugError: details?['_error'],
           ));
         }
       }
@@ -133,6 +138,7 @@ class CarouselService {
     String? backdrop;
     String? plotSummary;
     String? trailerUrl;
+    String? _lastError; // 记录最后的错误信息
     
     // 方案1：尝试通过后端API获取（包含backdrop和trailerUrl）
     try {
@@ -166,15 +172,19 @@ class CarouselService {
             debugPrint('  - summary: ${plotSummary != null ? "有(${plotSummary.length}字)" : "无"}');
             debugPrint('  - trailerUrl: ${trailerUrl ?? "无"}');
           } else {
+            _lastError = 'code=${data['code']}';
             debugPrint('[CarouselService] 后端返回code不是200或data为null');
           }
         } else {
+          _lastError = 'HTTP ${response.statusCode}';
           debugPrint('[CarouselService] 后端API响应非200: ${response.body.substring(0, response.body.length > 200 ? 200 : response.body.length)}');
         }
       } else {
+        _lastError = '服务器URL为空';
         debugPrint('[CarouselService] 服务器URL为空，跳过后端API');
       }
     } catch (e) {
+      _lastError = e.toString();
       debugPrint('[CarouselService] 后端API获取详情失败: $doubanId - $e');
     }
     
@@ -198,15 +208,16 @@ class CarouselService {
     // 返回结果
     debugPrint('[CarouselService] 最终返回 $doubanId - backdrop: ${backdrop != null}, summary: ${plotSummary != null}, trailer: ${trailerUrl != null}');
     
-    if (backdrop != null || plotSummary != null || trailerUrl != null) {
+    if (backdrop != null || plotSummary != null || trailerUrl != null || _lastError != null) {
       return {
         'backdrop': backdrop,
         'plot_summary': plotSummary,
         'trailerUrl': trailerUrl,
+        '_error': _lastError,
       };
     }
     
-    return null;
+    return {'_error': _lastError ?? '未知错误'};
   }
 
   /// 将豆瓣海报URL转换为高清版本

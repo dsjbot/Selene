@@ -17,6 +17,7 @@ class CarouselItem {
   final String? year;
   final String? rate;
   final String type; // movie, tv, variety, anime
+  final String? debugError; // 调试用：记录获取详情时的错误
 
   CarouselItem({
     required this.id,
@@ -28,6 +29,7 @@ class CarouselItem {
     this.year,
     this.rate,
     required this.type,
+    this.debugError,
   });
 }
 
@@ -113,7 +115,7 @@ class _HeroCarouselState extends State<HeroCarousel> {
     final currentItem = widget.items[_currentIndex];
     final trailerUrl = currentItem.trailerUrl;
     
-    setState(() => _debugInfo = '${currentItem.title} (ID:${currentItem.id})\ntrailerUrl: ${trailerUrl ?? "无"}');
+    setState(() => _debugInfo = '${currentItem.title} (ID:${currentItem.id})\ntrailerUrl: ${trailerUrl ?? "无"}\nerror: ${currentItem.debugError ?? "无"}');
     
     // 如果没有预告片URL或者URL相同，不重新加载
     if (trailerUrl == null || trailerUrl.isEmpty) {
