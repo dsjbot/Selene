@@ -11,6 +11,7 @@ class _DanmakuItem extends StatefulWidget {
   final double top;
   final int mode;
   final double screenWidth;
+  final double textWidth;
 
   const _DanmakuItem({
     super.key,
@@ -22,6 +23,7 @@ class _DanmakuItem extends StatefulWidget {
     required this.top,
     required this.mode,
     required this.screenWidth,
+    required this.textWidth,
   });
 
   @override
@@ -76,9 +78,10 @@ class _DanmakuItemState extends State<_DanmakuItem>
       animation: _controller,
       builder: (context, child) {
         final progress = _controller.value;
-        // 从右边进入，到左边消失
-        final estimatedWidth = widget.text.length * widget.fontSize * 0.6;
-        final left = widget.screenWidth - (widget.screenWidth + estimatedWidth) * progress;
+        // 从屏幕右边缘开始，移动到完全离开左边缘
+        // 总移动距离 = 屏幕宽度 + 弹幕宽度
+        final totalDistance = widget.screenWidth + widget.textWidth;
+        final left = widget.screenWidth - totalDistance * progress;
         return Positioned(
           top: widget.top,
           left: left,
@@ -92,14 +95,13 @@ class _DanmakuItemState extends State<_DanmakuItem>
 
 /// 轨道信息 - 记录每条轨道上弹幕的占用情况
 class _TrackInfo {
-  double lastDanmakuEndTime; // 上一条弹幕完全离开屏幕的时间
-  double lastDanmakuEnterTime; // 上一条弹幕完全进入屏幕的时间（尾部离开右边缘）
+  // 上一条弹幕尾部离开屏幕右边缘的时间（新弹幕可以开始进入的时间）
+  double availableTime;
   
-  _TrackInfo() : lastDanmakuEndTime = 0, lastDanmakuEnterTime = 0;
+  _TrackInfo() : availableTime = 0;
   
   void reset() {
-    lastDanmakuEndTime = 0;
-    lastDanmakuEnterTime = 0;
+    availableTime = 0;
   }
 }
 
@@ -111,6 +113,7 @@ class _PendingDanmaku {
   final Color color;
   final Key key;
   final double startTime;
+  final double textWidth;
 
   _PendingDanmaku({
     required this.item,
@@ -119,6 +122,7 @@ class _PendingDanmaku {
     required this.color,
     required this.key,
     required this.startTime,
+    required this.textWidth,
   });
 }
 
@@ -157,7 +161,7 @@ class _DanmakuLayerState extends State<DanmakuLayer> {
   int _keyCounter = 0;
   double _screenWidth = 0;
 
-  static const double _baseDuration = 8.0;
+  static const double _baseDuration = 10.0; // 弹幕滚动时间
   static const double _trackHeight = 32.0;
 
   @override
@@ -175,7 +179,7 @@ class _DanmakuLayerState extends State<DanmakuLayer> {
 
     final currentTime = widget.currentPosition.inMilliseconds / 1000.0;
 
-    // 检测 seek
+    // 检测 seek（跳转超过2秒）
     if ((currentTime - _lastTime).abs() > 2.0) {
       _onSeek(currentTime);
     }
@@ -251,23 +255,37 @@ class _DanmakuLayerState extends State<DanmakuLayer> {
     }
   }
 
+  double _estimateTextWidth(String text) {
+    // 估算文字宽度：中文字符约等于字体大小，英文约0.6倍
+    double width = 0;
+    for (int i = 0; i < text.length; i++) {
+      final code = text.codeUnitAt(i);
+      if (code > 127) {
+        width += widget.fontSize; // 中文等宽字符
+      } else {
+        width += widget.fontSize * 0.5; // ASCII字符
+      }
+    }
+    return width + 10; // 加一点边距
+  }
+
   bool _tryAddDanmaku(DanmakuItem item, double currentTime, double duration) {
     if (_tracks.isEmpty || _screenWidth <= 0) return false;
 
     // 估算弹幕宽度
-    final textWidth = item.text.length * widget.fontSize * 0.6;
-    // 弹幕完全进入屏幕所需时间（尾部离开右边缘）
-    final enterTime = duration * (textWidth / (_screenWidth + textWidth));
-    // 弹幕完全离开屏幕的时间
-    final exitTime = duration;
+    final textWidth = _estimateTextWidth(item.text);
+    
+    // 弹幕速度 = 总移动距离 / 时间
+    final totalDistance = _screenWidth + textWidth;
+    final speed = totalDistance / duration;
+    
+    // 弹幕尾部完全进入屏幕所需时间（即尾部离开右边缘）
+    final tailEnterTime = textWidth / speed;
 
     int? track;
     for (int i = 0; i < _tracks.length; i++) {
-      final trackInfo = _tracks[i];
-      // 检查是否会与上一条弹幕重叠：
-      // 1. 上一条弹幕已经完全进入屏幕（新弹幕不会追尾）
-      // 2. 或者上一条弹幕已经完全离开屏幕
-      if (currentTime >= trackInfo.lastDanmakuEnterTime) {
+      // 检查轨道是否可用：上一条弹幕的尾部已经完全进入屏幕
+      if (currentTime >= _tracks[i].availableTime) {
         track = i;
         break;
       }
@@ -290,11 +308,11 @@ class _DanmakuLayerState extends State<DanmakuLayer> {
       color: color,
       key: ValueKey(_keyCounter++),
       startTime: currentTime,
+      textWidth: textWidth,
     ));
 
-    // 更新轨道占用信息
-    _tracks[track].lastDanmakuEnterTime = currentTime + enterTime;
-    _tracks[track].lastDanmakuEndTime = currentTime + exitTime;
+    // 更新轨道可用时间：当前时间 + 尾部进入时间 + 小间隔
+    _tracks[track].availableTime = currentTime + tailEnterTime + 0.3;
 
     return true;
   }
@@ -336,6 +354,7 @@ class _DanmakuLayerState extends State<DanmakuLayer> {
                   top: d.track * _trackHeight,
                   mode: d.item.mode,
                   screenWidth: constraints.maxWidth,
+                  textWidth: d.textWidth,
                 );
               }).toList(),
             ),

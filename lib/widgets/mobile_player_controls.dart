@@ -1111,7 +1111,7 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
                     ),
                   ),
                 // 跳过设置按钮
-                if (!widget.live)
+                if (!widget.live && widget.videoSource != null && widget.videoId != null)
                   GestureDetector(
                     onTap: () async {
                       _onUserInteraction();
