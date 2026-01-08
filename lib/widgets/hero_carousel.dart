@@ -58,6 +58,7 @@ class _HeroCarouselState extends State<HeroCarousel> {
   final PageController _pageController = PageController();
   bool _isAutoPlayPaused = false; // 手动滑动后暂停自动播放
   bool _isAutoSwitching = false; // 标记是否是自动切换
+  bool _isDisposed = false; // 标记是否已经 dispose
   
   // 预告片播放器 - 复用同一个实例
   Player? _trailerPlayer;
@@ -88,7 +89,7 @@ class _HeroCarouselState extends State<HeroCarousel> {
     
     // 监听视频宽高变化（表示视频已加载）
     _trailerPlayer!.stream.width.listen((width) {
-      if (mounted && width != null && width > 0 && !_isVideoLoaded) {
+      if (mounted && !_isDisposed && width != null && width > 0 && !_isVideoLoaded) {
         setState(() {
           _isVideoLoaded = true;
         });
@@ -97,7 +98,7 @@ class _HeroCarouselState extends State<HeroCarousel> {
     
     _trailerPlayer!.stream.error.listen((error) {
       debugPrint('[HeroCarousel] 预告片播放错误: $error');
-      if (mounted) {
+      if (mounted && !_isDisposed) {
         setState(() {
           _isVideoLoaded = false;
         });
@@ -118,15 +119,30 @@ class _HeroCarouselState extends State<HeroCarousel> {
 
   @override
   void dispose() {
+    _isDisposed = true;
     _autoPlayTimer?.cancel();
+    _autoPlayTimer = null;
     _pageController.dispose();
-    _trailerPlayer?.dispose();
+    
+    // 安全地 dispose 播放器
+    final player = _trailerPlayer;
+    _trailerPlayer = null;
+    _trailerController = null;
+    
+    if (player != null) {
+      try {
+        player.dispose();
+      } catch (e) {
+        debugPrint('[HeroCarousel] dispose player error: $e');
+      }
+    }
+    
     super.dispose();
   }
 
   /// 加载当前项目的预告片
   Future<void> _loadTrailerForCurrentItem() async {
-    if (!widget.enableVideo || widget.items.isEmpty || _trailerPlayer == null) {
+    if (_isDisposed || !widget.enableVideo || widget.items.isEmpty || _trailerPlayer == null) {
       return;
     }
     
@@ -138,11 +154,17 @@ class _HeroCarouselState extends State<HeroCarousel> {
     
     // 如果没有预告片URL，停止播放
     if (trailerUrl == null || trailerUrl.isEmpty) {
-      setState(() {
-        _isVideoLoaded = false;
-        _currentTrailerUrl = null;
-      });
-      await _trailerPlayer!.stop();
+      if (mounted && !_isDisposed) {
+        setState(() {
+          _isVideoLoaded = false;
+          _currentTrailerUrl = null;
+        });
+      }
+      try {
+        await _trailerPlayer?.stop();
+      } catch (e) {
+        debugPrint('[HeroCarousel] stop player error: $e');
+      }
       return;
     }
     
@@ -152,12 +174,18 @@ class _HeroCarouselState extends State<HeroCarousel> {
     }
     
     _isLoadingVideo = true;
-    setState(() {
-      _isVideoLoaded = false;
-    });
+    if (mounted && !_isDisposed) {
+      setState(() {
+        _isVideoLoaded = false;
+      });
+    }
     
     try {
       final proxiedUrl = await _getProxiedVideoUrl(trailerUrl);
+      
+      // 检查是否已经 dispose
+      if (_isDisposed || !mounted || _trailerPlayer == null) return;
+      
       _currentTrailerUrl = trailerUrl;
       
       // 获取 cookies 用于视频请求
@@ -167,6 +195,9 @@ class _HeroCarouselState extends State<HeroCarousel> {
         headers['Cookie'] = cookies;
       }
       
+      // 再次检查
+      if (_isDisposed || !mounted || _trailerPlayer == null) return;
+      
       // 切换视频源
       await _trailerPlayer!.open(
         Media(proxiedUrl, httpHeaders: headers),
@@ -174,9 +205,11 @@ class _HeroCarouselState extends State<HeroCarousel> {
       
     } catch (e) {
       debugPrint('[HeroCarousel] 加载预告片失败: $e');
-      setState(() {
-        _isVideoLoaded = false;
-      });
+      if (mounted && !_isDisposed) {
+        setState(() {
+          _isVideoLoaded = false;
+        });
+      }
     } finally {
       _isLoadingVideo = false;
     }

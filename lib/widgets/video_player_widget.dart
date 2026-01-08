@@ -240,11 +240,17 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
       // 处理广告过滤
       String processedUrl = _currentUrl!;
       if (AdFilterService.isEnabled) {
+        // 检查是否已经被 dispose
+        if (_playerDisposed || !mounted) return;
+        
         processedUrl = await AdFilterService.processM3U8Url(
           _currentUrl!,
           headers: _currentHeaders,
           sourceKey: widget.videoSource,
         );
+        
+        // 再次检查是否已经被 dispose
+        if (_playerDisposed || !mounted || _player == null) return;
       }
       
       await _player!.open(
@@ -255,6 +261,9 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
         ),
         play: true,
       );
+      
+      if (_playerDisposed || !mounted) return;
+      
       await _player!.setRate(_playbackSpeed.value);
       setState(() {
         _hasCompleted = false;
@@ -263,7 +272,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
       // widget.onReady?.call();
     } catch (error) {
       debugPrint('VideoPlayerWidget: failed to open media $error');
-      if (mounted) {
+      if (mounted && !_playerDisposed) {
         setState(() {
           _isLoadingVideo = false;
         });
@@ -373,11 +382,17 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
       // 处理广告过滤
       String processedUrl = url;
       if (AdFilterService.isEnabled) {
+        // 检查是否已经被 dispose
+        if (_playerDisposed || !mounted) return;
+        
         processedUrl = await AdFilterService.processM3U8Url(
           url,
           headers: _currentHeaders,
           sourceKey: widget.videoSource,
         );
+        
+        // 再次检查是否已经被 dispose
+        if (_playerDisposed || !mounted || _player == null) return;
       }
       
       final currentSpeed = _player!.state.rate;
@@ -389,9 +404,12 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
         ),
         play: true,
       );
+      
+      if (_playerDisposed || !mounted) return;
+      
       _playbackSpeed.value = currentSpeed;
       await _player!.setRate(currentSpeed);
-      if (mounted) {
+      if (mounted && !_playerDisposed) {
         setState(() {
           _hasCompleted = false;
           // _isLoadingVideo = false;
@@ -400,7 +418,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
       // widget.onReady?.call();
     } catch (error) {
       debugPrint('VideoPlayerWidget: error while changing source $error');
-      if (mounted) {
+      if (mounted && !_playerDisposed) {
         setState(() {
           _isLoadingVideo = false;
         });
@@ -712,20 +730,36 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
       return;
     }
     _playerDisposed = true;
+    
+    // 先取消所有订阅
     _positionSubscription?.cancel();
+    _positionSubscription = null;
     _playingSubscription?.cancel();
+    _playingSubscription = null;
     _completedSubscription?.cancel();
+    _completedSubscription = null;
     _durationSubscription?.cancel();
+    _durationSubscription = null;
     _progressListeners.clear();
-    await _player?.dispose();
+    
+    // 安全地 dispose 播放器
+    final player = _player;
     _player = null;
     _videoController = null;
+    
+    if (player != null) {
+      try {
+        await player.dispose();
+      } catch (e) {
+        debugPrint('VideoPlayerWidget: error disposing player: $e');
+      }
+    }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    if (_player == null) {
+    if (_player == null || _playerDisposed) {
       return;
     }
     switch (state) {
@@ -742,11 +776,15 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
 
   @override
   void dispose() {
+    debugPrint('[VideoPlayerWidget] dispose called');
     WidgetsBinding.instance.removeObserver(this);
     if (Platform.isAndroid || Platform.isIOS) {
       _pip.unregisterStateChangedObserver();
       _pip.dispose();
     }
+    // 同步设置标记，防止其他异步操作继续
+    _playerDisposed = true;
+    // 异步清理播放器（不等待）
     _disposePlayer();
     _playbackSpeed.dispose();
     super.dispose();
