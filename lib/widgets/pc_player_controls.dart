@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'dlna_device_dialog.dart';
+import 'danmaku_settings_panel.dart';
 
 // 带 hover 效果的按钮组件
 class HoverButton extends StatefulWidget {
@@ -70,6 +71,9 @@ class PCPlayerControls extends StatefulWidget {
   final bool live;
   final ValueNotifier<double> playbackSpeedListenable;
   final Future<void> Function(double speed) onSetSpeed;
+  final int danmakuCount;
+  final DanmakuSettings danmakuSettings;
+  final ValueChanged<DanmakuSettings> onDanmakuSettingsChanged;
 
   const PCPlayerControls({
     super.key,
@@ -93,6 +97,9 @@ class PCPlayerControls extends StatefulWidget {
     this.live = false,
     required this.playbackSpeedListenable,
     required this.onSetSpeed,
+    this.danmakuCount = 0,
+    required this.danmakuSettings,
+    required this.onDanmakuSettingsChanged,
   });
 
   @override
@@ -122,6 +129,11 @@ class _PCPlayerControlsState extends State<PCPlayerControls> {
   double _volumeBeforeMute = 1.0;
   Timer? _volumeMenuHideTimer;
   final FocusNode _focusNode = FocusNode();
+  // 弹幕设置相关
+  bool _showDanmakuMenu = false;
+  final GlobalKey _danmakuButtonKey = GlobalKey();
+  bool _isHoveringDanmakuButton = false;
+  bool _isHoveringDanmakuMenu = false;
 
   @override
   void initState() {
@@ -203,13 +215,16 @@ class _PCPlayerControlsState extends State<PCPlayerControls> {
 
   void _startHideTimer() {
     _hideTimer?.cancel();
-    // 如果倍速菜单或音量菜单正在显示或鼠标悬停在按钮/菜单上，不启动隐藏定时器
+    // 如果倍速菜单或音量菜单或弹幕菜单正在显示或鼠标悬停在按钮/菜单上，不启动隐藏定时器
     if (_showSpeedMenu ||
         _isHoveringSpeedButton ||
         _isHoveringSpeedMenu ||
         _showVolumeMenu ||
         _isHoveringVolumeButton ||
-        _isHoveringVolumeMenu) {
+        _isHoveringVolumeMenu ||
+        _showDanmakuMenu ||
+        _isHoveringDanmakuButton ||
+        _isHoveringDanmakuMenu) {
       return;
     }
     if (widget.player.state.playing) {
@@ -578,7 +593,10 @@ class _PCPlayerControlsState extends State<PCPlayerControls> {
               !_isHoveringSpeedMenu &&
               !_showVolumeMenu &&
               !_isHoveringVolumeButton &&
-              !_isHoveringVolumeMenu) {
+              !_isHoveringVolumeMenu &&
+              !_showDanmakuMenu &&
+              !_isHoveringDanmakuButton &&
+              !_isHoveringDanmakuMenu) {
             setState(() {
               _controlsVisible = false;
             });
@@ -889,6 +907,81 @@ class _PCPlayerControlsState extends State<PCPlayerControls> {
                             Expanded(
                               child: _buildPositionIndicator(),
                             ),
+                          // 弹幕按钮
+                          if (!widget.live)
+                            MouseRegion(
+                              key: _danmakuButtonKey,
+                              cursor: SystemMouseCursors.click,
+                              onEnter: (_) {
+                                setState(() {
+                                  _isHoveringDanmakuButton = true;
+                                  _showDanmakuMenu = true;
+                                  _controlsVisible = true;
+                                });
+                                _hideTimer?.cancel();
+                              },
+                              onExit: (_) {
+                                setState(() {
+                                  _isHoveringDanmakuButton = false;
+                                });
+                                Future.delayed(const Duration(milliseconds: 100),
+                                    () {
+                                  if (mounted &&
+                                      !_isHoveringDanmakuButton &&
+                                      !_isHoveringDanmakuMenu) {
+                                    setState(() {
+                                      _showDanmakuMenu = false;
+                                    });
+                                    _startHideTimer();
+                                  }
+                                });
+                              },
+                              child: GestureDetector(
+                                onTap: () {
+                                  _onUserInteraction();
+                                  // 点击切换弹幕开关
+                                  widget.onDanmakuSettingsChanged(
+                                    widget.danmakuSettings.copyWith(
+                                      enabled: !widget.danmakuSettings.enabled,
+                                    ),
+                                  );
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: _isHoveringDanmakuButton
+                                      ? BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: Colors.grey.withValues(alpha: 0.5),
+                                        )
+                                      : null,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        widget.danmakuSettings.enabled
+                                            ? Icons.subtitles
+                                            : Icons.subtitles_off,
+                                        color: widget.danmakuSettings.enabled
+                                            ? Colors.white
+                                            : Colors.white.withValues(alpha: 0.5),
+                                        size: effectiveFullscreen ? 22 : 20,
+                                      ),
+                                      if (widget.danmakuCount > 0)
+                                        Padding(
+                                          padding: const EdgeInsets.only(left: 4),
+                                          child: Text(
+                                            '${widget.danmakuCount}',
+                                            style: TextStyle(
+                                              color: Colors.white.withValues(alpha: 0.7),
+                                              fontSize: effectiveFullscreen ? 11 : 10,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
                           if (!widget.live)
                             MouseRegion(
                               key: _speedButtonKey,
@@ -975,6 +1068,8 @@ class _PCPlayerControlsState extends State<PCPlayerControls> {
             if (_showSpeedMenu) _buildSpeedMenu(),
             // 音量调节弹窗
             if (_showVolumeMenu) _buildVolumeMenu(),
+            // 弹幕设置弹窗
+            if (_showDanmakuMenu) _buildDanmakuMenu(),
           ],
         ),
       ),
@@ -1225,6 +1320,59 @@ class _PCPlayerControlsState extends State<PCPlayerControls> {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDanmakuMenu() {
+    // 获取弹幕按钮的位置
+    final RenderBox? renderBox =
+        _danmakuButtonKey.currentContext?.findRenderObject() as RenderBox?;
+    if (renderBox == null) return const SizedBox.shrink();
+
+    final buttonPosition = renderBox.localToGlobal(Offset.zero);
+    final buttonSize = renderBox.size;
+
+    // 根据全屏状态调整弹窗大小
+    final effectiveFullscreen = _isWebFullscreen || _isFullscreen;
+    final menuWidth = effectiveFullscreen ? 280.0 : 240.0;
+    final menuHeight = effectiveFullscreen ? 280.0 : 240.0;
+
+    // 计算水平居中位置：按钮中心 - 弹框宽度的一半
+    final menuLeft =
+        buttonPosition.dx + (buttonSize.width / 2) - (menuWidth / 2);
+    // 计算垂直位置：按钮顶部 - 弹框高度 - 间距
+    final menuTop = buttonPosition.dy - menuHeight - (_isFullscreen ? 2 : 36);
+
+    return Positioned(
+      left: menuLeft,
+      top: menuTop,
+      child: MouseRegion(
+        onEnter: (_) {
+          setState(() {
+            _isHoveringDanmakuMenu = true;
+          });
+          _hideTimer?.cancel();
+        },
+        onExit: (_) {
+          setState(() {
+            _isHoveringDanmakuMenu = false;
+          });
+          // 延迟检查是否需要隐藏菜单
+          Future.delayed(const Duration(milliseconds: 100), () {
+            if (mounted && !_isHoveringDanmakuButton && !_isHoveringDanmakuMenu) {
+              setState(() {
+                _showDanmakuMenu = false;
+              });
+              _startHideTimer();
+            }
+          });
+        },
+        child: DanmakuSettingsPanel(
+          settings: widget.danmakuSettings,
+          onSettingsChanged: widget.onDanmakuSettingsChanged,
+          isFullscreen: effectiveFullscreen,
         ),
       ),
     );

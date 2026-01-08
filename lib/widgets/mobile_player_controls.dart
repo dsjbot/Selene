@@ -7,6 +7,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 import 'package:screen_brightness/screen_brightness.dart';
 import 'package:volume_controller/volume_controller.dart';
 import 'dlna_device_dialog.dart';
+import 'danmaku_settings_panel.dart';
 
 class MobilePlayerControls extends StatefulWidget {
   final Player player;
@@ -30,6 +31,9 @@ class MobilePlayerControls extends StatefulWidget {
   final Future<void> Function(double speed) onSetSpeed;
   final Future<void> Function() onEnterPipMode;
   final bool isPipMode;
+  final int danmakuCount;
+  final DanmakuSettings danmakuSettings;
+  final ValueChanged<DanmakuSettings> onDanmakuSettingsChanged;
 
   const MobilePlayerControls({
     super.key,
@@ -54,6 +58,9 @@ class MobilePlayerControls extends StatefulWidget {
     required this.onSetSpeed,
     required this.onEnterPipMode,
     required this.isPipMode,
+    this.danmakuCount = 0,
+    required this.danmakuSettings,
+    required this.onDanmakuSettingsChanged,
   });
 
   @override
@@ -455,6 +462,180 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
     if (result != null) {
       await widget.onSetSpeed(result);
     }
+  }
+
+  Future<void> _showDanmakuDialog() async {
+    final screenHeight = MediaQuery.of(context).size.height;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+            return SafeArea(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: screenHeight * 0.6,
+                ),
+                child: SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // 标题和开关
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '弹幕设置',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? Colors.white : Colors.black87,
+                              ),
+                            ),
+                            Switch(
+                              value: widget.danmakuSettings.enabled,
+                              onChanged: (value) {
+                                widget.onDanmakuSettingsChanged(
+                                  widget.danmakuSettings.copyWith(enabled: value),
+                                );
+                                setModalState(() {});
+                              },
+                              activeColor: Colors.blue,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        // 透明度
+                        _buildDanmakuSlider(
+                          label: '透明度',
+                          value: widget.danmakuSettings.opacity,
+                          min: 0.1,
+                          max: 1.0,
+                          displayValue: '${(widget.danmakuSettings.opacity * 100).round()}%',
+                          enabled: widget.danmakuSettings.enabled,
+                          isDark: isDark,
+                          onChanged: (value) {
+                            widget.onDanmakuSettingsChanged(
+                              widget.danmakuSettings.copyWith(opacity: value),
+                            );
+                            setModalState(() {});
+                          },
+                        ),
+                        // 字体大小
+                        _buildDanmakuSlider(
+                          label: '字体大小',
+                          value: widget.danmakuSettings.fontSize,
+                          min: 12.0,
+                          max: 32.0,
+                          displayValue: '${widget.danmakuSettings.fontSize.round()}',
+                          enabled: widget.danmakuSettings.enabled,
+                          isDark: isDark,
+                          onChanged: (value) {
+                            widget.onDanmakuSettingsChanged(
+                              widget.danmakuSettings.copyWith(fontSize: value),
+                            );
+                            setModalState(() {});
+                          },
+                        ),
+                        // 弹幕速度
+                        _buildDanmakuSlider(
+                          label: '弹幕速度',
+                          value: widget.danmakuSettings.speed,
+                          min: 0.5,
+                          max: 2.0,
+                          displayValue: '${widget.danmakuSettings.speed.toStringAsFixed(1)}x',
+                          enabled: widget.danmakuSettings.enabled,
+                          isDark: isDark,
+                          onChanged: (value) {
+                            widget.onDanmakuSettingsChanged(
+                              widget.danmakuSettings.copyWith(speed: value),
+                            );
+                            setModalState(() {});
+                          },
+                        ),
+                        // 显示区域
+                        _buildDanmakuSlider(
+                          label: '显示区域',
+                          value: widget.danmakuSettings.areaHeight,
+                          min: 0.25,
+                          max: 1.0,
+                          displayValue: '${(widget.danmakuSettings.areaHeight * 100).round()}%',
+                          enabled: widget.danmakuSettings.enabled,
+                          isDark: isDark,
+                          onChanged: (value) {
+                            widget.onDanmakuSettingsChanged(
+                              widget.danmakuSettings.copyWith(areaHeight: value),
+                            );
+                            setModalState(() {});
+                          },
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildDanmakuSlider({
+    required String label,
+    required double value,
+    required double min,
+    required double max,
+    required String displayValue,
+    required bool enabled,
+    required bool isDark,
+    required ValueChanged<double> onChanged,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  color: enabled
+                      ? (isDark ? Colors.white : Colors.black87)
+                      : (isDark ? Colors.white38 : Colors.black38),
+                  fontSize: 14,
+                ),
+              ),
+              Text(
+                displayValue,
+                style: TextStyle(
+                  color: enabled
+                      ? (isDark ? Colors.white70 : Colors.black54)
+                      : (isDark ? Colors.white24 : Colors.black26),
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+          Slider(
+            value: value,
+            min: min,
+            max: max,
+            onChanged: enabled ? onChanged : null,
+            activeColor: Colors.blue,
+            inactiveColor: isDark ? Colors.white24 : Colors.black12,
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _enterPipMode() async {
@@ -870,6 +1051,43 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
                     ),
                   ),
                 if (widget.live) const Spacer(),
+                // 弹幕按钮
+                if (!widget.live)
+                  GestureDetector(
+                    onTap: () async {
+                      _onUserInteraction();
+                      await _showDanmakuDialog();
+                    },
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
+                      padding: EdgeInsets.only(right: _isFullscreen ? 16 : 8),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            widget.danmakuSettings.enabled
+                                ? Icons.subtitles
+                                : Icons.subtitles_off,
+                            color: widget.danmakuSettings.enabled
+                                ? Colors.white
+                                : Colors.white.withValues(alpha: 0.5),
+                            size: _isFullscreen ? 22 : 20,
+                          ),
+                          if (widget.danmakuCount > 0)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 2),
+                              child: Text(
+                                '${widget.danmakuCount}',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.7),
+                                  fontSize: _isFullscreen ? 10 : 9,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
                 if (!widget.live)
                   GestureDetector(
                     onTap: () async {

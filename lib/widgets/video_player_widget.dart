@@ -7,6 +7,10 @@ import 'package:pip/pip.dart';
 import 'mobile_player_controls.dart';
 import 'pc_player_controls.dart';
 import 'video_player_surface.dart';
+import 'danmaku_layer.dart';
+import 'danmaku_settings_panel.dart';
+import '../models/danmaku.dart';
+import '../services/danmaku_service.dart';
 
 class VideoPlayerWidget extends StatefulWidget {
   final VideoPlayerSurface surface;
@@ -28,6 +32,7 @@ class VideoPlayerWidget extends StatefulWidget {
   final VoidCallback? onExitFullScreen;
   final bool live;
   final Function(bool isPipMode)? onPipModeChanged;
+  final String? doubanId; // 豆瓣ID，用于获取弹幕
 
   const VideoPlayerWidget({
     super.key,
@@ -50,6 +55,7 @@ class VideoPlayerWidget extends StatefulWidget {
     this.onExitFullScreen,
     this.live = false,
     this.onPipModeChanged,
+    this.doubanId,
   });
 
   @override
@@ -141,6 +147,12 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
   final Pip _pip = Pip();
   bool _isPipMode = false;
 
+  // 弹幕相关状态
+  List<DanmakuItem> _danmakuList = [];
+  DanmakuSettings _danmakuSettings = DanmakuSettings();
+  bool _isLoadingDanmaku = false;
+  Duration _currentPosition = Duration.zero;
+
   @override
   void initState() {
     super.initState();
@@ -151,6 +163,10 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     _setupPip();
     _registerPipObserver();
     widget.onControllerCreated?.call(VideoPlayerWidgetController._(this));
+    // 加载弹幕
+    if (!widget.live) {
+      _loadDanmaku();
+    }
   }
 
   @override
@@ -161,6 +177,13 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     }
     if (widget.url != oldWidget.url && widget.url != null) {
       unawaited(_updateDataSource(widget.url!));
+    }
+    // 视频标题或集数变化时重新加载弹幕
+    if (!widget.live &&
+        (widget.videoTitle != oldWidget.videoTitle ||
+            widget.currentEpisodeIndex != oldWidget.currentEpisodeIndex ||
+            widget.doubanId != oldWidget.doubanId)) {
+      _loadDanmaku();
     }
   }
 
@@ -220,7 +243,13 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     _completedSubscription?.cancel();
     _durationSubscription?.cancel();
 
-    _positionSubscription = _player!.stream.position.listen((_) {
+    _positionSubscription = _player!.stream.position.listen((position) {
+      // 更新弹幕位置
+      if (mounted) {
+        setState(() {
+          _currentPosition = position;
+        });
+      }
       for (final listener in List<VoidCallback>.from(_progressListeners)) {
         try {
           listener();
@@ -349,6 +378,56 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     _exitWebFullscreenCallback?.call();
   }
 
+  /// 加载弹幕数据
+  Future<void> _loadDanmaku() async {
+    if (widget.videoTitle == null || widget.videoTitle!.isEmpty) {
+      return;
+    }
+
+    setState(() {
+      _isLoadingDanmaku = true;
+      _danmakuList = [];
+    });
+
+    try {
+      final episode = widget.currentEpisodeIndex != null
+          ? (widget.currentEpisodeIndex! + 1).toString()
+          : null;
+
+      final response = await DanmakuService.getDanmaku(
+        title: widget.videoTitle!,
+        episode: episode,
+        doubanId: widget.doubanId,
+      );
+
+      if (mounted) {
+        setState(() {
+          _isLoadingDanmaku = false;
+          if (response.success) {
+            _danmakuList = response.danmakuList;
+            debugPrint('弹幕加载成功: ${_danmakuList.length} 条');
+          } else {
+            debugPrint('弹幕加载失败: ${response.error}');
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('弹幕加载异常: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingDanmaku = false;
+        });
+      }
+    }
+  }
+
+  /// 更新弹幕设置
+  void _updateDanmakuSettings(DanmakuSettings settings) {
+    setState(() {
+      _danmakuSettings = settings;
+    });
+  }
+
   void _setupPip() {
     if (!Platform.isAndroid && !Platform.isIOS) {
       return;
@@ -472,57 +551,84 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     return Container(
       color: Colors.black,
       child: _isInitialized && _videoController != null
-          ? Video(
-              controller: _videoController!,
-              controls: (state) {
-                return widget.surface == VideoPlayerSurface.desktop
-                    ? PCPlayerControls(
-                        state: state,
-                        player: _player!,
-                        onBackPressed: widget.onBackPressed,
-                        onNextEpisode: widget.onNextEpisode,
-                        onPause: widget.onPause,
-                        videoUrl: _currentUrl ?? '',
-                        isLastEpisode: widget.isLastEpisode,
-                        isLoadingVideo: _isLoadingVideo,
-                        onCastStarted: widget.onCastStarted,
-                        videoTitle: widget.videoTitle,
-                        currentEpisodeIndex: widget.currentEpisodeIndex,
-                        totalEpisodes: widget.totalEpisodes,
-                        sourceName: widget.sourceName,
-                        onWebFullscreenChanged: widget.onWebFullscreenChanged,
-                        onExitWebFullscreenCallbackReady: (callback) {
-                          _exitWebFullscreenCallback = callback;
-                        },
-                        onExitFullScreen: widget.onExitFullScreen,
-                        live: widget.live,
-                        playbackSpeedListenable: _playbackSpeed,
-                        onSetSpeed: _setPlaybackSpeed,
-                      )
-                    : MobilePlayerControls(
-                        player: _player!,
-                        state: state,
-                        onControlsVisibilityChanged: (_) {},
-                        onBackPressed: widget.onBackPressed,
-                        onFullscreenChange: (_) {},
-                        onNextEpisode: widget.onNextEpisode,
-                        onPause: widget.onPause,
-                        videoUrl: _currentUrl ?? '',
-                        isLastEpisode: widget.isLastEpisode,
-                        isLoadingVideo: _isLoadingVideo,
-                        onCastStarted: widget.onCastStarted,
-                        videoTitle: widget.videoTitle,
-                        currentEpisodeIndex: widget.currentEpisodeIndex,
-                        totalEpisodes: widget.totalEpisodes,
-                        sourceName: widget.sourceName,
-                        onExitFullScreen: widget.onExitFullScreen,
-                        live: widget.live,
-                        playbackSpeedListenable: _playbackSpeed,
-                        onSetSpeed: _setPlaybackSpeed,
-                        onEnterPipMode: _enterPipMode,
-                        isPipMode: _isPipMode,
-                      );
-              },
+          ? Stack(
+              children: [
+                // 视频层
+                Video(
+                  controller: _videoController!,
+                  controls: (state) {
+                    return widget.surface == VideoPlayerSurface.desktop
+                        ? PCPlayerControls(
+                            state: state,
+                            player: _player!,
+                            onBackPressed: widget.onBackPressed,
+                            onNextEpisode: widget.onNextEpisode,
+                            onPause: widget.onPause,
+                            videoUrl: _currentUrl ?? '',
+                            isLastEpisode: widget.isLastEpisode,
+                            isLoadingVideo: _isLoadingVideo,
+                            onCastStarted: widget.onCastStarted,
+                            videoTitle: widget.videoTitle,
+                            currentEpisodeIndex: widget.currentEpisodeIndex,
+                            totalEpisodes: widget.totalEpisodes,
+                            sourceName: widget.sourceName,
+                            onWebFullscreenChanged: widget.onWebFullscreenChanged,
+                            onExitWebFullscreenCallbackReady: (callback) {
+                              _exitWebFullscreenCallback = callback;
+                            },
+                            onExitFullScreen: widget.onExitFullScreen,
+                            live: widget.live,
+                            playbackSpeedListenable: _playbackSpeed,
+                            onSetSpeed: _setPlaybackSpeed,
+                            danmakuCount: _danmakuList.length,
+                            danmakuSettings: _danmakuSettings,
+                            onDanmakuSettingsChanged: _updateDanmakuSettings,
+                          )
+                        : MobilePlayerControls(
+                            player: _player!,
+                            state: state,
+                            onControlsVisibilityChanged: (_) {},
+                            onBackPressed: widget.onBackPressed,
+                            onFullscreenChange: (_) {},
+                            onNextEpisode: widget.onNextEpisode,
+                            onPause: widget.onPause,
+                            videoUrl: _currentUrl ?? '',
+                            isLastEpisode: widget.isLastEpisode,
+                            isLoadingVideo: _isLoadingVideo,
+                            onCastStarted: widget.onCastStarted,
+                            videoTitle: widget.videoTitle,
+                            currentEpisodeIndex: widget.currentEpisodeIndex,
+                            totalEpisodes: widget.totalEpisodes,
+                            sourceName: widget.sourceName,
+                            onExitFullScreen: widget.onExitFullScreen,
+                            live: widget.live,
+                            playbackSpeedListenable: _playbackSpeed,
+                            onSetSpeed: _setPlaybackSpeed,
+                            onEnterPipMode: _enterPipMode,
+                            isPipMode: _isPipMode,
+                            danmakuCount: _danmakuList.length,
+                            danmakuSettings: _danmakuSettings,
+                            onDanmakuSettingsChanged: _updateDanmakuSettings,
+                          );
+                  },
+                ),
+                // 弹幕层
+                if (!widget.live && !_isPipMode)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: DanmakuLayer(
+                        danmakuList: _danmakuList,
+                        currentPosition: _currentPosition,
+                        isPlaying: _player?.state.playing ?? false,
+                        enabled: _danmakuSettings.enabled,
+                        opacity: _danmakuSettings.opacity,
+                        fontSize: _danmakuSettings.fontSize,
+                        speed: _danmakuSettings.speed,
+                        areaHeight: _danmakuSettings.areaHeight,
+                      ),
+                    ),
+                  ),
+              ],
             )
           : const Center(
               child: CircularProgressIndicator(
