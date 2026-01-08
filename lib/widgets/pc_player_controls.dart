@@ -994,7 +994,7 @@ class _PCPlayerControlsState extends State<PCPlayerControls> {
                               ),
                             ),
                           // 跳过设置按钮
-                          if (!widget.live && widget.videoSource != null && widget.videoId != null)
+                          if (!widget.live && widget.videoUrl.isNotEmpty && widget.videoSource != null && widget.videoId != null)
                             HoverButton(
                               onTap: () {
                                 _onUserInteraction();
