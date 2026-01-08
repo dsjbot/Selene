@@ -888,6 +888,7 @@ class _MainLayoutState extends State<MainLayout> {
       {'icon': LucideIcons.tv, 'label': '剧集'},
       {'icon': LucideIcons.cat, 'label': '动漫'},
       {'icon': LucideIcons.clover, 'label': '综艺'},
+      {'icon': LucideIcons.clapperboard, 'label': '短剧'},
       {'icon': LucideIcons.radio, 'label': '直播'},
     ];
 

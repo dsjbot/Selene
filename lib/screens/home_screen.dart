@@ -5,6 +5,7 @@ import '../widgets/continue_watching_section.dart';
 import '../widgets/hot_movies_section.dart';
 import '../widgets/hot_tv_section.dart';
 import '../widgets/hot_show_section.dart';
+import '../widgets/hot_short_drama_section.dart';
 import '../widgets/bangumi_section.dart';
 import '../widgets/main_layout.dart';
 import '../widgets/top_tab_switcher.dart';
@@ -25,6 +26,8 @@ import 'anime_screen.dart';
 import 'show_screen.dart';
 import 'player_screen.dart';
 import 'live_screen.dart';
+import 'short_drama_screen.dart';
+import 'short_drama_player_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -142,6 +145,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
         // 刷新热门综艺组件
         await HotShowSection.refreshHotShows();
+
+        // 刷新热门短剧组件
+        await HotShortDramaSection.refreshHotShortDramas();
 
         // 强制重建页面
         setState(() {});
@@ -319,6 +325,22 @@ class _HomeScreenState extends State<HomeScreen> {
                 }
               },
             ),
+            // 热门短剧组件
+            HotShortDramaSection(
+              onDramaTap: (item) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ShortDramaPlayerScreen(
+                      id: item.id,
+                      name: item.name,
+                      cover: item.cover,
+                    ),
+                  ),
+                );
+              },
+              onMoreTap: () => _onBottomNavChanged(5),
+            ),
           ],
         ),
       ),
@@ -413,6 +435,7 @@ class _HomeScreenState extends State<HomeScreen> {
         const TvScreen(),
         const AnimeScreen(),
         const ShowScreen(),
+        const ShortDramaScreen(),
         const LiveScreen(),
       ],
     );

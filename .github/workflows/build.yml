@@ -1,0 +1,208 @@
+name: Build Selene
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          # Android
+          - name: android
+            os: ubuntu-latest
+            build-args: "--android-only"
+          # macOS / iOS
+          - name: macos_ios
+            os: macos-latest
+            build-args: "--apple-only"
+          # Windows
+          - name: windows-amd64
+            os: windows-latest
+
+    runs-on: ${{ matrix.os }}
+
+    env:
+      NDK_VERSION: '29.0.14033849'
+      NDK_VERSION_DEPS: '27.0.12077973'
+
+    name: Build ${{ matrix.name }}
+
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v4
+
+      - name: Get version from pubspec.yaml
+        id: get_version
+        run: |
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            VERSION=$(powershell -Command "(Get-Content pubspec.yaml | Select-String '^version:' | ForEach-Object {\$_ -replace 'version: ', ''}).trim()")
+          else
+            VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | tr -d ' ')
+          fi
+          VERSION=$(echo "$VERSION" | cut -d'+' -f1)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Extracted version: $VERSION"
+        shell: bash
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          cache: true
+
+      - name: Install Java
+        if: matrix.name == 'android'
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'zulu'
+          java-version: 21
+
+      - name: Setup Android SDK
+        if: matrix.name == 'android'
+        uses: android-actions/setup-android@v3
+
+      - name: Cache Gradle
+        if: matrix.name == 'android'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            android/.gradle
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Cache NDK
+        if: matrix.name == 'android'
+        id: cache-ndk
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.ANDROID_HOME }}/ndk/${{ env.NDK_VERSION }}
+            ${{ env.ANDROID_HOME }}/ndk/${{ env.NDK_VERSION_DEPS }}
+          key: ${{ runner.os }}-ndk-${{ env.NDK_VERSION }}-${{ env.NDK_VERSION_DEPS }}
+
+      - name: Install NDK
+        if: matrix.name == 'android' && steps.cache-ndk.outputs.cache-hit != 'true'
+        run: |
+          echo "y" | sdkmanager --install "ndk;${{ env.NDK_VERSION }}"
+          echo "y" | sdkmanager --install "ndk;${{ env.NDK_VERSION_DEPS }}"
+
+      - name: Write sign info
+        if: matrix.name == 'android'
+        run: |
+          if [ ! -z "${{ secrets.SIGNING_KEY }}" ]; then
+            echo "Writing signing configuration..."
+            echo ${{ secrets.SIGNING_KEY }} | base64 --decode > ${{ github.workspace }}/key.jks
+            cat > android/key.properties << EOF
+          storePassword=${{ secrets.KEY_STORE_PASSWORD }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          keyAlias=${{ secrets.ALIAS }}
+          storeFile=${{ github.workspace }}/key.jks
+          EOF
+            echo "Signing configuration written successfully"
+          else
+            echo "WARNING: SIGNING_KEY secret is not set!"
+          fi
+        shell: bash
+
+      - name: Build with build.sh (Android/macOS/iOS)
+        if: matrix.name != 'windows-amd64'
+        continue-on-error: true
+        run: |
+          chmod +x build.sh
+          ./build.sh ${{ matrix.build-args }}
+        shell: bash
+
+      - name: Build on Windows
+        if: matrix.name == 'windows-amd64'
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $version = "${{ steps.get_version.outputs.version }}"
+          Write-Host "Building version: $version" -ForegroundColor Green
+          
+          flutter pub get
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          
+          Write-Host "Building Windows..." -ForegroundColor Blue
+          flutter build windows --release
+          
+          Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath "dist/selene-$version-windows-x64-portable.zip" -Force
+          Write-Host "Windows build complete" -ForegroundColor Green
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: ${{ matrix.name }}-release-artifacts
+          path: dist/*
+
+  create-release:
+    needs: build
+    runs-on: ubuntu-latest
+    name: Create Release
+    if: startsWith(github.ref, 'refs/tags/')
+
+    env:
+      TZ: Asia/Shanghai
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-artifacts
+
+      - name: Prepare release artifacts
+        run: |
+          mkdir -p release-files
+          find all-artifacts -type f -exec cp {} release-files/ \;
+          ls -lh release-files/
+
+      - name: Get version from tag
+        id: tag_version
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Release version: $VERSION"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.tag_version.outputs.version }}
+          name: Selene ${{ steps.tag_version.outputs.version }}
+          files: release-files/*
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  cleanup:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Delete workflow runs
+        uses: Mattraks/delete-workflow-runs@main
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          retain_days: 0
+          keep_minimum_runs: 2
