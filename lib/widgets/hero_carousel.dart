@@ -114,12 +114,13 @@ class _HeroCarouselState extends State<HeroCarousel> {
     
     final currentItem = widget.items[_currentIndex];
     final trailerUrl = currentItem.trailerUrl;
+    final errorInfo = currentItem.debugError ?? "无";
     
-    setState(() => _debugInfo = '${currentItem.title} (ID:${currentItem.id})\ntrailerUrl: ${trailerUrl ?? "无"}\nerror: ${currentItem.debugError ?? "无"}');
+    // 始终显示完整调试信息
+    setState(() => _debugInfo = '${currentItem.title} (ID:${currentItem.id})\ntrailer: ${trailerUrl != null ? "有" : "无"}\nerror: $errorInfo');
     
     // 如果没有预告片URL或者URL相同，不重新加载
     if (trailerUrl == null || trailerUrl.isEmpty) {
-      setState(() => _debugInfo = '${currentItem.title} (ID:${currentItem.id})\n无预告片URL');
       _disposeTrailerPlayer();
       if (mounted) setState(() {});
       return;
