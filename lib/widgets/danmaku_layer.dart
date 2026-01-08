@@ -296,9 +296,16 @@ class _DanmakuLayerState extends State<DanmakuLayer>
 
   @override
   Widget build(BuildContext context) {
-    if (!widget.enabled || widget.danmakuList.isEmpty) {
+    if (!widget.enabled) {
+      debugPrint('[DanmakuLayer] 弹幕已禁用');
       return const SizedBox.shrink();
     }
+    if (widget.danmakuList.isEmpty) {
+      debugPrint('[DanmakuLayer] 弹幕列表为空');
+      return const SizedBox.shrink();
+    }
+
+    debugPrint('[DanmakuLayer] 渲染弹幕层, 弹幕数: ${widget.danmakuList.length}, 活跃弹幕: ${_activeDanmakus.length}');
 
     return LayoutBuilder(
       builder: (context, constraints) {

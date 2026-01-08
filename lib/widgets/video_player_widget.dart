@@ -156,6 +156,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
   @override
   void initState() {
     super.initState();
+    debugPrint('[VideoPlayerWidget] initState - videoTitle: ${widget.videoTitle}, live: ${widget.live}');
     WidgetsBinding.instance.addObserver(this);
     _currentUrl = widget.url;
     _currentHeaders = widget.headers;
@@ -172,6 +173,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
   @override
   void didUpdateWidget(covariant VideoPlayerWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
+    debugPrint('[VideoPlayerWidget] didUpdateWidget - old videoTitle: ${oldWidget.videoTitle}, new videoTitle: ${widget.videoTitle}');
     if (widget.headers != oldWidget.headers && widget.headers != null) {
       _currentHeaders = widget.headers;
     }
@@ -183,6 +185,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
         (widget.videoTitle != oldWidget.videoTitle ||
             widget.currentEpisodeIndex != oldWidget.currentEpisodeIndex ||
             widget.doubanId != oldWidget.doubanId)) {
+      debugPrint('[VideoPlayerWidget] 触发弹幕重新加载');
       _loadDanmaku();
     }
   }
@@ -380,12 +383,17 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
 
   /// 加载弹幕数据
   Future<void> _loadDanmaku() async {
+    debugPrint('[弹幕] _loadDanmaku 被调用');
+    debugPrint('[弹幕] videoTitle: ${widget.videoTitle}');
+    debugPrint('[弹幕] currentEpisodeIndex: ${widget.currentEpisodeIndex}');
+    debugPrint('[弹幕] doubanId: ${widget.doubanId}');
+    
     if (widget.videoTitle == null || widget.videoTitle!.isEmpty) {
       debugPrint('[弹幕] 视频标题为空，跳过加载');
       return;
     }
 
-    debugPrint('[弹幕] 开始加载弹幕: title=${widget.videoTitle}, episode=${widget.currentEpisodeIndex}, doubanId=${widget.doubanId}');
+    debugPrint('[弹幕] 开始加载弹幕...');
 
     setState(() {
       _isLoadingDanmaku = true;
@@ -397,11 +405,14 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
           ? (widget.currentEpisodeIndex! + 1).toString()
           : null;
 
+      debugPrint('[弹幕] 调用 DanmakuService.getDanmaku');
       final response = await DanmakuService.getDanmaku(
         title: widget.videoTitle!,
         episode: episode,
         doubanId: widget.doubanId,
       );
+
+      debugPrint('[弹幕] 收到响应: success=${response.success}, count=${response.count}, error=${response.error}');
 
       if (mounted) {
         setState(() {
