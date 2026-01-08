@@ -264,26 +264,35 @@ class _DanmakuLayerState extends State<DanmakuLayer> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final trackCount =
-            (constraints.maxHeight * widget.areaHeight / _trackHeight).floor();
+        final availableHeight = constraints.maxHeight * widget.areaHeight;
+        final trackCount = (availableHeight / _trackHeight).floor();
         while (_trackEndTimes.length < trackCount) {
           _trackEndTimes.add(0);
         }
+        while (_trackEndTimes.length > trackCount) {
+          _trackEndTimes.removeLast();
+        }
 
-        return Stack(
-          clipBehavior: Clip.hardEdge,
-          children: _visibleDanmakus.map<Widget>((d) {
-            return _DanmakuItem(
-              key: d.key,
-              text: d.item.text,
-              color: d.color,
-              fontSize: widget.fontSize,
-              opacity: widget.opacity,
-              duration: d.duration,
-              top: d.track * _trackHeight,
-              mode: d.item.mode,
-            );
-          }).toList(),
+        return ClipRect(
+          child: SizedBox(
+            width: constraints.maxWidth,
+            height: availableHeight,
+            child: Stack(
+              clipBehavior: Clip.hardEdge,
+              children: _visibleDanmakus.map<Widget>((d) {
+                return _DanmakuItem(
+                  key: d.key,
+                  text: d.item.text,
+                  color: d.color,
+                  fontSize: widget.fontSize,
+                  opacity: widget.opacity,
+                  duration: d.duration,
+                  top: d.track * _trackHeight,
+                  mode: d.item.mode,
+                );
+              }).toList(),
+            ),
+          ),
         );
       },
     );
