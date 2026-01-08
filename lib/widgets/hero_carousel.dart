@@ -55,8 +55,14 @@ class HeroCarousel extends StatefulWidget {
 class _HeroCarouselState extends State<HeroCarousel> {
   int _currentIndex = 0;
   Timer? _autoPlayTimer;
+  Timer? _resumeAutoPlayTimer; // 滑动后恢复自动播放的定时器
   final PageController _pageController = PageController();
   bool _isUserInteracting = false;
+  bool _isPausedAfterSwipe = false; // 滑动后暂停自动播放
+  
+  // 滑动手势相关
+  double? _touchStartX;
+  static const double _minSwipeDistance = 50.0;
   
   // 预告片播放器 - 复用同一个实例
   Player? _trailerPlayer;
@@ -118,6 +124,7 @@ class _HeroCarouselState extends State<HeroCarousel> {
   @override
   void dispose() {
     _autoPlayTimer?.cancel();
+    _resumeAutoPlayTimer?.cancel();
     _pageController.dispose();
     _trailerPlayer?.dispose();
     super.dispose();
@@ -204,8 +211,22 @@ class _HeroCarouselState extends State<HeroCarousel> {
     if (widget.items.length <= 1) return;
     
     _autoPlayTimer = Timer.periodic(widget.autoPlayInterval, (_) {
-      if (!_isUserInteracting && mounted) {
+      if (!_isUserInteracting && !_isPausedAfterSwipe && mounted) {
         _goToNext();
+      }
+    });
+  }
+
+  /// 滑动后暂停自动播放一段时间
+  void _pauseAutoPlayAfterSwipe() {
+    _isPausedAfterSwipe = true;
+    _resumeAutoPlayTimer?.cancel();
+    // 滑动后暂停5秒再恢复自动播放
+    _resumeAutoPlayTimer = Timer(const Duration(seconds: 5), () {
+      if (mounted) {
+        setState(() {
+          _isPausedAfterSwipe = false;
+        });
       }
     });
   }
@@ -241,12 +262,27 @@ class _HeroCarouselState extends State<HeroCarousel> {
 
   void _onUserInteractionStart() {
     _isUserInteracting = true;
-    _autoPlayTimer?.cancel();
   }
 
   void _onUserInteractionEnd() {
     _isUserInteracting = false;
-    _startAutoPlay();
+  }
+
+  /// 触摸开始
+  void _onTouchStart(DragStartDetails details) {
+    _touchStartX = details.globalPosition.dx;
+    _onUserInteractionStart();
+  }
+
+  /// 触摸结束，判断是否为滑动
+  void _onTouchEnd(DragEndDetails details) {
+    _onUserInteractionEnd();
+    
+    if (_touchStartX != null) {
+      // 滑动后暂停自动播放
+      _pauseAutoPlayAfterSwipe();
+    }
+    _touchStartX = null;
   }
 
   String _getTypeLabel(String type) {
@@ -282,8 +318,8 @@ class _HeroCarouselState extends State<HeroCarousel> {
           children: [
             // 轮播内容
             GestureDetector(
-              onHorizontalDragStart: (_) => _onUserInteractionStart(),
-              onHorizontalDragEnd: (_) => _onUserInteractionEnd(),
+              onHorizontalDragStart: _onTouchStart,
+              onHorizontalDragEnd: _onTouchEnd,
               child: PageView.builder(
                 controller: _pageController,
                 onPageChanged: _onPageChanged,
@@ -369,13 +405,12 @@ class _HeroCarouselState extends State<HeroCarousel> {
     // 只要是当前项目且有预告片URL，就渲染视频层（通过opacity控制显示）
     final shouldRenderVideo = widget.enableVideo && isCurrentItem && hasTrailer && _trailerController != null;
     
-    return GestureDetector(
-      onTap: () => widget.onItemTap?.call(item),
-      child: FutureBuilder<String>(
-        future: getImageUrl(imageUrl, 'douban'),
-        builder: (context, snapshot) {
-          final String finalImageUrl = snapshot.data ?? imageUrl;
-          final headers = getImageRequestHeaders(finalImageUrl, 'douban');
+    // 不在整个轮播项上添加点击事件，只在播放按钮上添加
+    return FutureBuilder<String>(
+      future: getImageUrl(imageUrl, 'douban'),
+      builder: (context, snapshot) {
+        final String finalImageUrl = snapshot.data ?? imageUrl;
+        final headers = getImageRequestHeaders(finalImageUrl, 'douban');
           
           return Stack(
             fit: StackFit.expand,
@@ -600,7 +635,6 @@ class _HeroCarouselState extends State<HeroCarousel> {
             ],
           );
         },
-      ),
     );
   }
 

@@ -202,24 +202,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildHomeContentWithPageView() {
     return Column(
       children: [
-        // 轮播图（在 TabBar 上方，所有 Tab 都能看到）
-        if (_carouselItems.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-            child: HeroCarousel(
-              items: _carouselItems,
-              autoPlayInterval: const Duration(seconds: 6),
-              onItemTap: (item) {
-                _navigateToPlayer(
-                  PlayerScreen(
-                    title: item.title,
-                    year: item.year,
-                    stype: item.type == 'movie' ? 'movie' : null,
-                  ),
-                );
-              },
-            ),
-          ),
         // 顶部导航栏
         TopTabSwitcher(
           selectedTab: _selectedTopTab,
@@ -267,6 +249,29 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// 构建轮播图组件（可复用）
+  Widget _buildCarousel() {
+    if (_carouselItems.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+      child: HeroCarousel(
+        items: _carouselItems,
+        autoPlayInterval: const Duration(seconds: 6),
+        onItemTap: (item) {
+          _navigateToPlayer(
+            PlayerScreen(
+              title: item.title,
+              year: item.year,
+              stype: item.type == 'movie' ? 'movie' : null,
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   /// 构建首页标签内容
   Widget _buildHomeTabContent() {
     return StyledRefreshIndicator(
@@ -276,7 +281,8 @@ class _HomeScreenState extends State<HomeScreen> {
       child: SingleChildScrollView(
         child: Column(
           children: [
-            const SizedBox(height: 8),
+            // 轮播图
+            _buildCarousel(),
             // 继续观看组件
             ContinueWatchingSection(
               onVideoTap: _onVideoTap,
@@ -399,7 +405,8 @@ class _HomeScreenState extends State<HomeScreen> {
       child: SingleChildScrollView(
         child: Column(
           children: [
-            const SizedBox(height: 4),
+            // 轮播图
+            _buildCarousel(),
             HistoryGrid(
               onVideoTap: _onVideoTap,
               onGlobalMenuAction: _onGlobalMenuAction,
@@ -419,7 +426,8 @@ class _HomeScreenState extends State<HomeScreen> {
       child: SingleChildScrollView(
         child: Column(
           children: [
-            const SizedBox(height: 4),
+            // 轮播图
+            _buildCarousel(),
             FavoritesGrid(
               onVideoTap: _onVideoTap,
               onGlobalMenuAction:
