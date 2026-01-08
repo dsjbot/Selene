@@ -121,6 +121,7 @@ class _HeroCarouselState extends State<HeroCarousel> {
   void dispose() {
     debugPrint('[HeroCarousel] dispose called');
     _isDisposed = true;
+    
     _autoPlayTimer?.cancel();
     _autoPlayTimer = null;
     _pageController.dispose();

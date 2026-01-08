@@ -44,6 +44,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // 轮播图数据
   List<CarouselItem> _carouselItems = [];
   bool _isLoadingCarousel = true;
+  bool _showCarousel = true; // 控制轮播图是否显示（进入播放页面时隐藏）
 
   @override
   void initState() {
@@ -259,7 +260,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// 构建轮播图组件（可复用）
   Widget _buildCarousel() {
-    if (_carouselItems.isEmpty) {
+    // 如果不显示轮播图或数据为空，返回空组件
+    if (!_showCarousel || _carouselItems.isEmpty) {
       return const SizedBox.shrink();
     }
     return Padding(
@@ -760,11 +762,33 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// 跳转到播放页的通用方法
   Future<void> _navigateToPlayer(Widget playerScreen) async {
+    // 防止重复点击
+    if (!_showCarousel) return;
+    
+    // 进入播放页面前隐藏轮播图（销毁播放器）
+    if (mounted) {
+      setState(() {
+        _showCarousel = false;
+      });
+    }
+    
+    // 等待一帧确保轮播图已经被销毁
+    await Future.delayed(const Duration(milliseconds: 50));
+    
+    if (!mounted) return;
+    
     await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => playerScreen),
     );
 
+    // 返回后恢复轮播图
+    if (mounted) {
+      setState(() {
+        _showCarousel = true;
+      });
+    }
+    
     _refreshOnResume();
   }
 
