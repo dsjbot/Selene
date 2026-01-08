@@ -202,6 +202,24 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildHomeContentWithPageView() {
     return Column(
       children: [
+        // 轮播图（在 TabBar 上方，所有 Tab 都能看到）
+        if (_carouselItems.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+            child: HeroCarousel(
+              items: _carouselItems,
+              autoPlayInterval: const Duration(seconds: 6),
+              onItemTap: (item) {
+                _navigateToPlayer(
+                  PlayerScreen(
+                    title: item.title,
+                    year: item.year,
+                    stype: item.type == 'movie' ? 'movie' : null,
+                  ),
+                );
+              },
+            ),
+          ),
         // 顶部导航栏
         TopTabSwitcher(
           selectedTab: _selectedTopTab,
@@ -259,26 +277,6 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           children: [
             const SizedBox(height: 8),
-            // 轮播图
-            if (_carouselItems.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: HeroCarousel(
-                  items: _carouselItems,
-                  autoPlayInterval: const Duration(seconds: 6),
-                  onItemTap: (item) {
-                    _navigateToPlayer(
-                      PlayerScreen(
-                        title: item.title,
-                        year: item.year,
-                        stype: item.type == 'movie' ? 'movie' : null,
-                      ),
-                    );
-                  },
-                ),
-              ),
-            if (_carouselItems.isNotEmpty)
-              const SizedBox(height: 12),
             // 继续观看组件
             ContinueWatchingSection(
               onVideoTap: _onVideoTap,
