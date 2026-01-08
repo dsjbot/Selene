@@ -787,8 +787,26 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     }
     // 同步设置标记，防止其他异步操作继续
     _playerDisposed = true;
-    // 异步清理播放器（不等待）
-    _disposePlayer();
+    
+    // 取消所有订阅
+    _positionSubscription?.cancel();
+    _playingSubscription?.cancel();
+    _completedSubscription?.cancel();
+    _durationSubscription?.cancel();
+    _progressListeners.clear();
+    
+    // 同步停止并释放播放器
+    final player = _player;
+    _player = null;
+    _videoController = null;
+    
+    if (player != null) {
+      // 同步调用 stop 和 dispose（不等待完成）
+      player.stop().then((_) => player.dispose()).catchError((e) {
+        debugPrint('VideoPlayerWidget: error disposing player: $e');
+      });
+    }
+    
     _playbackSpeed.dispose();
     super.dispose();
   }

@@ -119,25 +119,22 @@ class _HeroCarouselState extends State<HeroCarousel> {
 
   @override
   void dispose() {
+    debugPrint('[HeroCarousel] dispose called');
     _isDisposed = true;
     _autoPlayTimer?.cancel();
     _autoPlayTimer = null;
     _pageController.dispose();
     
-    // 安全地停止并 dispose 播放器
+    // 同步停止并释放播放器
     final player = _trailerPlayer;
     _trailerPlayer = null;
     _trailerController = null;
     
     if (player != null) {
-      try {
-        // 先停止播放
-        player.stop();
-        // 再 dispose
-        player.dispose();
-      } catch (e) {
+      // 同步调用 stop 和 dispose（不等待完成）
+      player.stop().then((_) => player.dispose()).catchError((e) {
         debugPrint('[HeroCarousel] dispose player error: $e');
-      }
+      });
     }
     
     super.dispose();
