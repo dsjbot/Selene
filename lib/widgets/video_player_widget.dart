@@ -642,27 +642,6 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
                       ),
                     ),
                   ),
-                // 弹幕调试信息（临时）
-                if (!widget.live && !_isPipMode)
-                  Positioned(
-                    top: 50,
-                    left: 10,
-                    child: IgnorePointer(
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.black54,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          '弹幕: ${_danmakuList.length}条 | 开关: ${_danmakuSettings.enabled ? "开" : "关"}\n'
-                          '标题: ${widget.videoTitle ?? "null"}\n'
-                          '豆瓣ID: ${widget.doubanId ?? "null"}',
-                          style: const TextStyle(color: Colors.yellow, fontSize: 12),
-                        ),
-                      ),
-                    ),
-                  ),
               ],
             )
           : const Center(
