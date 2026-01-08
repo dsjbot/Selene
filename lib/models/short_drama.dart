@@ -10,8 +10,8 @@ class ShortDramaCategory {
 
   factory ShortDramaCategory.fromJson(Map<String, dynamic> json) {
     return ShortDramaCategory(
-      typeId: json['type_id'] ?? 0,
-      typeName: json['type_name'] ?? '',
+      typeId: json['type_id'] ?? json['typeId'] ?? json['id'] ?? 0,
+      typeName: json['type_name'] ?? json['typeName'] ?? json['name'] ?? '',
     );
   }
 }
@@ -39,13 +39,21 @@ class ShortDramaItem {
   factory ShortDramaItem.fromJson(Map<String, dynamic> json) {
     return ShortDramaItem(
       id: json['id'] ?? 0,
-      name: json['name'] ?? '',
-      cover: json['cover'] ?? '',
-      updateTime: json['update_time'] ?? '',
-      score: (json['score'] ?? 0).toDouble(),
-      episodeCount: json['episode_count'] ?? 1,
-      description: json['description'] ?? '',
+      name: json['name'] ?? json['title'] ?? '',
+      cover: json['cover'] ?? json['poster'] ?? json['image'] ?? '',
+      updateTime: json['update_time'] ?? json['updateTime'] ?? json['time'] ?? '',
+      score: _parseDouble(json['score'] ?? json['rating']),
+      episodeCount: json['episode_count'] ?? json['episodeCount'] ?? json['episodes'] ?? 1,
+      description: json['description'] ?? json['desc'] ?? json['intro'] ?? '',
     );
+  }
+
+  static double _parseDouble(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0.0;
+    return 0.0;
   }
 }
 
@@ -60,13 +68,15 @@ class ShortDramaListResponse {
   });
 
   factory ShortDramaListResponse.fromJson(Map<String, dynamic> json) {
-    final list = (json['list'] as List<dynamic>?)
+    // 尝试多种可能的字段名
+    final listData = json['list'] ?? json['data'] ?? json['items'] ?? json['results'] ?? [];
+    final list = (listData as List<dynamic>?)
             ?.map((e) => ShortDramaItem.fromJson(e as Map<String, dynamic>))
             .toList() ??
         [];
     return ShortDramaListResponse(
       list: list,
-      hasMore: json['hasMore'] ?? false,
+      hasMore: json['hasMore'] ?? json['has_more'] ?? json['hasNext'] ?? false,
     );
   }
 }
@@ -100,24 +110,45 @@ class ShortDramaDetail {
   });
 
   factory ShortDramaDetail.fromJson(Map<String, dynamic> json) {
+    // 处理 episodes 字段，可能是数组或数字
+    List<String> episodes = [];
+    List<String> episodesTitles = [];
+    
+    final episodesData = json['episodes'] ?? json['episode_list'];
+    if (episodesData is List) {
+      episodes = episodesData.map((e) => e.toString()).toList();
+    } else if (episodesData is int) {
+      // 如果是数字，生成集数列表
+      episodes = List.generate(episodesData, (i) => (i + 1).toString());
+    } else if (json['episode_count'] != null) {
+      final count = json['episode_count'] is int 
+          ? json['episode_count'] 
+          : int.tryParse(json['episode_count'].toString()) ?? 1;
+      episodes = List.generate(count, (i) => (i + 1).toString());
+    }
+    
+    final titlesData = json['episodes_titles'] ?? json['episode_titles'];
+    if (titlesData is List) {
+      episodesTitles = titlesData.map((e) => e.toString()).toList();
+    }
+    
+    // 如果没有标题，使用默认标题
+    if (episodesTitles.isEmpty && episodes.isNotEmpty) {
+      episodesTitles = episodes.map((e) => '第$e集').toList();
+    }
+
     return ShortDramaDetail(
       id: json['id']?.toString() ?? '',
-      title: json['title'] ?? '',
-      poster: json['poster'] ?? '',
-      episodes: (json['episodes'] as List<dynamic>?)
-              ?.map((e) => e.toString())
-              .toList() ??
-          [],
-      episodesTitles: (json['episodes_titles'] as List<dynamic>?)
-              ?.map((e) => e.toString())
-              .toList() ??
-          [],
+      title: json['title'] ?? json['name'] ?? '',
+      poster: json['poster'] ?? json['cover'] ?? json['image'] ?? '',
+      episodes: episodes,
+      episodesTitles: episodesTitles,
       source: json['source'] ?? 'shortdrama',
-      sourceName: json['source_name'] ?? '短剧',
+      sourceName: json['source_name'] ?? json['sourceName'] ?? '短剧',
       year: json['year'] ?? '',
-      desc: json['desc'] ?? '',
-      typeName: json['type_name'] ?? '短剧',
-      dramaName: json['drama_name'] ?? '',
+      desc: json['desc'] ?? json['description'] ?? json['intro'] ?? '',
+      typeName: json['type_name'] ?? json['typeName'] ?? '短剧',
+      dramaName: json['drama_name'] ?? json['dramaName'] ?? json['name'] ?? '',
     );
   }
 }
@@ -142,12 +173,12 @@ class ShortDramaParseResult {
 
   factory ShortDramaParseResult.fromJson(Map<String, dynamic> json) {
     return ShortDramaParseResult(
-      url: json['url'] ?? '',
-      originalUrl: json['originalUrl'] ?? '',
-      proxyUrl: json['proxyUrl'] ?? '',
-      title: json['title'] ?? '',
+      url: json['url'] ?? json['playUrl'] ?? json['play_url'] ?? '',
+      originalUrl: json['originalUrl'] ?? json['original_url'] ?? json['url'] ?? '',
+      proxyUrl: json['proxyUrl'] ?? json['proxy_url'] ?? '',
+      title: json['title'] ?? json['name'] ?? '',
       episode: json['episode'] ?? 1,
-      totalEpisodes: json['totalEpisodes'] ?? 1,
+      totalEpisodes: json['totalEpisodes'] ?? json['total_episodes'] ?? json['total'] ?? 1,
     );
   }
 }

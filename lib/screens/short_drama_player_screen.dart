@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'dart:io' show Platform;
 import '../models/short_drama.dart';
 import '../services/short_drama_service.dart';
@@ -55,7 +54,9 @@ class _ShortDramaPlayerScreenState extends State<ShortDramaPlayerScreen> {
           _isLoading = false;
         });
         // 自动播放第一集
-        _playEpisode(0);
+        if (_detail!.episodes.isNotEmpty) {
+          _playEpisode(0);
+        }
       } else {
         setState(() {
           _error = response.message ?? '加载失败';
@@ -67,7 +68,16 @@ class _ShortDramaPlayerScreenState extends State<ShortDramaPlayerScreen> {
 
   Future<void> _playEpisode(int index) async {
     if (_isParsing) return;
-    if (_detail == null || index >= _detail!.episodes.length) return;
+    if (_detail == null) return;
+    if (_detail!.episodes.isEmpty) {
+      setState(() {
+        _error = '没有可播放的剧集';
+      });
+      return;
+    }
+    if (index >= _detail!.episodes.length) {
+      index = _detail!.episodes.length - 1;
+    }
 
     setState(() {
       _isParsing = true;
@@ -107,7 +117,6 @@ class _ShortDramaPlayerScreenState extends State<ShortDramaPlayerScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isMobile = Platform.isAndroid || Platform.isIOS;
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F5),
@@ -129,10 +138,14 @@ class _ShortDramaPlayerScreenState extends State<ShortDramaPlayerScreen> {
                         color: Colors.red[300],
                       ),
                       const SizedBox(height: 16),
-                      Text(
-                        _error!,
-                        style: TextStyle(
-                          color: isDark ? Colors.white70 : Colors.black54,
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 32),
+                        child: Text(
+                          _error!,
+                          style: TextStyle(
+                            color: isDark ? Colors.white70 : Colors.black54,
+                          ),
+                          textAlign: TextAlign.center,
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -159,7 +172,9 @@ class _ShortDramaPlayerScreenState extends State<ShortDramaPlayerScreen> {
                           children: [
                             // 标题和描述
                             Text(
-                              _detail?.title ?? widget.name,
+                              _detail?.title.isNotEmpty == true 
+                                  ? _detail!.title 
+                                  : widget.name,
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
@@ -213,7 +228,6 @@ class _ShortDramaPlayerScreenState extends State<ShortDramaPlayerScreen> {
   }
 
   Widget _buildPlayer(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final isMobile = Platform.isAndroid || Platform.isIOS;
 
     if (_isParsing) {
@@ -244,10 +258,13 @@ class _ShortDramaPlayerScreenState extends State<ShortDramaPlayerScreen> {
             children: [
               Icon(Icons.error_outline, size: 48, color: Colors.red[300]),
               const SizedBox(height: 12),
-              Text(
-                _error!,
-                style: const TextStyle(color: Colors.white70),
-                textAlign: TextAlign.center,
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  _error!,
+                  style: const TextStyle(color: Colors.white70),
+                  textAlign: TextAlign.center,
+                ),
               ),
               const SizedBox(height: 12),
               ElevatedButton(
@@ -294,6 +311,17 @@ class _ShortDramaPlayerScreenState extends State<ShortDramaPlayerScreen> {
   Widget _buildEpisodeGrid(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final episodes = _detail?.episodes ?? [];
+
+    if (episodes.isEmpty) {
+      return Center(
+        child: Text(
+          '暂无剧集',
+          style: TextStyle(
+            color: isDark ? Colors.white60 : Colors.black54,
+          ),
+        ),
+      );
+    }
 
     return GridView.builder(
       shrinkWrap: true,

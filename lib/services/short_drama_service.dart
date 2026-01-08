@@ -98,7 +98,7 @@ class ShortDramaService {
       final encodedQuery = Uri.encodeComponent(query);
       final response = await http.get(
         Uri.parse(
-            '$baseUrl/api/shortdrama/search?name=$encodedQuery&page=$page&size=$size'),
+            '$baseUrl/api/shortdrama/search?keyword=$encodedQuery&page=$page&size=$size'),
         headers: {
           'Accept': 'application/json',
           if (cookies != null) 'Cookie': cookies,
@@ -142,10 +142,24 @@ class ShortDramaService {
       ).timeout(_timeout);
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        final items = data
-            .map((e) => ShortDramaItem.fromJson(e as Map<String, dynamic>))
-            .toList();
+        final dynamic responseData = json.decode(response.body);
+        List<ShortDramaItem> items = [];
+        
+        // 处理不同的响应格式
+        if (responseData is List) {
+          items = responseData
+              .map((e) => ShortDramaItem.fromJson(e as Map<String, dynamic>))
+              .toList();
+        } else if (responseData is Map<String, dynamic>) {
+          // 可能是 { list: [...], hasMore: bool } 格式
+          final list = responseData['list'] ?? responseData['data'] ?? responseData['items'];
+          if (list is List) {
+            items = list
+                .map((e) => ShortDramaItem.fromJson(e as Map<String, dynamic>))
+                .toList();
+          }
+        }
+        
         return ApiResponse.success(items);
       } else {
         return ApiResponse.error('获取推荐失败: ${response.statusCode}');
@@ -158,7 +172,6 @@ class ShortDramaService {
   /// 获取短剧详情
   static Future<ApiResponse<ShortDramaDetail>> getDetail({
     required int id,
-    int episode = 1,
     String? name,
   }) async {
     try {
@@ -168,7 +181,8 @@ class ShortDramaService {
       }
 
       final cookies = await _getCookies();
-      String url = '$baseUrl/api/shortdrama/detail?id=$id&episode=$episode';
+      // 使用 name 参数作为主要查询条件，与后端 API 保持一致
+      String url = '$baseUrl/api/shortdrama/detail?id=$id';
       if (name != null && name.isNotEmpty) {
         url += '&name=${Uri.encodeComponent(name)}';
       }
@@ -185,7 +199,17 @@ class ShortDramaService {
         final data = json.decode(response.body) as Map<String, dynamic>;
         return ApiResponse.success(ShortDramaDetail.fromJson(data));
       } else {
-        return ApiResponse.error('获取详情失败: ${response.statusCode}');
+        // 尝试解析错误信息
+        String errorMsg = '获取详情失败: ${response.statusCode}';
+        try {
+          final errorData = json.decode(response.body);
+          if (errorData is Map && errorData['message'] != null) {
+            errorMsg = errorData['message'];
+          } else if (errorData is Map && errorData['error'] != null) {
+            errorMsg = errorData['error'];
+          }
+        } catch (_) {}
+        return ApiResponse.error(errorMsg);
       }
     } catch (e) {
       return ApiResponse.error('获取详情异常: $e');
@@ -205,7 +229,8 @@ class ShortDramaService {
       }
 
       final cookies = await _getCookies();
-      String url = '$baseUrl/api/shortdrama/parse?id=$id&episode=$episode';
+      // episode 从 0 开始，API 可能需要从 1 开始
+      String url = '$baseUrl/api/shortdrama/parse?id=$id&episode=${episode + 1}';
       if (name != null && name.isNotEmpty) {
         url += '&name=${Uri.encodeComponent(name)}';
       }
@@ -222,8 +247,16 @@ class ShortDramaService {
         final data = json.decode(response.body) as Map<String, dynamic>;
         return ApiResponse.success(ShortDramaParseResult.fromJson(data));
       } else {
-        final errorData = json.decode(response.body);
-        return ApiResponse.error(errorData['error'] ?? '解析失败');
+        String errorMsg = '解析失败: ${response.statusCode}';
+        try {
+          final errorData = json.decode(response.body);
+          if (errorData is Map && errorData['message'] != null) {
+            errorMsg = errorData['message'];
+          } else if (errorData is Map && errorData['error'] != null) {
+            errorMsg = errorData['error'];
+          }
+        } catch (_) {}
+        return ApiResponse.error(errorMsg);
       }
     } catch (e) {
       return ApiResponse.error('解析异常: $e');
