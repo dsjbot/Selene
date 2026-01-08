@@ -13,6 +13,7 @@ class _DanmakuItem extends StatefulWidget {
   final int mode;
 
   const _DanmakuItem({
+    super.key,
     required this.text,
     required this.color,
     required this.fontSize,
@@ -271,7 +272,7 @@ class _DanmakuLayerState extends State<DanmakuLayer> {
 
         return Stack(
           clipBehavior: Clip.hardEdge,
-          children: _visibleDanmakus.map((d) {
+          children: _visibleDanmakus.map<Widget>((d) {
             return _DanmakuItem(
               key: d.key,
               text: d.item.text,
