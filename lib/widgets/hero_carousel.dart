@@ -68,6 +68,10 @@ class _HeroCarouselState extends State<HeroCarousel> {
   String? _currentTrailerUrl;
   String? _serverUrl;
   bool _isLoadingVideo = false; // 防止重复加载
+  
+  // Stream 订阅
+  StreamSubscription? _widthSubscription;
+  StreamSubscription? _errorSubscription;
 
   @override
   void initState() {
@@ -88,7 +92,7 @@ class _HeroCarouselState extends State<HeroCarousel> {
     _trailerPlayer!.setPlaylistMode(PlaylistMode.loop);
     
     // 监听视频宽高变化（表示视频已加载）
-    _trailerPlayer!.stream.width.listen((width) {
+    _widthSubscription = _trailerPlayer!.stream.width.listen((width) {
       if (mounted && !_isDisposed && width != null && width > 0 && !_isVideoLoaded) {
         setState(() {
           _isVideoLoaded = true;
@@ -96,7 +100,7 @@ class _HeroCarouselState extends State<HeroCarousel> {
       }
     });
     
-    _trailerPlayer!.stream.error.listen((error) {
+    _errorSubscription = _trailerPlayer!.stream.error.listen((error) {
       debugPrint('[HeroCarousel] 预告片播放错误: $error');
       if (mounted && !_isDisposed) {
         setState(() {
@@ -125,6 +129,12 @@ class _HeroCarouselState extends State<HeroCarousel> {
     _autoPlayTimer?.cancel();
     _autoPlayTimer = null;
     _pageController.dispose();
+    
+    // 取消 stream 订阅
+    _widthSubscription?.cancel();
+    _widthSubscription = null;
+    _errorSubscription?.cancel();
+    _errorSubscription = null;
     
     // 同步停止并释放播放器
     final player = _trailerPlayer;

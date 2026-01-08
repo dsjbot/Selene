@@ -233,24 +233,34 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     if (_playerDisposed || _player == null || _currentUrl == null) {
       return;
     }
+    
+    // 保存当前 URL 用于后续比较
+    final urlToOpen = _currentUrl!;
+    
     setState(() {
       _isLoadingVideo = true;
     });
     try {
       // 处理广告过滤
-      String processedUrl = _currentUrl!;
+      String processedUrl = urlToOpen;
       if (AdFilterService.isEnabled) {
         // 检查是否已经被 dispose
         if (_playerDisposed || !mounted) return;
         
-        processedUrl = await AdFilterService.processM3U8Url(
-          _currentUrl!,
-          headers: _currentHeaders,
-          sourceKey: widget.videoSource,
-        );
+        try {
+          processedUrl = await AdFilterService.processM3U8Url(
+            urlToOpen,
+            headers: _currentHeaders,
+            sourceKey: widget.videoSource,
+          );
+        } catch (e) {
+          debugPrint('VideoPlayerWidget: ad filter error $e');
+          // 广告过滤失败时使用原始 URL
+          processedUrl = urlToOpen;
+        }
         
-        // 再次检查是否已经被 dispose
-        if (_playerDisposed || !mounted || _player == null) return;
+        // 再次检查是否已经被 dispose 或 URL 已经改变
+        if (_playerDisposed || !mounted || _player == null || _currentUrl != urlToOpen) return;
       }
       
       await _player!.open(
@@ -265,11 +275,11 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
       if (_playerDisposed || !mounted) return;
       
       await _player!.setRate(_playbackSpeed.value);
-      setState(() {
-        _hasCompleted = false;
-        // _isLoadingVideo = false;
-      });
-      // widget.onReady?.call();
+      if (mounted && !_playerDisposed) {
+        setState(() {
+          _hasCompleted = false;
+        });
+      }
     } catch (error) {
       debugPrint('VideoPlayerWidget: failed to open media $error');
       if (mounted && !_playerDisposed) {
@@ -374,25 +384,34 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
       return;
     }
 
+    // 保存当前 URL 用于后续比较
+    final urlToUpdate = url;
+
     setState(() {
       _isLoadingVideo = true;
     });
 
     try {
       // 处理广告过滤
-      String processedUrl = url;
+      String processedUrl = urlToUpdate;
       if (AdFilterService.isEnabled) {
         // 检查是否已经被 dispose
         if (_playerDisposed || !mounted) return;
         
-        processedUrl = await AdFilterService.processM3U8Url(
-          url,
-          headers: _currentHeaders,
-          sourceKey: widget.videoSource,
-        );
+        try {
+          processedUrl = await AdFilterService.processM3U8Url(
+            urlToUpdate,
+            headers: _currentHeaders,
+            sourceKey: widget.videoSource,
+          );
+        } catch (e) {
+          debugPrint('VideoPlayerWidget: ad filter error $e');
+          // 广告过滤失败时使用原始 URL
+          processedUrl = urlToUpdate;
+        }
         
-        // 再次检查是否已经被 dispose
-        if (_playerDisposed || !mounted || _player == null) return;
+        // 再次检查是否已经被 dispose 或 URL 已经改变
+        if (_playerDisposed || !mounted || _player == null || _currentUrl != urlToUpdate) return;
       }
       
       final currentSpeed = _player!.state.rate;
@@ -412,10 +431,8 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
       if (mounted && !_playerDisposed) {
         setState(() {
           _hasCompleted = false;
-          // _isLoadingVideo = false;
         });
       }
-      // widget.onReady?.call();
     } catch (error) {
       debugPrint('VideoPlayerWidget: error while changing source $error');
       if (mounted && !_playerDisposed) {

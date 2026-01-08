@@ -172,13 +172,14 @@ class AdFilterService {
     }
     
     try {
-      // 获取原始 M3U8 内容
+      // 获取原始 M3U8 内容（设置较短的超时时间）
       final response = await _dio.get(
         originalUrl,
         options: Options(
           headers: headers,
           responseType: ResponseType.plain,
-          receiveTimeout: const Duration(seconds: 10),
+          receiveTimeout: const Duration(seconds: 5),
+          sendTimeout: const Duration(seconds: 5),
         ),
       );
       
@@ -212,6 +213,9 @@ class AdFilterService {
           return tempFile.path;
         }
       }
+    } on DioException catch (e) {
+      // 网络错误时静默返回原始 URL
+      debugPrint('[AdFilter] 网络请求失败: ${e.type} - ${e.message}');
     } catch (e) {
       debugPrint('[AdFilter] 处理 M3U8 失败: $e');
     }
