@@ -273,7 +273,7 @@ class _ShortDramaPlayerScreenState extends State<ShortDramaPlayerScreen> {
     }
 
     return VideoPlayerWidget(
-      surface: isMobile ? VideoPlayerSurface.mobile : VideoPlayerSurface.pc,
+      surface: isMobile ? VideoPlayerSurface.mobile : VideoPlayerSurface.desktop,
       url: _parseResult!.url,
       videoTitle: '${widget.name} 第${_currentEpisode + 1}集',
       currentEpisodeIndex: _currentEpisode,
