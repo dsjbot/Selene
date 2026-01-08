@@ -260,6 +260,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: HeroCarousel(
         items: _carouselItems,
         autoPlayInterval: const Duration(seconds: 6),
+        enableVideo: false, // 暂时禁用视频，排查闪退问题
         onItemTap: (item) {
           _navigateToPlayer(
             PlayerScreen(
