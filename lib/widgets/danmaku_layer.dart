@@ -73,13 +73,12 @@ class _DanmakuItemState extends State<_DanmakuItem>
       );
     }
 
-    // 滚动弹幕 - 从右到左
+    // 滚动弹幕 - 从右到左，统一速度
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
         final progress = _controller.value;
         // 从屏幕右边缘开始，移动到完全离开左边缘
-        // 总移动距离 = 屏幕宽度 + 弹幕宽度
         final totalDistance = widget.screenWidth + widget.textWidth;
         final left = widget.screenWidth - totalDistance * progress;
         return Positioned(
@@ -93,15 +92,72 @@ class _DanmakuItemState extends State<_DanmakuItem>
   }
 }
 
-/// 轨道信息 - 记录每条轨道上弹幕的占用情况
+/// 轨道信息 - 记录每条轨道上弹幕的占用情况（防重叠核心）
 class _TrackInfo {
-  // 上一条弹幕尾部离开屏幕右边缘的时间（新弹幕可以开始进入的时间）
-  double availableTime;
+  // 上一条弹幕的信息，用于计算是否会追尾
+  double lastDanmakuStartTime; // 上一条弹幕开始时间
+  double lastDanmakuWidth;     // 上一条弹幕宽度
+  double lastDanmakuSpeed;     // 上一条弹幕速度（像素/秒）
   
-  _TrackInfo() : availableTime = 0;
+  _TrackInfo() 
+      : lastDanmakuStartTime = -999,
+        lastDanmakuWidth = 0,
+        lastDanmakuSpeed = 0;
   
   void reset() {
-    availableTime = 0;
+    lastDanmakuStartTime = -999;
+    lastDanmakuWidth = 0;
+    lastDanmakuSpeed = 0;
+  }
+  
+  /// 检查新弹幕是否可以安全进入此轨道（不会追尾）
+  /// [currentTime] 当前时间
+  /// [screenWidth] 屏幕宽度
+  /// [newDanmakuWidth] 新弹幕宽度
+  /// [newDanmakuSpeed] 新弹幕速度
+  bool canAccept(double currentTime, double screenWidth, double newDanmakuWidth, double newDanmakuSpeed) {
+    // 如果轨道从未使用过，直接可用
+    if (lastDanmakuStartTime < 0) return true;
+    
+    // 计算上一条弹幕当前位置（头部位置，从屏幕右边缘开始）
+    final elapsed = currentTime - lastDanmakuStartTime;
+    final lastDanmakuHeadPos = screenWidth - elapsed * lastDanmakuSpeed;
+    final lastDanmakuTailPos = lastDanmakuHeadPos + lastDanmakuWidth;
+    
+    // 条件1：上一条弹幕的尾部必须已经完全进入屏幕（留出间隙）
+    // 间隙 = 弹幕宽度的20%或最小30像素
+    final minGap = (lastDanmakuWidth * 0.2).clamp(30.0, 100.0);
+    if (lastDanmakuTailPos > screenWidth - minGap) {
+      return false;
+    }
+    
+    // 条件2：新弹幕不会追上上一条弹幕（防追尾）
+    // 由于所有弹幕速度相同，只要尾部进入屏幕就不会追尾
+    // 但为了安全，我们额外检查：新弹幕到达屏幕左边缘时，上一条弹幕是否已经离开
+    // 新弹幕完全穿过屏幕的时间 = (screenWidth + newDanmakuWidth) / newDanmakuSpeed
+    // 上一条弹幕完全离开屏幕的时间 = (screenWidth + lastDanmakuWidth) / lastDanmakuSpeed - elapsed
+    
+    final newDanmakuTotalTime = (screenWidth + newDanmakuWidth) / newDanmakuSpeed;
+    final lastDanmakuRemainingTime = (screenWidth + lastDanmakuWidth) / lastDanmakuSpeed - elapsed;
+    
+    // 如果新弹幕完成时间 > 上一条弹幕剩余时间，说明可能追尾
+    // 但由于速度相同，这种情况不会发生，除非速度不同
+    // 这里保留检查以防万一
+    if (newDanmakuTotalTime > lastDanmakuRemainingTime + 0.5) {
+      // 速度相同时不会追尾，但如果速度不同需要检查
+      if (newDanmakuSpeed > lastDanmakuSpeed * 1.1) {
+        return false;
+      }
+    }
+    
+    return true;
+  }
+  
+  /// 更新轨道信息
+  void update(double startTime, double width, double speed) {
+    lastDanmakuStartTime = startTime;
+    lastDanmakuWidth = width;
+    lastDanmakuSpeed = speed;
   }
 }
 
@@ -161,7 +217,8 @@ class _DanmakuLayerState extends State<DanmakuLayer> {
   int _keyCounter = 0;
   double _screenWidth = 0;
 
-  static const double _baseDuration = 10.0; // 弹幕滚动时间
+  // 基础速度：像素/秒（所有弹幕使用相同速度，避免追尾）
+  static const double _baseSpeed = 150.0;
   static const double _trackHeight = 32.0;
 
   @override
@@ -219,7 +276,6 @@ class _DanmakuLayerState extends State<DanmakuLayer> {
   }
 
   void _processNewDanmakus(double currentTime) {
-    final duration = _baseDuration / widget.speed;
     bool changed = false;
 
     while (_nextIndex < widget.danmakuList.length) {
@@ -235,7 +291,7 @@ class _DanmakuLayerState extends State<DanmakuLayer> {
       }
 
       // 尝试添加弹幕
-      if (_tryAddDanmaku(item, currentTime, duration)) {
+      if (_tryAddDanmaku(item, currentTime)) {
         changed = true;
       }
       _nextIndex++;
@@ -247,16 +303,15 @@ class _DanmakuLayerState extends State<DanmakuLayer> {
   }
 
   void _removeExpiredDanmakus(double currentTime) {
-    final duration = _baseDuration / widget.speed;
     final before = _visibleDanmakus.length;
-    _visibleDanmakus.removeWhere((d) => currentTime > d.startTime + duration + 0.5);
+    _visibleDanmakus.removeWhere((d) => currentTime > d.startTime + d.duration + 0.5);
     if (_visibleDanmakus.length != before) {
       setState(() {});
     }
   }
 
   double _estimateTextWidth(String text) {
-    // 估算文字宽度：中文字符约等于字体大小，英文约0.6倍
+    // 估算文字宽度：中文字符约等于字体大小，英文约0.5倍
     double width = 0;
     for (int i = 0; i < text.length; i++) {
       final code = text.codeUnitAt(i);
@@ -269,23 +324,23 @@ class _DanmakuLayerState extends State<DanmakuLayer> {
     return width + 10; // 加一点边距
   }
 
-  bool _tryAddDanmaku(DanmakuItem item, double currentTime, double duration) {
+  bool _tryAddDanmaku(DanmakuItem item, double currentTime) {
     if (_tracks.isEmpty || _screenWidth <= 0) return false;
 
     // 估算弹幕宽度
     final textWidth = _estimateTextWidth(item.text);
     
-    // 弹幕速度 = 总移动距离 / 时间
-    final totalDistance = _screenWidth + textWidth;
-    final speed = totalDistance / duration;
+    // 实际速度 = 基础速度 * 用户设置的速度倍率
+    final actualSpeed = _baseSpeed * widget.speed;
     
-    // 弹幕尾部完全进入屏幕所需时间（即尾部离开右边缘）
-    final tailEnterTime = textWidth / speed;
+    // 弹幕从出现到完全消失的时间 = 总移动距离 / 速度
+    final totalDistance = _screenWidth + textWidth;
+    final duration = totalDistance / actualSpeed;
 
     int? track;
     for (int i = 0; i < _tracks.length; i++) {
-      // 检查轨道是否可用：上一条弹幕的尾部已经完全进入屏幕
-      if (currentTime >= _tracks[i].availableTime) {
+      // 使用防重叠算法检查轨道是否可用
+      if (_tracks[i].canAccept(currentTime, _screenWidth, textWidth, actualSpeed)) {
         track = i;
         break;
       }
@@ -311,8 +366,8 @@ class _DanmakuLayerState extends State<DanmakuLayer> {
       textWidth: textWidth,
     ));
 
-    // 更新轨道可用时间：当前时间 + 尾部进入时间 + 小间隔
-    _tracks[track].availableTime = currentTime + tailEnterTime + 0.3;
+    // 更新轨道信息（记录弹幕的宽度和速度，用于防追尾计算）
+    _tracks[track].update(currentTime, textWidth, actualSpeed);
 
     return true;
   }
