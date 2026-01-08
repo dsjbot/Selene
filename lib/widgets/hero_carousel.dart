@@ -131,12 +131,12 @@ class _HeroCarouselState extends State<HeroCarousel> with WidgetsBindingObserver
       case AppLifecycleState.paused:
       case AppLifecycleState.inactive:
       case AppLifecycleState.hidden:
-        // 应用进入后台或被覆盖，停止并释放播放器
-        _stopAndReleasePlayer();
+        // 应用进入后台或被覆盖，暂停视频
+        _pauseVideo();
         break;
       case AppLifecycleState.resumed:
-        // 应用恢复前台，重新创建播放器
-        _recreatePlayer();
+        // 应用恢复前台，恢复视频
+        _resumeVideo();
         break;
       case AppLifecycleState.detached:
         break;
@@ -155,44 +155,6 @@ class _HeroCarouselState extends State<HeroCarousel> with WidgetsBindingObserver
     if (_trailerPlayer != null && !_isDisposed && _isVideoLoaded) {
       _trailerPlayer!.play();
     }
-  }
-
-  /// 停止并释放播放器（进入其他页面时调用）
-  void _stopAndReleasePlayer() {
-    if (_isDisposed) return;
-    
-    debugPrint('[HeroCarousel] 停止并释放播放器');
-    
-    // 取消 stream 订阅
-    _widthSubscription?.cancel();
-    _widthSubscription = null;
-    _errorSubscription?.cancel();
-    _errorSubscription = null;
-    
-    // 停止并释放播放器
-    final player = _trailerPlayer;
-    _trailerPlayer = null;
-    _trailerController = null;
-    _isVideoLoaded = false;
-    _currentTrailerUrl = null;
-    
-    if (player != null) {
-      player.stop().then((_) => player.dispose()).catchError((e) {
-        debugPrint('[HeroCarousel] 释放播放器错误: $e');
-      });
-    }
-  }
-
-  /// 重新创建播放器（从其他页面返回时调用）
-  void _recreatePlayer() {
-    if (_isDisposed || !widget.enableVideo) return;
-    
-    // 如果播放器已存在，不重复创建
-    if (_trailerPlayer != null) return;
-    
-    debugPrint('[HeroCarousel] 重新创建播放器');
-    _initPlayer();
-    _loadTrailerForCurrentItem();
   }
 
   @override
