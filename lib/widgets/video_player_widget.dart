@@ -742,13 +742,16 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     _durationSubscription = null;
     _progressListeners.clear();
     
-    // 安全地 dispose 播放器
+    // 安全地停止并 dispose 播放器
     final player = _player;
     _player = null;
     _videoController = null;
     
     if (player != null) {
       try {
+        // 先停止播放
+        await player.stop();
+        // 再 dispose
         await player.dispose();
       } catch (e) {
         debugPrint('VideoPlayerWidget: error disposing player: $e');
