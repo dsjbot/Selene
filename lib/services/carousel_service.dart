@@ -30,15 +30,12 @@ class CarouselService {
       // 处理电影数据（取前3个）- 立即获取详情
       if (moviesResult.success && moviesResult.data != null) {
         final movies = moviesResult.data!.take(3).toList();
-        debugPrint('[CarouselService] 电影数据: ${movies.map((m) => "${m.title}(${m.id})").join(", ")}');
         final detailsFutures = movies.map((movie) => _getDoubanDetails(context, movie.id));
         final detailsList = await Future.wait(detailsFutures);
         
         for (int i = 0; i < movies.length; i++) {
           final movie = movies[i];
           final details = detailsList[i];
-          final error = details?['_error'];
-          debugPrint('[CarouselService] 添加电影: ${movie.title}, trailerUrl: ${details?['trailerUrl']}, error: $error');
           items.add(CarouselItem(
             id: movie.id,
             title: movie.title,
@@ -49,7 +46,6 @@ class CarouselService {
             year: movie.year,
             rate: movie.rate,
             type: 'movie',
-            debugError: error,
           ));
         }
       }
@@ -73,7 +69,6 @@ class CarouselService {
             year: show.year,
             rate: show.rate,
             type: 'tv',
-            debugError: details?['_error'],
           ));
         }
       }
@@ -97,7 +92,6 @@ class CarouselService {
             year: show.year,
             rate: show.rate,
             type: 'variety',
-            debugError: details?['_error'],
           ));
         }
       }
@@ -121,7 +115,6 @@ class CarouselService {
             year: anime.year,
             rate: anime.rate,
             type: 'anime',
-            debugError: details?['_error'],
           ));
         }
       }
@@ -138,17 +131,14 @@ class CarouselService {
     String? backdrop;
     String? plotSummary;
     String? trailerUrl;
-    String? _lastError; // 记录最后的错误信息
     
     // 方案1：尝试通过后端API获取（包含backdrop和trailerUrl）
     try {
       final serverUrl = await UserDataService.getServerUrl();
       final cookies = await UserDataService.getCookies();
-      debugPrint('[CarouselService] 服务器URL: $serverUrl, doubanId: $doubanId, hasCookies: ${cookies != null}');
       
       if (serverUrl != null && serverUrl.isNotEmpty) {
         final url = '$serverUrl/api/douban/details?id=$doubanId';
-        debugPrint('[CarouselService] 请求后端API: $url');
         
         // 构建请求头，包含认证 cookies
         final headers = <String, String>{
@@ -163,11 +153,8 @@ class CarouselService {
           headers: headers,
         ).timeout(const Duration(seconds: 15));
         
-        debugPrint('[CarouselService] 后端API响应状态: ${response.statusCode}');
-        
         if (response.statusCode == 200) {
           final data = json.decode(response.body);
-          debugPrint('[CarouselService] 后端API响应code: ${data['code']}');
           
           if (data['code'] == 200 && data['data'] != null) {
             final detailData = data['data'];
@@ -179,38 +166,21 @@ class CarouselService {
             if (backdrop != null && backdrop.isEmpty) backdrop = null;
             if (plotSummary != null && plotSummary.isEmpty) plotSummary = null;
             if (trailerUrl != null && trailerUrl.isEmpty) trailerUrl = null;
-            
-            debugPrint('[CarouselService] 后端返回 $doubanId:');
-            debugPrint('  - backdrop: ${backdrop != null ? "有" : "无"}');
-            debugPrint('  - summary: ${plotSummary != null ? "有(${plotSummary.length}字)" : "无"}');
-            debugPrint('  - trailerUrl: ${trailerUrl ?? "无"}');
-          } else {
-            _lastError = 'code=${data['code']}';
-            debugPrint('[CarouselService] 后端返回code不是200或data为null');
           }
-        } else {
-          _lastError = 'HTTP ${response.statusCode}';
-          debugPrint('[CarouselService] 后端API响应非200: ${response.body.substring(0, response.body.length > 200 ? 200 : response.body.length)}');
         }
-      } else {
-        _lastError = '服务器URL为空';
-        debugPrint('[CarouselService] 服务器URL为空，跳过后端API');
       }
     } catch (e) {
-      _lastError = e.toString();
       debugPrint('[CarouselService] 后端API获取详情失败: $doubanId - $e');
     }
     
     // 方案2：如果后端没有返回summary，使用本地DoubanService作为备用
     if (plotSummary == null) {
       try {
-        debugPrint('[CarouselService] 尝试本地DoubanService获取详情: $doubanId');
         final result = await DoubanService.getDoubanDetails(context, doubanId: doubanId);
         if (result.success && result.data != null) {
           final localSummary = result.data!.summary;
           if (localSummary != null && localSummary.isNotEmpty) {
             plotSummary = localSummary;
-            debugPrint('[CarouselService] 本地获取成功: $doubanId - summary长度: ${plotSummary.length}');
           }
         }
       } catch (e) {
@@ -219,18 +189,15 @@ class CarouselService {
     }
     
     // 返回结果
-    debugPrint('[CarouselService] 最终返回 $doubanId - backdrop: ${backdrop != null}, summary: ${plotSummary != null}, trailer: ${trailerUrl != null}');
-    
-    if (backdrop != null || plotSummary != null || trailerUrl != null || _lastError != null) {
+    if (backdrop != null || plotSummary != null || trailerUrl != null) {
       return {
         'backdrop': backdrop,
         'plot_summary': plotSummary,
         'trailerUrl': trailerUrl,
-        '_error': _lastError,
       };
     }
     
-    return {'_error': _lastError ?? '未知错误'};
+    return null;
   }
 
   /// 将豆瓣海报URL转换为高清版本

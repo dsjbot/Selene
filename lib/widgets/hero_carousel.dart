@@ -17,7 +17,6 @@ class CarouselItem {
   final String? year;
   final String? rate;
   final String type; // movie, tv, variety, anime
-  final String? debugError; // 调试用：记录获取详情时的错误
 
   CarouselItem({
     required this.id,
@@ -29,7 +28,6 @@ class CarouselItem {
     this.year,
     this.rate,
     required this.type,
-    this.debugError,
   });
 }
 
@@ -67,9 +65,6 @@ class _HeroCarouselState extends State<HeroCarousel> {
   bool _isMuted = true;
   String? _currentTrailerUrl;
   String? _serverUrl;
-  
-  // 调试信息
-  String _debugInfo = '初始化中...';
 
   @override
   void initState() {
@@ -120,16 +115,11 @@ class _HeroCarouselState extends State<HeroCarousel> {
   /// 加载当前项目的预告片
   Future<void> _loadTrailerForCurrentItem() async {
     if (!widget.enableVideo || widget.items.isEmpty) {
-      setState(() => _debugInfo = '跳过: enableVideo=${widget.enableVideo}, items=${widget.items.length}');
       return;
     }
     
     final currentItem = widget.items[_currentIndex];
     final trailerUrl = currentItem.trailerUrl;
-    final errorInfo = currentItem.debugError ?? "无";
-    
-    // 始终显示完整调试信息
-    setState(() => _debugInfo = '${currentItem.title}\nerror: $errorInfo');
     
     // 如果没有预告片URL，释放播放器
     if (trailerUrl == null || trailerUrl.isEmpty) {
@@ -153,7 +143,6 @@ class _HeroCarouselState extends State<HeroCarousel> {
     // 创建新的播放器
     try {
       final proxiedUrl = await _getProxiedVideoUrl(trailerUrl);
-      setState(() => _debugInfo = '${currentItem.title}\n加载视频中...');
       
       final newPlayer = Player();
       final newController = VideoController(newPlayer);
@@ -171,23 +160,15 @@ class _HeroCarouselState extends State<HeroCarousel> {
         if (mounted && width != null && width > 0 && !_isVideoLoaded && _trailerPlayer == newPlayer) {
           setState(() {
             _isVideoLoaded = true;
-            _debugInfo = '${currentItem.title}\n视频已加载 宽度:$width';
           });
         }
       });
       
-      // 监听播放状态
-      newPlayer.stream.playing.listen((playing) {
-        if (mounted && playing && _trailerPlayer == newPlayer) {
-          setState(() => _debugInfo = '${currentItem.title}\n播放中...');
-        }
-      });
-      
       newPlayer.stream.error.listen((error) {
+        debugPrint('[HeroCarousel] 预告片播放错误: $error');
         if (mounted && _trailerPlayer == newPlayer) {
           setState(() {
             _isVideoLoaded = false;
-            _debugInfo = '${currentItem.title}\n播放错误: $error';
           });
         }
       });
@@ -206,9 +187,7 @@ class _HeroCarouselState extends State<HeroCarousel> {
       
       if (mounted) setState(() {});
     } catch (e) {
-      if (mounted) {
-        setState(() => _debugInfo = '${currentItem.title}\n加载失败: $e');
-      }
+      debugPrint('[HeroCarousel] 加载预告片失败: $e');
       _disposeTrailerPlayer();
     }
   }
@@ -382,27 +361,6 @@ class _HeroCarouselState extends State<HeroCarousel> {
                     color: Colors.white,
                     fontSize: isTablet ? 12 : 10,
                     fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-            
-            // 调试信息（临时）
-            Positioned(
-              top: isTablet ? 50 : 30,
-              left: isTablet ? 16 : 8,
-              right: isTablet ? 16 : 8,
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.8),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  '调试: $_debugInfo\nvideoLoaded: $_isVideoLoaded\ncontroller: ${_trailerController != null}',
-                  style: const TextStyle(
-                    color: Colors.yellow,
-                    fontSize: 10,
                   ),
                 ),
               ),
