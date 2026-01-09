@@ -74,63 +74,80 @@ class _HeroCarouselState extends State<HeroCarousel> with WidgetsBindingObserver
   // Stream 订阅
   StreamSubscription? _widthSubscription;
   StreamSubscription? _errorSubscription;
+  bool _isPlayerInitializing = false; // 防止重复初始化
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _initPlayer();
-    _loadServerUrl();
+    _initialize();
     _startAutoPlay();
+  }
+
+  /// 统一初始化入口
+  Future<void> _initialize() async {
+    await _initPlayer();
+    await _loadServerUrl();
   }
 
   /// 初始化播放器（使用 PlayerManager）
   Future<void> _initPlayer() async {
-    if (!widget.enableVideo || _isDisposed) return;
+    if (!widget.enableVideo || _isDisposed || _isPlayerInitializing) return;
     
-    final managed = await PlayerManager().getPlayer(PlayerManager.carouselPlayerId);
+    _isPlayerInitializing = true;
     
-    if (_isDisposed || !mounted) {
-      return;
-    }
-    
-    _managedPlayer = managed;
-    _trailerPlayer = managed.player;
-    _trailerController = managed.controller;
-    
-    // 先停止之前的播放
-    await _trailerPlayer!.stop();
-    
-    // 设置静音和循环
-    _trailerPlayer!.setVolume(0);
-    _trailerPlayer!.setPlaylistMode(PlaylistMode.loop);
-    
-    // 取消之前的订阅
-    _widthSubscription?.cancel();
-    _errorSubscription?.cancel();
-    
-    // 监听视频宽高变化（表示视频已加载）
-    _widthSubscription = _trailerPlayer!.stream.width.listen((width) {
-      if (mounted && !_isDisposed && width != null && width > 0 && !_isVideoLoaded) {
-        setState(() {
-          _isVideoLoaded = true;
-        });
+    try {
+      final managed = await PlayerManager().getPlayer(PlayerManager.carouselPlayerId);
+      
+      if (_isDisposed || !mounted) {
+        return;
       }
-    });
-    
-    _errorSubscription = _trailerPlayer!.stream.error.listen((error) {
-      debugPrint('[HeroCarousel] 预告片播放错误: $error');
+      
+      _managedPlayer = managed;
+      _trailerPlayer = managed.player;
+      _trailerController = managed.controller;
+      
+      // 先停止之前的播放
+      await _trailerPlayer!.stop();
+      
+      // 设置静音和循环
+      _trailerPlayer!.setVolume(0);
+      _trailerPlayer!.setPlaylistMode(PlaylistMode.loop);
+      
+      // 取消之前的订阅
+      _widthSubscription?.cancel();
+      _errorSubscription?.cancel();
+      
+      // 监听视频宽高变化（表示视频已加载）
+      _widthSubscription = _trailerPlayer!.stream.width.listen((width) {
+        if (mounted && !_isDisposed && width != null && width > 0 && !_isVideoLoaded) {
+          setState(() {
+            _isVideoLoaded = true;
+          });
+        }
+      });
+      
+      _errorSubscription = _trailerPlayer!.stream.error.listen((error) {
+        debugPrint('[HeroCarousel] 预告片播放错误: $error');
+        if (mounted && !_isDisposed) {
+          setState(() {
+            _isVideoLoaded = false;
+          });
+        }
+      });
+      
+      // 触发 UI 更新，让 VideoController 可用
       if (mounted && !_isDisposed) {
-        setState(() {
-          _isVideoLoaded = false;
-        });
+        setState(() {});
       }
-    });
+    } finally {
+      _isPlayerInitializing = false;
+    }
   }
 
   Future<void> _loadServerUrl() async {
     final url = await UserDataService.getServerUrl();
-    if (mounted) {
+    if (mounted && !_isDisposed) {
       setState(() {
         _serverUrl = url;
       });
@@ -208,10 +225,10 @@ class _HeroCarouselState extends State<HeroCarousel> with WidgetsBindingObserver
       return;
     }
     
-    // 确保播放器已初始化
+    // 等待播放器初始化完成
     if (_trailerPlayer == null) {
-      await _initPlayer();
-      if (_trailerPlayer == null || _isDisposed) return;
+      debugPrint('[HeroCarousel] 播放器未初始化，跳过加载预告片');
+      return;
     }
     
     // 防止重复加载
