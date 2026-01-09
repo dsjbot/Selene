@@ -59,10 +59,13 @@ class _UpcomingSectionState extends State<UpcomingSection> {
   Future<void> _loadData({bool forceRefresh = false}) async {
     if (!mounted) return;
 
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+    // 只有在没有数据时才显示加载状态，刷新时保持旧数据
+    if (_items.isEmpty) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
 
     try {
       final items = await ReleaseCalendarService.getUpcomingForHome(
@@ -74,12 +77,16 @@ class _UpcomingSectionState extends State<UpcomingSection> {
         setState(() {
           _items = items;
           _isLoading = false;
+          _error = null;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString();
+          // 如果有旧数据，保持旧数据不显示错误
+          if (_items.isEmpty) {
+            _error = e.toString();
+          }
           _isLoading = false;
         });
       }

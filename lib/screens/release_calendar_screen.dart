@@ -188,64 +188,60 @@ class _ReleaseCalendarScreenState extends State<ReleaseCalendarScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 第一行：类型筛选
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _buildFilterChip(
-                  label: '全部类型',
-                  value: '',
-                  selectedValue: _selectedType,
-                  onTap: () => setState(() => _selectedType = ''),
-                  themeService: themeService,
-                ),
-                const SizedBox(width: 8),
-                _buildFilterChip(
-                  label: '电影',
-                  value: 'movie',
-                  selectedValue: _selectedType,
-                  onTap: () => setState(() => _selectedType = 'movie'),
-                  themeService: themeService,
-                ),
-                const SizedBox(width: 8),
-                _buildFilterChip(
-                  label: '电视剧',
-                  value: 'tv',
-                  selectedValue: _selectedType,
-                  onTap: () => setState(() => _selectedType = 'tv'),
-                  themeService: themeService,
-                ),
-              ],
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.start,
+            children: [
+              _buildFilterChip(
+                label: '全部类型',
+                value: '',
+                selectedValue: _selectedType,
+                onTap: () => setState(() => _selectedType = ''),
+                themeService: themeService,
+              ),
+              const SizedBox(width: 8),
+              _buildFilterChip(
+                label: '电影',
+                value: 'movie',
+                selectedValue: _selectedType,
+                onTap: () => setState(() => _selectedType = 'movie'),
+                themeService: themeService,
+              ),
+              const SizedBox(width: 8),
+              _buildFilterChip(
+                label: '电视剧',
+                value: 'tv',
+                selectedValue: _selectedType,
+                onTap: () => setState(() => _selectedType = 'tv'),
+                themeService: themeService,
+              ),
+            ],
           ),
           // 第二行：地区和类型筛选
           if (_filters != null && (_filters!.regions.isNotEmpty || _filters!.genres.isNotEmpty))
             Padding(
               padding: const EdgeInsets.only(top: 8),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    if (_filters!.regions.isNotEmpty)
-                      _buildDropdownFilter(
-                        label: _selectedRegion.isEmpty ? '地区' : _selectedRegion,
-                        options: ['全部', ..._filters!.regions.map((r) => r.value)],
-                        selectedValue: _selectedRegion,
-                        onChanged: (value) => setState(() => _selectedRegion = value == '全部' ? '' : value),
-                        themeService: themeService,
-                      ),
-                    if (_filters!.regions.isNotEmpty && _filters!.genres.isNotEmpty)
-                      const SizedBox(width: 8),
-                    if (_filters!.genres.isNotEmpty)
-                      _buildDropdownFilter(
-                        label: _selectedGenre.isEmpty ? '类型' : _selectedGenre,
-                        options: ['全部', ..._filters!.genres.map((g) => g.value)],
-                        selectedValue: _selectedGenre,
-                        onChanged: (value) => setState(() => _selectedGenre = value == '全部' ? '' : value),
-                        themeService: themeService,
-                      ),
-                  ],
-                ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.start,
+                children: [
+                  if (_filters!.regions.isNotEmpty)
+                    _buildDropdownFilter(
+                      label: _selectedRegion.isEmpty ? '地区' : _selectedRegion,
+                      options: ['全部', ..._filters!.regions.map((r) => r.value)],
+                      selectedValue: _selectedRegion,
+                      onChanged: (value) => setState(() => _selectedRegion = value == '全部' ? '' : value),
+                      themeService: themeService,
+                    ),
+                  if (_filters!.regions.isNotEmpty && _filters!.genres.isNotEmpty)
+                    const SizedBox(width: 8),
+                  if (_filters!.genres.isNotEmpty)
+                    _buildDropdownFilter(
+                      label: _selectedGenre.isEmpty ? '类型' : _selectedGenre,
+                      options: ['全部', ..._filters!.genres.map((g) => g.value)],
+                      selectedValue: _selectedGenre,
+                      onChanged: (value) => setState(() => _selectedGenre = value == '全部' ? '' : value),
+                      themeService: themeService,
+                    ),
+                ],
               ),
             ),
         ],
