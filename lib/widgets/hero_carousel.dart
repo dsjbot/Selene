@@ -174,15 +174,23 @@ class _HeroCarouselState extends State<HeroCarousel> with WidgetsBindingObserver
     _errorSubscription?.cancel();
     _errorSubscription = null;
     
-    // 同步停止并释放播放器
+    // 安全地停止并释放播放器
     final player = _trailerPlayer;
     _trailerPlayer = null;
     _trailerController = null;
     
     if (player != null) {
-      // 同步调用 stop 和 dispose（不等待完成）
-      player.stop().then((_) => player.dispose()).catchError((e) {
-        debugPrint('[HeroCarousel] dispose player error: $e');
+      // 使用 Future.microtask 确保在当前帧结束后执行
+      Future.microtask(() async {
+        try {
+          await player.pause();
+          await Future.delayed(const Duration(milliseconds: 100));
+          await player.stop();
+          await Future.delayed(const Duration(milliseconds: 100));
+          await player.dispose();
+        } catch (e) {
+          debugPrint('[HeroCarousel] dispose player error: $e');
+        }
       });
     }
     

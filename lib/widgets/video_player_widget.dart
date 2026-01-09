@@ -807,20 +807,39 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     
     // 取消所有订阅
     _positionSubscription?.cancel();
+    _positionSubscription = null;
     _playingSubscription?.cancel();
+    _playingSubscription = null;
     _completedSubscription?.cancel();
+    _completedSubscription = null;
     _durationSubscription?.cancel();
+    _durationSubscription = null;
     _progressListeners.clear();
     
-    // 同步停止并释放播放器
+    // 安全地停止并释放播放器
+    // 注意：必须先 stop 等待完成后再 dispose，否则会导致 native 回调崩溃
     final player = _player;
+    final controller = _videoController;
     _player = null;
     _videoController = null;
     
     if (player != null) {
-      // 同步调用 stop 和 dispose（不等待完成）
-      player.stop().then((_) => player.dispose()).catchError((e) {
-        debugPrint('VideoPlayerWidget: error disposing player: $e');
+      // 使用 Future.microtask 确保在当前帧结束后执行
+      Future.microtask(() async {
+        try {
+          // 先暂停，避免继续产生回调
+          await player.pause();
+          // 等待一小段时间让 native 层处理完
+          await Future.delayed(const Duration(milliseconds: 100));
+          // 停止播放
+          await player.stop();
+          // 再等待一下
+          await Future.delayed(const Duration(milliseconds: 100));
+          // 最后 dispose
+          await player.dispose();
+        } catch (e) {
+          debugPrint('VideoPlayerWidget: error disposing player: $e');
+        }
       });
     }
     
