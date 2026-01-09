@@ -412,7 +412,8 @@ class _UpcomingSectionState extends State<UpcomingSection> {
           VideoMenuBottomSheet.show(
             context,
             videoInfo: videoInfo,
-            onAction: (action) {
+            isFavorited: false,
+            onActionSelected: (action) {
               widget.onGlobalMenuAction!(videoInfo, action);
             },
             from: 'upcoming',
