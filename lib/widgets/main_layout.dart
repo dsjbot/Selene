@@ -5,9 +5,11 @@ import 'package:selene/services/search_service.dart';
 import 'package:selene/services/user_data_service.dart';
 import '../services/theme_service.dart';
 import '../services/api_service.dart';
+import '../services/ai_recommend_service.dart';
 import '../utils/device_utils.dart';
 import '../utils/font_utils.dart';
 import 'user_menu.dart';
+import 'ai_recommend_modal.dart';
 import 'dart:io' show Platform;
 import 'dart:async';
 import 'windows_title_bar.dart';
@@ -56,6 +58,10 @@ class _MainLayoutState extends State<MainLayout> {
   bool _isSearchButtonPressed = false;
   bool _showUserMenu = false;
 
+  // AI 推荐功能状态
+  bool _isAIEnabled = false;
+  bool _isAIButtonHovered = false;
+
   // 用于跟踪底部导航栏按钮的 hover 状态
   int? _hoveredNavIndex;
 
@@ -82,6 +88,26 @@ class _MainLayoutState extends State<MainLayout> {
   Timer? _debounceTimer;
   final LayerLink _layerLink = LayerLink();
   OverlayEntry? _overlayEntry;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAIAvailability();
+  }
+
+  /// 检查 AI 推荐功能是否可用
+  Future<void> _checkAIAvailability() async {
+    try {
+      final isAvailable = await AIRecommendService.checkAvailable();
+      if (mounted) {
+        setState(() {
+          _isAIEnabled = isAvailable;
+        });
+      }
+    } catch (e) {
+      // 静默处理错误
+    }
+  }
 
   @override
   void dispose() {
@@ -767,6 +793,57 @@ class _MainLayoutState extends State<MainLayout> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
+        // AI 推荐按钮（仅在功能可用时显示）
+        if (_isAIEnabled)
+          MouseRegion(
+            cursor:
+                DeviceUtils.isPC() ? SystemMouseCursors.click : MouseCursor.defer,
+            onEnter: DeviceUtils.isPC()
+                ? (_) {
+                    setState(() {
+                      _isAIButtonHovered = true;
+                    });
+                  }
+                : null,
+            onExit: DeviceUtils.isPC()
+                ? (_) {
+                    setState(() {
+                      _isAIButtonHovered = false;
+                    });
+                  }
+                : null,
+            child: GestureDetector(
+              onTap: () {
+                AIRecommendModal.show(context);
+              },
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: DeviceUtils.isPC() && _isAIButtonHovered
+                      ? (themeService.isDarkMode
+                          ? const Color(0xFF333333)
+                          : const Color(0xFFe0e0e0))
+                      : Colors.transparent,
+                ),
+                child: Center(
+                  child: Icon(
+                    LucideIcons.sparkles,
+                    color: _isAIButtonHovered
+                        ? const Color(0xFF8B5CF6)
+                        : themeService.isDarkMode
+                            ? const Color(0xFFffffff)
+                            : const Color(0xFF2c3e50),
+                    size: 22,
+                    weight: 1.0,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        if (_isAIEnabled) const SizedBox(width: 12),
         // 深浅模式切换按钮
         MouseRegion(
           cursor:

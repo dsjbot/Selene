@@ -81,6 +81,7 @@ enum VideoMenuAction {
   deleteRecord,
   doubanDetail,
   bangumiDetail,
+  aiChat, // AI 问片
 }
 
 /// 视频菜单底部弹窗组件
@@ -1389,7 +1390,7 @@ class _VideoMenuBottomSheetState extends State<VideoMenuBottomSheet>
       );
     }
     
-    // 如果是收藏场景，只显示播放和取消收藏
+    // 如果是收藏场景，显示播放、取消收藏和AI问片
     if (widget.from == 'favorite') {
       return Column(
         children: [
@@ -1419,11 +1420,26 @@ class _VideoMenuBottomSheetState extends State<VideoMenuBottomSheet>
               widget.onActionSelected(VideoMenuAction.unfavorite);
             },
           ),
+          
+          _buildDivider(themeService),
+          
+          // AI 问片
+          _buildMenuItem(
+            context,
+            themeService,
+            icon: Icons.auto_awesome,
+            iconColor: const Color(0xFF8B5CF6),
+            title: 'AI 问片',
+            onTap: () {
+              widget.onClose();
+              widget.onActionSelected(VideoMenuAction.aiChat);
+            },
+          ),
         ],
       );
     }
     
-    // 如果是聚合场景，显示播放和豆瓣详情（如果有）
+    // 如果是聚合场景，显示播放、AI问片和豆瓣详情（如果有）
     if (widget.from == 'agg') {
       List<Widget> menuItems = [
         // 播放按钮
@@ -1438,6 +1454,21 @@ class _VideoMenuBottomSheetState extends State<VideoMenuBottomSheet>
             // 对于聚合卡片，关闭菜单后触发播放操作（会显示源选择对话框）
             widget.onClose();
             widget.onActionSelected(VideoMenuAction.play);
+          },
+        ),
+        
+        _buildDivider(themeService),
+        
+        // AI 问片
+        _buildMenuItem(
+          context,
+          themeService,
+          icon: Icons.auto_awesome,
+          iconColor: const Color(0xFF8B5CF6),
+          title: 'AI 问片',
+          onTap: () {
+            widget.onClose();
+            widget.onActionSelected(VideoMenuAction.aiChat);
           },
         ),
       ];
@@ -1491,6 +1522,21 @@ class _VideoMenuBottomSheetState extends State<VideoMenuBottomSheet>
           onTap: () {
             widget.onClose();
             widget.onActionSelected(widget.isFavorited ? VideoMenuAction.unfavorite : VideoMenuAction.favorite);
+          },
+        ),
+        
+        _buildDivider(themeService),
+        
+        // AI 问片
+        _buildMenuItem(
+          context,
+          themeService,
+          icon: Icons.auto_awesome,
+          iconColor: const Color(0xFF8B5CF6),
+          title: 'AI 问片',
+          onTap: () {
+            widget.onClose();
+            widget.onActionSelected(VideoMenuAction.aiChat);
           },
         ),
       ];
@@ -1562,6 +1608,21 @@ class _VideoMenuBottomSheetState extends State<VideoMenuBottomSheet>
           onTap: () {
             widget.onClose();
             widget.onActionSelected(widget.isFavorited ? VideoMenuAction.unfavorite : VideoMenuAction.favorite);
+          },
+        ),
+        
+        _buildDivider(themeService),
+        
+        // AI 问片
+        _buildMenuItem(
+          context,
+          themeService,
+          icon: Icons.auto_awesome,
+          iconColor: const Color(0xFF8B5CF6),
+          title: 'AI 问片',
+          onTap: () {
+            widget.onClose();
+            widget.onActionSelected(VideoMenuAction.aiChat);
           },
         ),
         

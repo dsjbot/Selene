@@ -16,6 +16,8 @@ import '../services/player_manager.dart';
 import 'search_screen.dart';
 import '../widgets/video_menu_bottom_sheet.dart';
 import '../widgets/custom_refresh_indicator.dart';
+import '../widgets/ai_recommend_modal.dart';
+import '../services/ai_recommend_service.dart';
 import '../models/play_record.dart';
 import '../models/video_info.dart';
 import '../utils/font_utils.dart';
@@ -717,7 +719,24 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         );
         break;
+      case VideoMenuAction.aiChat:
+        // AI 问片
+        _showAIRecommendModal(playRecord);
+        break;
     }
+  }
+
+  /// 显示 AI 推荐模态框
+  void _showAIRecommendModal(PlayRecord playRecord) {
+    AIRecommendModal.show(
+      context,
+      videoContext: VideoContext(
+        title: playRecord.title,
+        year: playRecord.year,
+        type: playRecord.source == 'movie' ? 'movie' : 'tv',
+      ),
+      welcomeMessage: '想了解《${playRecord.title}》的更多信息吗？我可以帮你查询剧情、演员、评价等。',
+    );
   }
 
   /// 从继续观看UI中移除播放记录
