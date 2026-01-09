@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
 import 'user_data_service.dart';
 
 /// AI 消息
@@ -226,6 +226,8 @@ class AIRecommendPreset {
 
 /// AI 推荐服务
 class AIRecommendService {
+  static final Dio _dio = Dio();
+  
   static const List<AIRecommendPreset> presets = [
     AIRecommendPreset(
       title: '🎬 推荐热门电影',
@@ -271,16 +273,21 @@ class AIRecommendService {
         return false;
       }
 
-      final response = await http.post(
-        Uri.parse('$serverUrl/api/ai-recommend'),
-        headers: {
-          'Content-Type': 'application/json',
-          if (cookies != null && cookies.isNotEmpty) 'Cookie': cookies,
-        },
-        body: jsonEncode({
+      final response = await _dio.post(
+        '$serverUrl/api/ai-recommend',
+        data: {
           'messages': [{'role': 'user', 'content': '测试'}],
-        }),
-      ).timeout(const Duration(seconds: 10));
+        },
+        options: Options(
+          headers: {
+            'Content-Type': 'application/json',
+            if (cookies != null && cookies.isNotEmpty) 'Cookie': cookies,
+          },
+          validateStatus: (status) => true, // 接受所有状态码
+          receiveTimeout: const Duration(seconds: 10),
+          sendTimeout: const Duration(seconds: 10),
+        ),
+      );
 
       // 403 表示功能未启用或无权限
       if (response.statusCode == 403) {
@@ -319,66 +326,81 @@ class AIRecommendService {
         'stream': onStream != null,
       };
 
-      final request = http.Request(
-        'POST',
-        Uri.parse('$serverUrl/api/ai-recommend'),
-      );
-      request.headers['Content-Type'] = 'application/json';
-      if (cookies != null && cookies.isNotEmpty) {
-        request.headers['Cookie'] = cookies;
-      }
-      request.body = jsonEncode(requestBody);
-
-      final streamedResponse = await request.send().timeout(
-        const Duration(seconds: 120),
-      );
-
-      if (streamedResponse.statusCode == 401) {
-        return AIChatResponse.error('请先登录');
-      }
-
-      if (streamedResponse.statusCode == 403) {
-        final body = await streamedResponse.stream.bytesToString();
-        final json = jsonDecode(body);
-        return AIChatResponse.error(
-          json['error'] ?? 'AI推荐功能未启用或无权限',
-          details: json['details'],
-        );
-      }
-
-      if (streamedResponse.statusCode != 200) {
-        final body = await streamedResponse.stream.bytesToString();
-        try {
-          final json = jsonDecode(body);
-          return AIChatResponse.error(
-            json['error'] ?? '请求失败',
-            details: json['details'],
-          );
-        } catch (_) {
-          return AIChatResponse.error('请求失败: ${streamedResponse.statusCode}');
-        }
-      }
-
       // 流式响应处理
       if (onStream != null) {
         String fullContent = '';
         List<YouTubeVideo> youtubeVideos = [];
         List<VideoLink> videoLinks = [];
+        String buffer = ''; // 用于处理不完整的 SSE 行
 
-        debugPrint('[AIRecommendService] 开始流式响应处理...');
+        debugPrint('[AIRecommendService] 开始流式请求...');
 
-        await for (final chunk in streamedResponse.stream.transform(utf8.decoder)) {
-          debugPrint('[AIRecommendService] 收到chunk: ${chunk.length} 字节');
-          final lines = chunk.split('\n').where((line) => line.trim().isNotEmpty);
+        final response = await _dio.post<ResponseBody>(
+          '$serverUrl/api/ai-recommend',
+          data: requestBody,
+          options: Options(
+            headers: {
+              'Content-Type': 'application/json',
+              if (cookies != null && cookies.isNotEmpty) 'Cookie': cookies,
+            },
+            responseType: ResponseType.stream,
+            validateStatus: (status) => true,
+            receiveTimeout: const Duration(seconds: 120),
+            sendTimeout: const Duration(seconds: 30),
+          ),
+        );
 
-          for (final line in lines) {
-            debugPrint('[AIRecommendService] 处理行: $line');
+        if (response.statusCode == 401) {
+          return AIChatResponse.error('请先登录');
+        }
+
+        if (response.statusCode == 403) {
+          // 需要读取流来获取错误信息
+          final bytes = await (response.data as ResponseBody).stream.toList();
+          final body = utf8.decode(bytes.expand((x) => x).toList());
+          try {
+            final json = jsonDecode(body);
+            return AIChatResponse.error(
+              json['error'] ?? 'AI推荐功能未启用或无权限',
+              details: json['details'],
+            );
+          } catch (_) {
+            return AIChatResponse.error('AI推荐功能未启用或无权限');
+          }
+        }
+
+        if (response.statusCode != 200) {
+          final bytes = await (response.data as ResponseBody).stream.toList();
+          final body = utf8.decode(bytes.expand((x) => x).toList());
+          try {
+            final json = jsonDecode(body);
+            return AIChatResponse.error(
+              json['error'] ?? '请求失败',
+              details: json['details'],
+            );
+          } catch (_) {
+            return AIChatResponse.error('请求失败: ${response.statusCode}');
+          }
+        }
+
+        // 处理 SSE 流
+        await for (final chunk in (response.data as ResponseBody).stream.transform(utf8.decoder)) {
+          buffer += chunk;
+          
+          // 按换行符分割，处理完整的行
+          while (buffer.contains('\n')) {
+            final newlineIndex = buffer.indexOf('\n');
+            final line = buffer.substring(0, newlineIndex).trim();
+            buffer = buffer.substring(newlineIndex + 1);
+            
+            if (line.isEmpty) continue;
+            
             if (line.startsWith('data: ')) {
               final data = line.substring(6);
 
               if (data == '[DONE]') {
                 debugPrint('[AIRecommendService] 流式响应完成');
-                break;
+                continue;
               }
 
               try {
@@ -388,7 +410,6 @@ class AIRecommendService {
                 if (json['text'] != null) {
                   final text = json['text'] as String;
                   fullContent += text;
-                  debugPrint('[AIRecommendService] 流式文本: $text');
                   onStream(text);
                 }
 
@@ -408,7 +429,7 @@ class AIRecommendService {
                   debugPrint('[AIRecommendService] 收到视频链接: ${videoLinks.length}');
                 }
               } catch (e) {
-                debugPrint('[AIRecommendService] 解析 SSE 数据失败: $e, 数据: $data');
+                debugPrint('[AIRecommendService] 解析 SSE 数据失败: $e');
               }
             }
           }
@@ -425,14 +446,49 @@ class AIRecommendService {
       }
 
       // 非流式响应
-      final body = await streamedResponse.stream.bytesToString();
-      final json = jsonDecode(body);
-      return AIChatResponse.fromJson(json);
-    } catch (e) {
-      debugPrint('[AIRecommendService] 发送消息失败: $e');
-      if (e.toString().contains('TimeoutException')) {
+      final response = await _dio.post(
+        '$serverUrl/api/ai-recommend',
+        data: requestBody,
+        options: Options(
+          headers: {
+            'Content-Type': 'application/json',
+            if (cookies != null && cookies.isNotEmpty) 'Cookie': cookies,
+          },
+          validateStatus: (status) => true,
+          receiveTimeout: const Duration(seconds: 120),
+          sendTimeout: const Duration(seconds: 30),
+        ),
+      );
+
+      if (response.statusCode == 401) {
+        return AIChatResponse.error('请先登录');
+      }
+
+      if (response.statusCode == 403) {
+        return AIChatResponse.error(
+          response.data['error'] ?? 'AI推荐功能未启用或无权限',
+          details: response.data['details'],
+        );
+      }
+
+      if (response.statusCode != 200) {
+        return AIChatResponse.error(
+          response.data['error'] ?? '请求失败',
+          details: response.data['details'],
+        );
+      }
+
+      return AIChatResponse.fromJson(response.data);
+    } on DioException catch (e) {
+      debugPrint('[AIRecommendService] Dio异常: $e');
+      if (e.type == DioExceptionType.receiveTimeout || 
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.connectionTimeout) {
         return AIChatResponse.error('请求超时，请稍后重试');
       }
+      return AIChatResponse.error('网络错误: ${e.message}');
+    } catch (e) {
+      debugPrint('[AIRecommendService] 发送消息失败: $e');
       return AIChatResponse.error('网络错误: $e');
     }
   }
