@@ -15,6 +15,7 @@ import '../models/skip_config.dart';
 import '../services/danmaku_service.dart';
 import '../services/skip_config_service.dart';
 import '../services/ad_filter_service.dart';
+import '../services/player_manager.dart';
 
 class VideoPlayerWidget extends StatefulWidget {
   final VideoPlayerSurface surface;
@@ -139,6 +140,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     with WidgetsBindingObserver {
   Player? _player;
   VideoController? _videoController;
+  ManagedPlayer? _managedPlayer; // 使用 PlayerManager 管理的播放器
   bool _isInitialized = false;
   bool _hasCompleted = false;
   bool _isLoadingVideo = false;
@@ -218,8 +220,21 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     if (_playerDisposed) {
       return;
     }
-    _player = Player();
-    _videoController = VideoController(_player!);
+    
+    // 使用 PlayerManager 获取播放器（复用单例）
+    final managed = await PlayerManager().getPlayer(PlayerManager.mainPlayerId);
+    
+    if (_playerDisposed || !mounted) {
+      return;
+    }
+    
+    _managedPlayer = managed;
+    _player = managed.player;
+    _videoController = managed.controller;
+    
+    // 先停止之前的播放
+    await _player!.stop();
+    
     _setupPlayerListeners();
     if (_currentUrl != null) {
       await _openCurrentMedia();
@@ -294,6 +309,8 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     if (_player == null) {
       return;
     }
+    
+    // 先取消之前的订阅
     _positionSubscription?.cancel();
     _playingSubscription?.cancel();
     _completedSubscription?.cancel();
@@ -301,7 +318,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
 
     _positionSubscription = _player!.stream.position.listen((position) {
       // 更新弹幕位置
-      if (mounted) {
+      if (mounted && !_playerDisposed) {
         setState(() {
           _currentPosition = position;
         });
@@ -318,7 +335,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     });
 
     _playingSubscription = _player!.stream.playing.listen((playing) {
-      if (!mounted) return;
+      if (!mounted || _playerDisposed) return;
       if (!playing) {
         setState(() {
           _hasCompleted = false;
@@ -345,7 +362,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
 
     if (!widget.live) {
       _completedSubscription = _player!.stream.completed.listen((completed) {
-        if (!mounted) return;
+        if (!mounted || _playerDisposed) return;
         if (completed && !_hasCompleted) {
           _hasCompleted = true;
           widget.onVideoCompleted?.call();
@@ -354,7 +371,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     }
 
     _durationSubscription = _player!.stream.duration.listen((duration) {
-      if (!mounted) return;
+      if (!mounted || _playerDisposed) return;
       if (duration != Duration.zero) {
         if (_isLoadingVideo) {
           setState(() {
@@ -748,7 +765,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     }
     _playerDisposed = true;
     
-    // 先取消所有订阅
+    // 取消所有订阅
     _positionSubscription?.cancel();
     _positionSubscription = null;
     _playingSubscription?.cancel();
@@ -759,21 +776,12 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     _durationSubscription = null;
     _progressListeners.clear();
     
-    // 安全地停止并 dispose 播放器
-    final player = _player;
+    // 停止播放器（不释放）
+    await PlayerManager().stopPlayer(PlayerManager.mainPlayerId);
+    
     _player = null;
     _videoController = null;
-    
-    if (player != null) {
-      try {
-        // 先停止播放
-        await player.stop();
-        // 再 dispose
-        await player.dispose();
-      } catch (e) {
-        debugPrint('VideoPlayerWidget: error disposing player: $e');
-      }
-    }
+    _managedPlayer = null;
   }
 
   @override
@@ -805,7 +813,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     // 同步设置标记，防止其他异步操作继续
     _playerDisposed = true;
     
-    // 取消所有订阅
+    // 取消所有订阅（重要：避免回调到已销毁的 Widget）
     _positionSubscription?.cancel();
     _positionSubscription = null;
     _playingSubscription?.cancel();
@@ -816,32 +824,13 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     _durationSubscription = null;
     _progressListeners.clear();
     
-    // 安全地停止并释放播放器
-    // 注意：必须先 stop 等待完成后再 dispose，否则会导致 native 回调崩溃
-    final player = _player;
-    final controller = _videoController;
+    // 停止播放器（不释放，只停止）
+    // 播放器由 PlayerManager 管理，永不 dispose
+    PlayerManager().stopPlayer(PlayerManager.mainPlayerId);
+    
     _player = null;
     _videoController = null;
-    
-    if (player != null) {
-      // 使用 Future.microtask 确保在当前帧结束后执行
-      Future.microtask(() async {
-        try {
-          // 先暂停，避免继续产生回调
-          await player.pause();
-          // 等待一小段时间让 native 层处理完
-          await Future.delayed(const Duration(milliseconds: 100));
-          // 停止播放
-          await player.stop();
-          // 再等待一下
-          await Future.delayed(const Duration(milliseconds: 100));
-          // 最后 dispose
-          await player.dispose();
-        } catch (e) {
-          debugPrint('VideoPlayerWidget: error disposing player: $e');
-        }
-      });
-    }
+    _managedPlayer = null;
     
     _playbackSpeed.dispose();
     super.dispose();

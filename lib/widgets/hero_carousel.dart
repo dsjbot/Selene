@@ -5,6 +5,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import '../utils/image_url.dart';
 import '../services/user_data_service.dart';
+import '../services/player_manager.dart';
 
 /// 轮播图项目数据
 class CarouselItem {
@@ -60,7 +61,8 @@ class _HeroCarouselState extends State<HeroCarousel> with WidgetsBindingObserver
   bool _isAutoSwitching = false; // 标记是否是自动切换
   bool _isDisposed = false; // 标记是否已经 dispose
   
-  // 预告片播放器 - 复用同一个实例
+  // 预告片播放器 - 使用 PlayerManager 管理
+  ManagedPlayer? _managedPlayer;
   Player? _trailerPlayer;
   VideoController? _trailerController;
   bool _isVideoLoaded = false;
@@ -82,15 +84,30 @@ class _HeroCarouselState extends State<HeroCarousel> with WidgetsBindingObserver
     _startAutoPlay();
   }
 
-  /// 初始化播放器（只创建一次）
-  void _initPlayer() {
-    if (!widget.enableVideo) return;
-    _trailerPlayer = Player();
-    _trailerController = VideoController(_trailerPlayer!);
+  /// 初始化播放器（使用 PlayerManager）
+  Future<void> _initPlayer() async {
+    if (!widget.enableVideo || _isDisposed) return;
+    
+    final managed = await PlayerManager().getPlayer(PlayerManager.carouselPlayerId);
+    
+    if (_isDisposed || !mounted) {
+      return;
+    }
+    
+    _managedPlayer = managed;
+    _trailerPlayer = managed.player;
+    _trailerController = managed.controller;
+    
+    // 先停止之前的播放
+    await _trailerPlayer!.stop();
     
     // 设置静音和循环
     _trailerPlayer!.setVolume(0);
     _trailerPlayer!.setPlaylistMode(PlaylistMode.loop);
+    
+    // 取消之前的订阅
+    _widthSubscription?.cancel();
+    _errorSubscription?.cancel();
     
     // 监听视频宽高变化（表示视频已加载）
     _widthSubscription = _trailerPlayer!.stream.width.listen((width) {
@@ -109,6 +126,7 @@ class _HeroCarouselState extends State<HeroCarousel> with WidgetsBindingObserver
         });
       }
     });
+  }
   }
 
   Future<void> _loadServerUrl() async {
@@ -168,39 +186,33 @@ class _HeroCarouselState extends State<HeroCarousel> with WidgetsBindingObserver
     _autoPlayTimer = null;
     _pageController.dispose();
     
-    // 取消 stream 订阅
+    // 取消所有订阅（重要：避免回调到已销毁的 Widget）
     _widthSubscription?.cancel();
     _widthSubscription = null;
     _errorSubscription?.cancel();
     _errorSubscription = null;
     
-    // 安全地停止并释放播放器
-    final player = _trailerPlayer;
+    // 停止播放器（不释放，只停止）
+    // 播放器由 PlayerManager 管理，永不 dispose
+    PlayerManager().stopPlayer(PlayerManager.carouselPlayerId);
+    
     _trailerPlayer = null;
     _trailerController = null;
-    
-    if (player != null) {
-      // 使用 Future.microtask 确保在当前帧结束后执行
-      Future.microtask(() async {
-        try {
-          await player.pause();
-          await Future.delayed(const Duration(milliseconds: 100));
-          await player.stop();
-          await Future.delayed(const Duration(milliseconds: 100));
-          await player.dispose();
-        } catch (e) {
-          debugPrint('[HeroCarousel] dispose player error: $e');
-        }
-      });
-    }
+    _managedPlayer = null;
     
     super.dispose();
   }
 
   /// 加载当前项目的预告片
   Future<void> _loadTrailerForCurrentItem() async {
-    if (_isDisposed || !widget.enableVideo || widget.items.isEmpty || _trailerPlayer == null) {
+    if (_isDisposed || !widget.enableVideo || widget.items.isEmpty) {
       return;
+    }
+    
+    // 确保播放器已初始化
+    if (_trailerPlayer == null) {
+      await _initPlayer();
+      if (_trailerPlayer == null || _isDisposed) return;
     }
     
     // 防止重复加载
