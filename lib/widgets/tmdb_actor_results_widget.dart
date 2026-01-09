@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
@@ -27,6 +28,7 @@ class _TMDBActorResultsWidgetState extends State<TMDBActorResultsWidget> {
   bool _isLoading = false;
   String? _error;
   String? _serverUrl;
+  String? _cookies;
 
   TMDBContentType _contentType = TMDBContentType.movie;
   TMDBSortBy _sortBy = TMDBSortBy.popularity;
@@ -36,15 +38,17 @@ class _TMDBActorResultsWidgetState extends State<TMDBActorResultsWidget> {
   @override
   void initState() {
     super.initState();
-    _loadServerUrl();
+    _loadServerInfo();
     _search();
   }
   
-  Future<void> _loadServerUrl() async {
+  Future<void> _loadServerInfo() async {
     final url = await UserDataService.getServerUrl();
+    final cookies = await UserDataService.getCookies();
     if (mounted) {
       setState(() {
         _serverUrl = url;
+        _cookies = cookies;
       });
     }
   }
@@ -54,6 +58,15 @@ class _TMDBActorResultsWidgetState extends State<TMDBActorResultsWidget> {
     if (originalUrl.isEmpty || _serverUrl == null) return originalUrl;
     // 通过后端代理加载图片
     return '$_serverUrl/api/image-proxy?url=${Uri.encodeComponent(originalUrl)}';
+  }
+  
+  /// 获取图片请求的headers
+  Map<String, String> _getImageHeaders() {
+    final headers = <String, String>{};
+    if (_cookies != null && _cookies!.isNotEmpty) {
+      headers['Cookie'] = _cookies!;
+    }
+    return headers;
   }
 
   @override
@@ -366,68 +379,32 @@ class _TMDBActorResultsWidgetState extends State<TMDBActorResultsWidget> {
       );
     }
 
-    // 调试信息
-    final firstWork = _result!.list.isNotEmpty ? _result!.list[0] : null;
-    final proxiedPoster = firstWork != null ? _getProxiedImageUrl(firstWork.poster) : '';
-    
-    return Column(
-      children: [
-        // 调试信息区域
-        Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.purple.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.purple.withOpacity(0.3)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '🔍 调试信息 (共 ${_result!.list.length} 个结果)',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-              ),
-              const SizedBox(height: 4),
-              if (firstWork != null) ...[
-                Text('id: ${firstWork.id}', style: const TextStyle(fontSize: 11)),
-                Text('title: ${firstWork.title}', style: const TextStyle(fontSize: 11)),
-                Text('原始poster: ${firstWork.poster}', style: const TextStyle(fontSize: 11)),
-                Text('代理poster: $proxiedPoster', style: const TextStyle(fontSize: 11)),
-              ],
-            ],
-          ),
-        ),
-        // GridView
-        Expanded(
-          child: GridView.builder(
-            padding: const EdgeInsets.only(bottom: 16),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              childAspectRatio: 0.55,
-              crossAxisSpacing: 10,
-              mainAxisSpacing: 12,
-            ),
-            itemCount: _result!.list.length,
-            itemBuilder: (context, index) {
-              final work = _result!.list[index];
-              return _TMDBWorkCard(
-                work: work,
-                posterUrl: _getProxiedImageUrl(work.poster),
-                contentType: _contentType,
-                themeService: themeService,
-                onTap: () {
-                  if (widget.onWorkTap != null) {
-                    widget.onWorkTap!(work);
-                  } else {
-                    _navigateToPlayer(work);
-                  }
-                },
-              );
-            },
-          ),
-        ),
-      ],
+    return GridView.builder(
+      padding: const EdgeInsets.only(bottom: 16),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        childAspectRatio: 0.55,
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 12,
+      ),
+      itemCount: _result!.list.length,
+      itemBuilder: (context, index) {
+        final work = _result!.list[index];
+        return _TMDBWorkCard(
+          work: work,
+          posterUrl: _getProxiedImageUrl(work.poster),
+          httpHeaders: _getImageHeaders(),
+          contentType: _contentType,
+          themeService: themeService,
+          onTap: () {
+            if (widget.onWorkTap != null) {
+              widget.onWorkTap!(work);
+            } else {
+              _navigateToPlayer(work);
+            }
+          },
+        );
+      },
     );
   }
 
@@ -449,6 +426,7 @@ class _TMDBActorResultsWidgetState extends State<TMDBActorResultsWidget> {
 class _TMDBWorkCard extends StatelessWidget {
   final TMDBActorWork work;
   final String posterUrl;
+  final Map<String, String> httpHeaders;
   final TMDBContentType contentType;
   final ThemeService themeService;
   final VoidCallback? onTap;
@@ -456,6 +434,7 @@ class _TMDBWorkCard extends StatelessWidget {
   const _TMDBWorkCard({
     required this.work,
     required this.posterUrl,
+    required this.httpHeaders,
     required this.contentType,
     required this.themeService,
     this.onTap,
@@ -482,24 +461,22 @@ class _TMDBWorkCard extends StatelessWidget {
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: posterUrl.isNotEmpty
-                        ? Image.network(
-                            posterUrl,
+                        ? CachedNetworkImage(
+                            imageUrl: posterUrl,
+                            httpHeaders: httpHeaders,
                             fit: BoxFit.cover,
                             width: double.infinity,
                             height: double.infinity,
-                            loadingBuilder: (context, child, loadingProgress) {
-                              if (loadingProgress == null) return child;
-                              return Container(
-                                color: themeService.isDarkMode ? Colors.grey[800] : Colors.grey[200],
-                                child: const Center(
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B5CF6)),
-                                  ),
+                            placeholder: (context, url) => Container(
+                              color: themeService.isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                              child: const Center(
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B5CF6)),
                                 ),
-                              );
-                            },
-                            errorBuilder: (context, error, stackTrace) {
+                              ),
+                            ),
+                            errorWidget: (context, url, error) {
                               return Container(
                                 color: themeService.isDarkMode ? Colors.grey[800] : Colors.grey[200],
                                 child: Center(

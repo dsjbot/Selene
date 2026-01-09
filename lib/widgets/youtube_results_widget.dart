@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
@@ -27,6 +28,7 @@ class _YouTubeResultsWidgetState extends State<YouTubeResultsWidget> {
   bool _isLoading = false;
   String? _error;
   String? _serverUrl;
+  String? _cookies;
 
   YouTubeContentType _contentType = YouTubeContentType.all;
   YouTubeSortOrder _sortOrder = YouTubeSortOrder.relevance;
@@ -34,15 +36,17 @@ class _YouTubeResultsWidgetState extends State<YouTubeResultsWidget> {
   @override
   void initState() {
     super.initState();
-    _loadServerUrl();
+    _loadServerInfo();
     _search();
   }
   
-  Future<void> _loadServerUrl() async {
+  Future<void> _loadServerInfo() async {
     final url = await UserDataService.getServerUrl();
+    final cookies = await UserDataService.getCookies();
     if (mounted) {
       setState(() {
         _serverUrl = url;
+        _cookies = cookies;
       });
     }
   }
@@ -52,6 +56,15 @@ class _YouTubeResultsWidgetState extends State<YouTubeResultsWidget> {
     if (originalUrl.isEmpty || _serverUrl == null) return originalUrl;
     // 通过后端代理加载图片
     return '$_serverUrl/api/image-proxy?url=${Uri.encodeComponent(originalUrl)}';
+  }
+  
+  /// 获取图片请求的headers
+  Map<String, String> _getImageHeaders() {
+    final headers = <String, String>{};
+    if (_cookies != null && _cookies!.isNotEmpty) {
+      headers['Cookie'] = _cookies!;
+    }
+    return headers;
   }
 
   @override
@@ -325,43 +338,13 @@ class _YouTubeResultsWidgetState extends State<YouTubeResultsWidget> {
 
     return ListView.builder(
       padding: const EdgeInsets.only(bottom: 16),
-      itemCount: _result!.videos.length + 1, // +1 for debug info
+      itemCount: _result!.videos.length,
       itemBuilder: (context, index) {
-        // 第一个item显示调试信息
-        if (index == 0) {
-          final firstVideo = _result!.videos.isNotEmpty ? _result!.videos[0] : null;
-          final proxiedUrl = firstVideo != null ? _getProxiedImageUrl(firstVideo.thumbnailUrl) : '';
-          return Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.blue.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.blue.withOpacity(0.3)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '🔍 调试信息 (共 ${_result!.videos.length} 个结果)',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                ),
-                const SizedBox(height: 4),
-                if (firstVideo != null) ...[
-                  Text('videoId: ${firstVideo.videoId}', style: const TextStyle(fontSize: 11)),
-                  Text('原始URL: ${firstVideo.thumbnailUrl}', style: const TextStyle(fontSize: 11)),
-                  Text('代理URL: $proxiedUrl', style: const TextStyle(fontSize: 11)),
-                  Text('title: ${firstVideo.title}', style: const TextStyle(fontSize: 11)),
-                ],
-              ],
-            ),
-          );
-        }
-        
-        final video = _result!.videos[index - 1];
+        final video = _result!.videos[index];
         return _YouTubeVideoCard(
           video: video,
           thumbnailUrl: _getProxiedImageUrl(video.thumbnailUrl),
+          httpHeaders: _getImageHeaders(),
           themeService: themeService,
           onTap: () => widget.onVideoTap?.call(video),
         );
@@ -374,12 +357,14 @@ class _YouTubeResultsWidgetState extends State<YouTubeResultsWidget> {
 class _YouTubeVideoCard extends StatefulWidget {
   final YouTubeVideo video;
   final String thumbnailUrl;
+  final Map<String, String> httpHeaders;
   final ThemeService themeService;
   final VoidCallback? onTap;
 
   const _YouTubeVideoCard({
     required this.video,
     required this.thumbnailUrl,
+    required this.httpHeaders,
     required this.themeService,
     this.onTap,
   });
@@ -391,6 +376,7 @@ class _YouTubeVideoCard extends StatefulWidget {
 class _YouTubeVideoCardState extends State<_YouTubeVideoCard> {
   YouTubeVideo get video => widget.video;
   String get thumbnailUrl => widget.thumbnailUrl;
+  Map<String, String> get httpHeaders => widget.httpHeaders;
   ThemeService get themeService => widget.themeService;
 
   @override
@@ -421,35 +407,33 @@ class _YouTubeVideoCardState extends State<_YouTubeVideoCard> {
                     child: AspectRatio(
                       aspectRatio: 16 / 9,
                       child: thumbnailUrl.isNotEmpty
-                          ? Image.network(
-                              thumbnailUrl,
+                          ? CachedNetworkImage(
+                              imageUrl: thumbnailUrl,
+                              httpHeaders: httpHeaders,
                               fit: BoxFit.cover,
-                              loadingBuilder: (context, child, loadingProgress) {
-                                if (loadingProgress == null) return child;
-                                return Container(
-                                  color: themeService.isDarkMode ? Colors.grey[800] : Colors.grey[200],
-                                  child: Center(
-                                    child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        const CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF0000)),
+                              placeholder: (context, url) => Container(
+                                color: themeService.isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                                child: Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF0000)),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        '加载中...',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: themeService.isDarkMode ? Colors.grey[400] : Colors.grey[600],
                                         ),
-                                        const SizedBox(height: 8),
-                                        Text(
-                                          '加载中...',
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            color: themeService.isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
+                                      ),
+                                    ],
                                   ),
-                                );
-                              },
-                              errorBuilder: (context, error, stackTrace) {
+                                ),
+                              ),
+                              errorWidget: (context, url, error) {
                                 return Container(
                                   color: themeService.isDarkMode ? Colors.grey[800] : Colors.grey[200],
                                   child: Center(
