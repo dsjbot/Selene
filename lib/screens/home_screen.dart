@@ -6,6 +6,7 @@ import '../widgets/hot_movies_section.dart';
 import '../widgets/hot_tv_section.dart';
 import '../widgets/hot_show_section.dart';
 import '../widgets/bangumi_section.dart';
+import '../widgets/upcoming_section.dart';
 import '../widgets/main_layout.dart';
 import '../widgets/top_tab_switcher.dart';
 import '../widgets/favorites_grid.dart';
@@ -183,6 +184,9 @@ class _HomeScreenState extends State<HomeScreen> {
         // 刷新热门综艺组件
         await HotShowSection.refreshHotShows();
 
+        // 刷新即将上映组件
+        await UpcomingSection.refreshUpcoming();
+
         // 强制重建页面
         setState(() {});
       }
@@ -291,6 +295,30 @@ class _HomeScreenState extends State<HomeScreen> {
               onViewAll: () {
                 // 切换到播放历史标签
                 _onTopTabChanged('播放历史');
+              },
+            ),
+            // 即将上映组件
+            UpcomingSection(
+              onItemTap: (videoInfo) {
+                // 即将上映的内容，使用标题搜索
+                _navigateToPlayer(
+                  PlayerScreen(
+                    title: videoInfo.title,
+                    year: videoInfo.year,
+                  ),
+                );
+              },
+              onGlobalMenuAction: (videoInfo, action) {
+                if (action == VideoMenuAction.play) {
+                  _navigateToPlayer(
+                    PlayerScreen(
+                      title: videoInfo.title,
+                      year: videoInfo.year,
+                    ),
+                  );
+                } else {
+                  _onGlobalMenuActionFromVideoInfo(videoInfo, action);
+                }
               },
             ),
             // 热门电影组件
