@@ -200,10 +200,6 @@ class _HomeScreenState extends State<HomeScreen> {
     return NestedScrollView(
       headerSliverBuilder: (context, innerBoxIsScrolled) {
         return [
-          // 轮播图作为 Sliver 头部，可以跟随滚动
-          SliverToBoxAdapter(
-            child: _buildCarousel(),
-          ),
           // 顶部导航栏固定
           SliverPersistentHeader(
             pinned: true,
@@ -213,6 +209,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 onTabChanged: _onTopTabChanged,
               ),
             ),
+          ),
+          // 轮播图在 Tab 下面，可以跟随滚动
+          SliverToBoxAdapter(
+            child: _buildCarousel(),
           ),
         ];
       },
