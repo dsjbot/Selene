@@ -720,7 +720,7 @@ class _ReleaseCalendarScreenState extends State<ReleaseCalendarScreen> {
         return _DateInfo(
           label: '已上映',
           color: const Color(0xFF22C55E),
-          icon: LucideIcons.checkCircle,
+          icon: LucideIcons.check,
         );
       } else if (diff == 0) {
         return _DateInfo(

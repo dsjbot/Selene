@@ -409,8 +409,8 @@ class _UpcomingSectionState extends State<UpcomingSection> {
             saveTime: 0,
             searchTitle: item.title,
           );
-          showVideoMenuBottomSheet(
-            context: context,
+          VideoMenuBottomSheet.show(
+            context,
             videoInfo: videoInfo,
             onAction: (action) {
               widget.onGlobalMenuAction!(videoInfo, action);
