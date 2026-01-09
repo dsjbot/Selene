@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'user_data_service.dart';
@@ -326,125 +327,135 @@ class AIRecommendService {
         'stream': onStream != null,
       };
 
-      // 流式响应处理
+      // 流式响应处理 - 使用原生 HttpClient 以支持真正的流式传输
       if (onStream != null) {
         String fullContent = '';
         List<YouTubeVideo> youtubeVideos = [];
         List<VideoLink> videoLinks = [];
-        String buffer = ''; // 用于处理不完整的 SSE 行
+        String buffer = '';
 
         debugPrint('[AIRecommendService] 开始流式请求...');
 
-        final response = await _dio.post<ResponseBody>(
-          '$serverUrl/api/ai-recommend',
-          data: requestBody,
-          options: Options(
-            headers: {
-              'Content-Type': 'application/json',
-              if (cookies != null && cookies.isNotEmpty) 'Cookie': cookies,
-            },
-            responseType: ResponseType.stream,
-            validateStatus: (status) => true,
-            receiveTimeout: const Duration(seconds: 120),
-            sendTimeout: const Duration(seconds: 30),
-          ),
-        );
-
-        if (response.statusCode == 401) {
-          return AIChatResponse.error('请先登录');
-        }
-
-        if (response.statusCode == 403) {
-          // 需要读取流来获取错误信息
-          final bytes = await (response.data as ResponseBody).stream.toList();
-          final body = utf8.decode(bytes.expand((x) => x).toList());
-          try {
-            final json = jsonDecode(body);
-            return AIChatResponse.error(
-              json['error'] ?? 'AI推荐功能未启用或无权限',
-              details: json['details'],
-            );
-          } catch (_) {
-            return AIChatResponse.error('AI推荐功能未启用或无权限');
-          }
-        }
-
-        if (response.statusCode != 200) {
-          final bytes = await (response.data as ResponseBody).stream.toList();
-          final body = utf8.decode(bytes.expand((x) => x).toList());
-          try {
-            final json = jsonDecode(body);
-            return AIChatResponse.error(
-              json['error'] ?? '请求失败',
-              details: json['details'],
-            );
-          } catch (_) {
-            return AIChatResponse.error('请求失败: ${response.statusCode}');
-          }
-        }
-
-        // 处理 SSE 流
-        final stream = (response.data as ResponseBody).stream;
-        await for (final bytes in stream) {
-          final chunk = utf8.decode(bytes);
-          buffer += chunk;
+        final httpClient = HttpClient();
+        httpClient.connectionTimeout = const Duration(seconds: 30);
+        
+        try {
+          final uri = Uri.parse('$serverUrl/api/ai-recommend');
+          final request = await httpClient.postUrl(uri);
           
-          // 按换行符分割，处理完整的行
-          while (buffer.contains('\n')) {
-            final newlineIndex = buffer.indexOf('\n');
-            final line = buffer.substring(0, newlineIndex).trim();
-            buffer = buffer.substring(newlineIndex + 1);
+          // 设置请求头
+          request.headers.set('Content-Type', 'application/json');
+          if (cookies != null && cookies.isNotEmpty) {
+            request.headers.set('Cookie', cookies);
+          }
+          
+          // 写入请求体
+          request.write(jsonEncode(requestBody));
+          
+          // 发送请求并获取响应
+          final response = await request.close();
+          
+          debugPrint('[AIRecommendService] 响应状态码: ${response.statusCode}');
+
+          if (response.statusCode == 401) {
+            httpClient.close();
+            return AIChatResponse.error('请先登录');
+          }
+
+          if (response.statusCode == 403) {
+            final body = await response.transform(utf8.decoder).join();
+            httpClient.close();
+            try {
+              final json = jsonDecode(body);
+              return AIChatResponse.error(
+                json['error'] ?? 'AI推荐功能未启用或无权限',
+                details: json['details'],
+              );
+            } catch (_) {
+              return AIChatResponse.error('AI推荐功能未启用或无权限');
+            }
+          }
+
+          if (response.statusCode != 200) {
+            final body = await response.transform(utf8.decoder).join();
+            httpClient.close();
+            try {
+              final json = jsonDecode(body);
+              return AIChatResponse.error(
+                json['error'] ?? '请求失败',
+                details: json['details'],
+              );
+            } catch (_) {
+              return AIChatResponse.error('请求失败: ${response.statusCode}');
+            }
+          }
+
+          // 处理 SSE 流
+          await for (final chunk in response.transform(utf8.decoder)) {
+            buffer += chunk;
             
-            if (line.isEmpty) continue;
-            
-            if (line.startsWith('data: ')) {
-              final data = line.substring(6);
+            // 按换行符分割，处理完整的行
+            while (buffer.contains('\n')) {
+              final newlineIndex = buffer.indexOf('\n');
+              final line = buffer.substring(0, newlineIndex).trim();
+              buffer = buffer.substring(newlineIndex + 1);
+              
+              if (line.isEmpty) continue;
+              
+              if (line.startsWith('data: ')) {
+                final data = line.substring(6);
 
-              if (data == '[DONE]') {
-                debugPrint('[AIRecommendService] 流式响应完成');
-                continue;
-              }
-
-              try {
-                final json = jsonDecode(data);
-
-                // 处理文本流
-                if (json['text'] != null) {
-                  final text = json['text'] as String;
-                  fullContent += text;
-                  onStream(text);
+                if (data == '[DONE]') {
+                  debugPrint('[AIRecommendService] 流式响应完成');
+                  continue;
                 }
 
-                // 处理 YouTube 视频数据
-                if (json['type'] == 'youtube_data' && json['youtubeVideos'] != null) {
-                  youtubeVideos = (json['youtubeVideos'] as List)
-                      .map((e) => YouTubeVideo.fromJson(e))
-                      .toList();
-                  debugPrint('[AIRecommendService] 收到YouTube视频: ${youtubeVideos.length}');
-                }
+                try {
+                  final json = jsonDecode(data);
 
-                // 处理视频链接数据
-                if (json['type'] == 'video_links' && json['videoLinks'] != null) {
-                  videoLinks = (json['videoLinks'] as List)
-                      .map((e) => VideoLink.fromJson(e))
-                      .toList();
-                  debugPrint('[AIRecommendService] 收到视频链接: ${videoLinks.length}');
+                  // 处理文本流
+                  if (json['text'] != null) {
+                    final text = json['text'] as String;
+                    fullContent += text;
+                    onStream(text);
+                  }
+
+                  // 处理 YouTube 视频数据
+                  if (json['type'] == 'youtube_data' && json['youtubeVideos'] != null) {
+                    youtubeVideos = (json['youtubeVideos'] as List)
+                        .map((e) => YouTubeVideo.fromJson(e))
+                        .toList();
+                    debugPrint('[AIRecommendService] 收到YouTube视频: ${youtubeVideos.length}');
+                  }
+
+                  // 处理视频链接数据
+                  if (json['type'] == 'video_links' && json['videoLinks'] != null) {
+                    videoLinks = (json['videoLinks'] as List)
+                        .map((e) => VideoLink.fromJson(e))
+                        .toList();
+                    debugPrint('[AIRecommendService] 收到视频链接: ${videoLinks.length}');
+                  }
+                } catch (e) {
+                  debugPrint('[AIRecommendService] 解析 SSE 数据失败: $e');
                 }
-              } catch (e) {
-                debugPrint('[AIRecommendService] 解析 SSE 数据失败: $e');
               }
             }
           }
+
+          httpClient.close();
+          debugPrint('[AIRecommendService] 流式响应处理完成，总内容长度: ${fullContent.length}');
+
+          return AIChatResponse(
+            id: 'stream-${DateTime.now().millisecondsSinceEpoch}',
+            content: fullContent,
+            youtubeVideos: youtubeVideos.isNotEmpty ? youtubeVideos : null,
+            videoLinks: videoLinks.isNotEmpty ? videoLinks : null,
+          );
+        } catch (e) {
+          httpClient.close();
+          debugPrint('[AIRecommendService] 流式请求失败: $e');
+          return AIChatResponse.error('网络错误: $e');
         }
-
-        debugPrint('[AIRecommendService] 流式响应处理完成，总内容长度: ${fullContent.length}');
-
-        return AIChatResponse(
-          id: 'stream-${DateTime.now().millisecondsSinceEpoch}',
-          content: fullContent,
-          youtubeVideos: youtubeVideos.isNotEmpty ? youtubeVideos : null,
-          videoLinks: videoLinks.isNotEmpty ? videoLinks : null,
-        );
       }
 
       // 非流式响应
