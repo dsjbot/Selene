@@ -221,6 +221,10 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
       return;
     }
     
+    setState(() {
+      _isLoadingVideo = true;
+    });
+    
     // 使用 PlayerManager 获取播放器（复用单例）
     final managed = await PlayerManager().getPlayer(PlayerManager.mainPlayerId);
     
@@ -232,16 +236,17 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     _player = managed.player;
     _videoController = managed.controller;
     
-    // 先停止之前的播放
-    await _player!.stop();
-    
+    // 不等待 stop 完成，直接设置监听器并加载新视频
+    // stop 和 open 会自动处理状态切换
     _setupPlayerListeners();
-    if (_currentUrl != null) {
-      await _openCurrentMedia();
-    }
+    
     setState(() {
       _isInitialized = true;
     });
+    
+    if (_currentUrl != null) {
+      await _openCurrentMedia();
+    }
   }
 
   Future<void> _openCurrentMedia({Duration? startAt}) async {
@@ -841,118 +846,131 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     return Container(
       color: Colors.black,
       child: _isInitialized && _videoController != null
-          ? Video(
-              controller: _videoController!,
-              controls: (state) {
-                // 弹幕层需要放在controls里面，这样全屏时也能显示
-                return Stack(
-                  children: [
-                    // 弹幕层（放在控制层下面）
-                    if (!widget.live && !_isPipMode)
-                      Positioned.fill(
-                        child: IgnorePointer(
-                          child: DanmakuLayer(
-                            danmakuList: _danmakuList,
-                            currentPosition: _currentPosition,
-                            isPlaying: _player?.state.playing ?? false,
-                            enabled: _danmakuSettings.enabled,
-                            opacity: _danmakuSettings.opacity,
-                            fontSize: _danmakuSettings.fontSize,
-                            speed: _danmakuSettings.speed,
-                            areaHeight: _danmakuSettings.areaHeight,
+          ? Stack(
+              children: [
+                Video(
+                  controller: _videoController!,
+                  controls: (state) {
+                    // 弹幕层需要放在controls里面，这样全屏时也能显示
+                    return Stack(
+                      children: [
+                        // 弹幕层（放在控制层下面）
+                        if (!widget.live && !_isPipMode)
+                          Positioned.fill(
+                            child: IgnorePointer(
+                              child: DanmakuLayer(
+                                danmakuList: _danmakuList,
+                                currentPosition: _currentPosition,
+                                isPlaying: _player?.state.playing ?? false,
+                                enabled: _danmakuSettings.enabled,
+                                opacity: _danmakuSettings.opacity,
+                                fontSize: _danmakuSettings.fontSize,
+                                speed: _danmakuSettings.speed,
+                                areaHeight: _danmakuSettings.areaHeight,
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                    // 控制层
-                    widget.surface == VideoPlayerSurface.desktop
-                        ? PCPlayerControls(
-                            state: state,
-                            player: _player!,
-                            onBackPressed: widget.onBackPressed,
-                            onNextEpisode: widget.onNextEpisode,
-                            onPause: widget.onPause,
-                            videoUrl: _currentUrl ?? '',
-                            isLastEpisode: widget.isLastEpisode,
-                            isLoadingVideo: _isLoadingVideo,
-                            onCastStarted: widget.onCastStarted,
-                            videoTitle: widget.videoTitle,
-                            currentEpisodeIndex: widget.currentEpisodeIndex,
-                            totalEpisodes: widget.totalEpisodes,
-                            sourceName: widget.sourceName,
-                            onWebFullscreenChanged: widget.onWebFullscreenChanged,
-                            onExitWebFullscreenCallbackReady: (callback) {
-                              _exitWebFullscreenCallback = callback;
-                            },
-                            onExitFullScreen: widget.onExitFullScreen,
-                            live: widget.live,
-                            playbackSpeedListenable: _playbackSpeed,
-                            onSetSpeed: _setPlaybackSpeed,
-                            danmakuCount: _danmakuList.length,
-                            danmakuSettings: _danmakuSettings,
-                            onDanmakuSettingsChanged: _updateDanmakuSettings,
-                            videoSource: widget.videoSource,
-                            videoId: widget.videoId,
-                            skipConfig: _skipConfig,
-                            onSkipConfigChanged: _updateSkipConfig,
-                          )
-                        : MobilePlayerControls(
-                            player: _player!,
-                            state: state,
-                            onControlsVisibilityChanged: (_) {},
-                            onBackPressed: widget.onBackPressed,
-                            onFullscreenChange: (_) {},
-                            onNextEpisode: widget.onNextEpisode,
-                            onPause: widget.onPause,
-                            videoUrl: _currentUrl ?? '',
-                            isLastEpisode: widget.isLastEpisode,
-                            isLoadingVideo: _isLoadingVideo,
-                            onCastStarted: widget.onCastStarted,
-                            videoTitle: widget.videoTitle,
-                            currentEpisodeIndex: widget.currentEpisodeIndex,
-                            totalEpisodes: widget.totalEpisodes,
-                            sourceName: widget.sourceName,
-                            onExitFullScreen: widget.onExitFullScreen,
-                            live: widget.live,
-                            playbackSpeedListenable: _playbackSpeed,
-                            onSetSpeed: _setPlaybackSpeed,
-                            onEnterPipMode: _enterPipMode,
-                            isPipMode: _isPipMode,
-                            danmakuCount: _danmakuList.length,
-                            danmakuSettings: _danmakuSettings,
-                            onDanmakuSettingsChanged: _updateDanmakuSettings,
-                            videoSource: widget.videoSource,
-                            videoId: widget.videoId,
-                            skipConfig: _skipConfig,
-                            onSkipConfigChanged: _updateSkipConfig,
+                        // 控制层
+                        widget.surface == VideoPlayerSurface.desktop
+                            ? PCPlayerControls(
+                                state: state,
+                                player: _player!,
+                                onBackPressed: widget.onBackPressed,
+                                onNextEpisode: widget.onNextEpisode,
+                                onPause: widget.onPause,
+                                videoUrl: _currentUrl ?? '',
+                                isLastEpisode: widget.isLastEpisode,
+                                isLoadingVideo: _isLoadingVideo,
+                                onCastStarted: widget.onCastStarted,
+                                videoTitle: widget.videoTitle,
+                                currentEpisodeIndex: widget.currentEpisodeIndex,
+                                totalEpisodes: widget.totalEpisodes,
+                                sourceName: widget.sourceName,
+                                onWebFullscreenChanged: widget.onWebFullscreenChanged,
+                                onExitWebFullscreenCallbackReady: (callback) {
+                                  _exitWebFullscreenCallback = callback;
+                                },
+                                onExitFullScreen: widget.onExitFullScreen,
+                                live: widget.live,
+                                playbackSpeedListenable: _playbackSpeed,
+                                onSetSpeed: _setPlaybackSpeed,
+                                danmakuCount: _danmakuList.length,
+                                danmakuSettings: _danmakuSettings,
+                                onDanmakuSettingsChanged: _updateDanmakuSettings,
+                                videoSource: widget.videoSource,
+                                videoId: widget.videoId,
+                                skipConfig: _skipConfig,
+                                onSkipConfigChanged: _updateSkipConfig,
+                              )
+                            : MobilePlayerControls(
+                                player: _player!,
+                                state: state,
+                                onControlsVisibilityChanged: (_) {},
+                                onBackPressed: widget.onBackPressed,
+                                onFullscreenChange: (_) {},
+                                onNextEpisode: widget.onNextEpisode,
+                                onPause: widget.onPause,
+                                videoUrl: _currentUrl ?? '',
+                                isLastEpisode: widget.isLastEpisode,
+                                isLoadingVideo: _isLoadingVideo,
+                                onCastStarted: widget.onCastStarted,
+                                videoTitle: widget.videoTitle,
+                                currentEpisodeIndex: widget.currentEpisodeIndex,
+                                totalEpisodes: widget.totalEpisodes,
+                                sourceName: widget.sourceName,
+                                onExitFullScreen: widget.onExitFullScreen,
+                                live: widget.live,
+                                playbackSpeedListenable: _playbackSpeed,
+                                onSetSpeed: _setPlaybackSpeed,
+                                onEnterPipMode: _enterPipMode,
+                                isPipMode: _isPipMode,
+                                danmakuCount: _danmakuList.length,
+                                danmakuSettings: _danmakuSettings,
+                                onDanmakuSettingsChanged: _updateDanmakuSettings,
+                                videoSource: widget.videoSource,
+                                videoId: widget.videoId,
+                                skipConfig: _skipConfig,
+                                onSkipConfigChanged: _updateSkipConfig,
+                              ),
+                        // 片头跳过提示
+                        if (_showIntroPrompt && !_isPipMode)
+                          Positioned(
+                            left: 16,
+                            top: 60,
+                            child: SkipIntroPrompt(
+                              onSkip: _skipIntro,
+                              onDismiss: _dismissIntroPrompt,
+                            ),
                           ),
-                    // 片头跳过提示
-                    if (_showIntroPrompt && !_isPipMode)
-                      Positioned(
-                        left: 16,
-                        top: 60,
-                        child: SkipIntroPrompt(
-                          onSkip: _skipIntro,
-                          onDismiss: _dismissIntroPrompt,
-                        ),
-                      ),
-                    // 片尾倒计时
-                    if (_showEndingCountdown && !_isPipMode)
-                      Positioned(
-                        top: 16,
-                        left: 0,
-                        right: 0,
-                        child: Center(
-                          child: SkipEndingCountdown(
-                            countdownSeconds: 5,
-                            onNextEpisode: _triggerNextEpisode,
-                            onCancel: _cancelEndingCountdown,
-                            isLastEpisode: widget.isLastEpisode,
+                        // 片尾倒计时
+                        if (_showEndingCountdown && !_isPipMode)
+                          Positioned(
+                            top: 16,
+                            left: 0,
+                            right: 0,
+                            child: Center(
+                              child: SkipEndingCountdown(
+                                countdownSeconds: 5,
+                                onNextEpisode: _triggerNextEpisode,
+                                onCancel: _cancelEndingCountdown,
+                                isLastEpisode: widget.isLastEpisode,
+                              ),
+                            ),
                           ),
-                        ),
+                      ],
+                    );
+                  },
+                ),
+                // 视频加载中的指示器（覆盖在视频上方）
+                if (_isLoadingVideo)
+                  const Positioned.fill(
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
                       ),
-                  ],
-                );
-              },
+                    ),
+                  ),
+              ],
             )
           : const Center(
               child: CircularProgressIndicator(
