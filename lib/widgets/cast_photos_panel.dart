@@ -46,13 +46,29 @@ class _CastPhotosPanelState extends State<CastPhotosPanel> {
   bool _showActorsRightArrow = false;
   bool _showWorksLeftArrow = false;
   bool _showWorksRightArrow = false;
+  
+  // 图片代理相关
+  String? _serverUrl;
+  String? _cookies;
 
   @override
   void initState() {
     super.initState();
+    _loadServerInfo();
     _loadCastPhotos();
     _actorsScrollController.addListener(_checkActorsScrollPosition);
     _worksScrollController.addListener(_checkWorksScrollPosition);
+  }
+  
+  Future<void> _loadServerInfo() async {
+    final url = await UserDataService.getServerUrl();
+    final cookies = await UserDataService.getCookies();
+    if (mounted) {
+      setState(() {
+        _serverUrl = url;
+        _cookies = cookies;
+      });
+    }
   }
 
   @override
@@ -397,32 +413,26 @@ class _CastPhotosPanelState extends State<CastPhotosPanel> {
               ),
               child: ClipOval(
                 child: actor.photo != null
-                    ? FutureBuilder<String>(
-                        future: _getProxiedImageUrl(actor.photo!),
-                        builder: (context, snapshot) {
-                          final imageUrl = snapshot.data ?? actor.photo!;
-                          return CachedNetworkImage(
-                            imageUrl: imageUrl,
-                            fit: BoxFit.cover,
-                            httpHeaders: _getImageHeaders(),
-                            placeholder: (context, url) => Container(
-                              color: widget.isDarkMode ? Colors.grey[800] : Colors.grey[200],
-                              child: Icon(
-                                LucideIcons.user,
-                                size: 24,
-                                color: widget.isDarkMode ? Colors.grey[600] : Colors.grey[400],
-                              ),
-                            ),
-                            errorWidget: (context, url, error) => Container(
-                              color: widget.isDarkMode ? Colors.grey[800] : Colors.grey[200],
-                              child: Icon(
-                                LucideIcons.user,
-                                size: 24,
-                                color: widget.isDarkMode ? Colors.grey[600] : Colors.grey[400],
-                              ),
-                            ),
-                          );
-                        },
+                    ? CachedNetworkImage(
+                        imageUrl: _getProxiedImageUrl(actor.photo!),
+                        fit: BoxFit.cover,
+                        httpHeaders: _getImageHeaders(),
+                        placeholder: (context, url) => Container(
+                          color: widget.isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                          child: Icon(
+                            LucideIcons.user,
+                            size: 24,
+                            color: widget.isDarkMode ? Colors.grey[600] : Colors.grey[400],
+                          ),
+                        ),
+                        errorWidget: (context, url, error) => Container(
+                          color: widget.isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                          child: Icon(
+                            LucideIcons.user,
+                            size: 24,
+                            color: widget.isDarkMode ? Colors.grey[600] : Colors.grey[400],
+                          ),
+                        ),
                       )
                     : Container(
                         color: widget.isDarkMode ? Colors.grey[800] : Colors.grey[200],
@@ -470,14 +480,18 @@ class _CastPhotosPanelState extends State<CastPhotosPanel> {
   }
 
   Widget _buildWorkItem(TMDBActorWork work) {
+    // 获取代理后的封面URL
+    final proxiedPoster = _getProxiedImageUrl(work.poster);
+    
     // 创建 VideoInfo 对象
+    // 使用 'tmdb' 作为 source，避免 VideoCard 添加豆瓣的 headers
     final videoInfo = VideoInfo(
       id: work.id,
-      source: 'douban',
+      source: 'tmdb',
       title: work.title,
-      sourceName: '豆瓣',
+      sourceName: 'TMDB',
       year: work.year,
-      cover: work.poster,
+      cover: proxiedPoster, // 使用代理后的URL
       index: 1,
       totalEpisodes: 1,
       playTime: 0,
@@ -579,18 +593,21 @@ class _CastPhotosPanelState extends State<CastPhotosPanel> {
     );
   }
 
-  Future<String> _getProxiedImageUrl(String url) async {
-    // TMDB 图片需要通过代理访问
-    if (url.contains('image.tmdb.org')) {
-      final baseUrl = await UserDataService.getServerUrl();
-      if (baseUrl != null && baseUrl.isNotEmpty) {
-        return '$baseUrl/api/image-proxy?url=${Uri.encodeComponent(url)}';
-      }
+  /// 获取代理后的图片URL
+  String _getProxiedImageUrl(String originalUrl) {
+    if (originalUrl.isEmpty || _serverUrl == null) return originalUrl;
+    // TMDB 图片需要通过后端代理访问
+    if (originalUrl.contains('image.tmdb.org') || originalUrl.contains('tmdb.org')) {
+      return '$_serverUrl/api/image-proxy?url=${Uri.encodeComponent(originalUrl)}';
     }
-    return url;
+    return originalUrl;
   }
 
   Map<String, String> _getImageHeaders() {
-    return {};
+    final headers = <String, String>{};
+    if (_cookies != null && _cookies!.isNotEmpty) {
+      headers['Cookie'] = _cookies!;
+    }
+    return headers;
   }
 }

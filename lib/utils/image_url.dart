@@ -1,11 +1,26 @@
 // 通用图片地址处理工具
 import '../services/user_data_service.dart';
 
+// 缓存的 cookies
+String? _cachedCookies;
+bool _cookiesLoaded = false;
+
+/// 初始化/刷新 cookies 缓存
+Future<void> _ensureCookiesLoaded() async {
+  if (!_cookiesLoaded) {
+    _cachedCookies = await UserDataService.getCookies();
+    _cookiesLoaded = true;
+  }
+}
+
 /// 根据来源处理图片 URL（例如豆瓣域名替换）。
 /// - [originalUrl]: 原始图片地址
 /// - [source]: 数据来源（如 'douban'、'bangumi' 等）
 /// 返回可直接用于加载的图片地址。
 Future<String> getImageUrl(String originalUrl, String? source) async {
+  // 确保 cookies 已加载
+  await _ensureCookiesLoaded();
+  
   if (source == 'douban' && originalUrl.isNotEmpty) {
     final imageSourceKey = await UserDataService.getDoubanImageSourceKey();
     
@@ -48,6 +63,15 @@ Map<String, String>? getImageRequestHeaders(String imageUrl, String? source) {
       'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
     };
   }
+  
+  // 检查是否是通过后端代理的图片（需要 Cookie 认证）
+  final bool isProxiedImage = imageUrl.contains('/api/image-proxy');
+  if (isProxiedImage && _cachedCookies != null && _cachedCookies!.isNotEmpty) {
+    return <String, String>{
+      'Cookie': _cachedCookies!,
+    };
+  }
+  
   return null;
 }
 
