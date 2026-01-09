@@ -184,56 +184,71 @@ class _ReleaseCalendarScreenState extends State<ReleaseCalendarScreen> {
   Widget _buildFilters(ThemeService themeService) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            // 类型筛选
-            _buildFilterChip(
-              label: '全部类型',
-              value: '',
-              selectedValue: _selectedType,
-              onTap: () => setState(() => _selectedType = ''),
-              themeService: themeService,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 第一行：类型筛选
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildFilterChip(
+                  label: '全部类型',
+                  value: '',
+                  selectedValue: _selectedType,
+                  onTap: () => setState(() => _selectedType = ''),
+                  themeService: themeService,
+                ),
+                const SizedBox(width: 8),
+                _buildFilterChip(
+                  label: '电影',
+                  value: 'movie',
+                  selectedValue: _selectedType,
+                  onTap: () => setState(() => _selectedType = 'movie'),
+                  themeService: themeService,
+                ),
+                const SizedBox(width: 8),
+                _buildFilterChip(
+                  label: '电视剧',
+                  value: 'tv',
+                  selectedValue: _selectedType,
+                  onTap: () => setState(() => _selectedType = 'tv'),
+                  themeService: themeService,
+                ),
+              ],
             ),
-            const SizedBox(width: 8),
-            _buildFilterChip(
-              label: '电影',
-              value: 'movie',
-              selectedValue: _selectedType,
-              onTap: () => setState(() => _selectedType = 'movie'),
-              themeService: themeService,
-            ),
-            const SizedBox(width: 8),
-            _buildFilterChip(
-              label: '电视剧',
-              value: 'tv',
-              selectedValue: _selectedType,
-              onTap: () => setState(() => _selectedType = 'tv'),
-              themeService: themeService,
-            ),
-            const SizedBox(width: 16),
-            // 地区筛选
-            if (_filters != null && _filters!.regions.isNotEmpty)
-              _buildDropdownFilter(
-                label: _selectedRegion.isEmpty ? '地区' : _selectedRegion,
-                options: ['全部', ..._filters!.regions.map((r) => r.value)],
-                selectedValue: _selectedRegion,
-                onChanged: (value) => setState(() => _selectedRegion = value == '全部' ? '' : value),
-                themeService: themeService,
+          ),
+          // 第二行：地区和类型筛选
+          if (_filters != null && (_filters!.regions.isNotEmpty || _filters!.genres.isNotEmpty))
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    if (_filters!.regions.isNotEmpty)
+                      _buildDropdownFilter(
+                        label: _selectedRegion.isEmpty ? '地区' : _selectedRegion,
+                        options: ['全部', ..._filters!.regions.map((r) => r.value)],
+                        selectedValue: _selectedRegion,
+                        onChanged: (value) => setState(() => _selectedRegion = value == '全部' ? '' : value),
+                        themeService: themeService,
+                      ),
+                    if (_filters!.regions.isNotEmpty && _filters!.genres.isNotEmpty)
+                      const SizedBox(width: 8),
+                    if (_filters!.genres.isNotEmpty)
+                      _buildDropdownFilter(
+                        label: _selectedGenre.isEmpty ? '类型' : _selectedGenre,
+                        options: ['全部', ..._filters!.genres.map((g) => g.value)],
+                        selectedValue: _selectedGenre,
+                        onChanged: (value) => setState(() => _selectedGenre = value == '全部' ? '' : value),
+                        themeService: themeService,
+                      ),
+                  ],
+                ),
               ),
-            const SizedBox(width: 8),
-            // 类型筛选
-            if (_filters != null && _filters!.genres.isNotEmpty)
-              _buildDropdownFilter(
-                label: _selectedGenre.isEmpty ? '类型' : _selectedGenre,
-                options: ['全部', ..._filters!.genres.map((g) => g.value)],
-                selectedValue: _selectedGenre,
-                onChanged: (value) => setState(() => _selectedGenre = value == '全部' ? '' : value),
-                themeService: themeService,
-              ),
-          ],
-        ),
+            ),
+        ],
       ),
     );
   }
@@ -490,8 +505,11 @@ class _ReleaseCalendarScreenState extends State<ReleaseCalendarScreen> {
   }
 
   Widget _buildItemCard(ReleaseCalendarItem item, ThemeService themeService) {
+    // 只有已上映的才能点击播放
+    final canPlay = item.isReleased || item.isReleasingToday;
+
     return GestureDetector(
-      onTap: () {
+      onTap: canPlay ? () {
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -501,7 +519,7 @@ class _ReleaseCalendarScreenState extends State<ReleaseCalendarScreen> {
             ),
           ),
         );
-      },
+      } : null,
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(12),
@@ -520,38 +538,35 @@ class _ReleaseCalendarScreenState extends State<ReleaseCalendarScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // 封面
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Container(
-                width: 80,
-                height: 110,
-                color: themeService.isDarkMode ? Colors.grey[800] : Colors.grey[200],
-                child: item.cover != null && item.cover!.isNotEmpty
-                    ? Image.network(
-                        item.cover!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Center(
-                            child: Icon(
-                              LucideIcons.film,
-                              size: 24,
-                              color: themeService.isDarkMode
-                                  ? Colors.grey[600]
-                                  : Colors.grey[400],
-                            ),
-                          );
-                        },
-                      )
-                    : Center(
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    width: 80,
+                    height: 110,
+                    color: themeService.isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                    child: _buildCoverImage(item, themeService),
+                  ),
+                ),
+                // 未上映遮罩
+                if (!canPlay)
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.4),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Center(
                         child: Icon(
-                          LucideIcons.film,
+                          LucideIcons.clock,
                           size: 24,
-                          color: themeService.isDarkMode
-                              ? Colors.grey[600]
-                              : Colors.grey[400],
+                          color: Colors.white.withOpacity(0.8),
                         ),
                       ),
-              ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(width: 12),
             // 信息
@@ -570,9 +585,9 @@ class _ReleaseCalendarScreenState extends State<ReleaseCalendarScreen> {
                           style: FontUtils.poppins(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
-                            color: themeService.isDarkMode
-                                ? Colors.white
-                                : Colors.black87,
+                            color: canPlay
+                                ? (themeService.isDarkMode ? Colors.white : Colors.black87)
+                                : (themeService.isDarkMode ? Colors.grey[400] : Colors.grey[600]),
                           ),
                         ),
                       ),
@@ -665,6 +680,59 @@ class _ReleaseCalendarScreenState extends State<ReleaseCalendarScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  /// 构建封面图片
+  Widget _buildCoverImage(ReleaseCalendarItem item, ThemeService themeService) {
+    if (item.cover == null || item.cover!.isEmpty) {
+      return Center(
+        child: Icon(
+          LucideIcons.film,
+          size: 24,
+          color: themeService.isDarkMode
+              ? Colors.grey[600]
+              : Colors.grey[400],
+        ),
+      );
+    }
+
+    return Image.network(
+      item.cover!,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: double.infinity,
+      headers: const {
+        'Referer': 'https://g.manmankan.com/',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      },
+      errorBuilder: (context, error, stackTrace) {
+        return Center(
+          child: Icon(
+            LucideIcons.film,
+            size: 24,
+            color: themeService.isDarkMode
+                ? Colors.grey[600]
+                : Colors.grey[400],
+          ),
+        );
+      },
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) return child;
+        return Center(
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFF97316)),
+              value: loadingProgress.expectedTotalBytes != null
+                  ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                  : null,
+            ),
+          ),
+        );
+      },
     );
   }
 

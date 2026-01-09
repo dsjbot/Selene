@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import '../services/release_calendar_service.dart';
 import '../services/theme_service.dart';
 import '../utils/font_utils.dart';
-import '../utils/device_utils.dart';
 import '../models/video_info.dart';
 import '../screens/release_calendar_screen.dart';
 import 'video_menu_bottom_sheet.dart';
@@ -212,10 +211,28 @@ class _UpcomingSectionState extends State<UpcomingSection> {
                   ],
                 ),
               ),
-            // 内容区域
-            SizedBox(
-              height: DeviceUtils.isTablet(context) ? 260 : 200,
-              child: _buildContent(themeService),
+            // 内容区域 - 使用 LayoutBuilder 动态计算高度
+            LayoutBuilder(
+              builder: (context, constraints) {
+                // 与 _buildItemsList 使用相同的计算逻辑
+                const double visibleCards = 2.75;
+                final double screenWidth = constraints.maxWidth;
+                const double padding = 32.0;
+                const double spacing = 12.0;
+                final double availableWidth = screenWidth - padding;
+                const double minCardWidth = 120.0;
+                final double calculatedCardWidth =
+                    (availableWidth - (spacing * (visibleCards - 1))) / visibleCards;
+                final double cardWidth = calculatedCardWidth > minCardWidth ? calculatedCardWidth : minCardWidth;
+                final double imageHeight = cardWidth * 1.5;
+                // 高度 = 图片高度 + 间距 + 标题高度（约40）
+                final double sectionHeight = imageHeight + 8 + 40;
+
+                return SizedBox(
+                  height: sectionHeight,
+                  child: _buildContent(themeService),
+                );
+              },
             ),
           ],
         );
@@ -298,20 +315,34 @@ class _UpcomingSectionState extends State<UpcomingSection> {
   }
 
   Widget _buildLoadingState(ThemeService themeService) {
-    return ListView.builder(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      itemCount: 5,
-      itemBuilder: (context, index) {
-        return Container(
-          width: DeviceUtils.isTablet(context) ? 160 : 120,
-          margin: const EdgeInsets.only(right: 12),
-          decoration: BoxDecoration(
-            color: themeService.isDarkMode
-                ? Colors.grey[800]
-                : Colors.grey[200],
-            borderRadius: BorderRadius.circular(12),
-          ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const double visibleCards = 2.75;
+        final double screenWidth = constraints.maxWidth;
+        const double padding = 32.0;
+        const double spacing = 12.0;
+        final double availableWidth = screenWidth - padding;
+        const double minCardWidth = 120.0;
+        final double calculatedCardWidth =
+            (availableWidth - (spacing * (visibleCards - 1))) / visibleCards;
+        final double cardWidth = calculatedCardWidth > minCardWidth ? calculatedCardWidth : minCardWidth;
+
+        return ListView.builder(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          itemCount: 5,
+          itemBuilder: (context, index) {
+            return Container(
+              width: cardWidth,
+              margin: const EdgeInsets.only(right: 12),
+              decoration: BoxDecoration(
+                color: themeService.isDarkMode
+                    ? Colors.grey[800]
+                    : Colors.grey[200],
+                borderRadius: BorderRadius.circular(12),
+              ),
+            );
+          },
         );
       },
     );
@@ -358,23 +389,40 @@ class _UpcomingSectionState extends State<UpcomingSection> {
   }
 
   Widget _buildItemsList(ThemeService themeService) {
-    return ListView.builder(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      itemCount: _filteredItems.length,
-      itemBuilder: (context, index) {
-        final item = _filteredItems[index];
-        return _buildItemCard(item, themeService);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // 使用与 RecommendationSection 相同的卡片宽度计算逻辑
+        const double visibleCards = 2.75;
+        final double screenWidth = constraints.maxWidth;
+        const double padding = 32.0;
+        const double spacing = 12.0;
+        final double availableWidth = screenWidth - padding;
+        const double minCardWidth = 120.0;
+        final double calculatedCardWidth =
+            (availableWidth - (spacing * (visibleCards - 1))) / visibleCards;
+        final double cardWidth = calculatedCardWidth > minCardWidth ? calculatedCardWidth : minCardWidth;
+
+        return ListView.builder(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          itemCount: _filteredItems.length,
+          itemBuilder: (context, index) {
+            final item = _filteredItems[index];
+            return _buildItemCard(item, themeService, cardWidth);
+          },
+        );
       },
     );
   }
 
-  Widget _buildItemCard(ReleaseCalendarItem item, ThemeService themeService) {
-    final cardWidth = DeviceUtils.isTablet(context) ? 160.0 : 120.0;
-    final imageHeight = DeviceUtils.isTablet(context) ? 200.0 : 150.0;
+  Widget _buildItemCard(ReleaseCalendarItem item, ThemeService themeService, double cardWidth) {
+    final imageHeight = cardWidth * 1.5; // 与 RecommendationSection 保持一致的比例
+
+    // 只有已上映的才能点击播放
+    final canPlay = item.isReleased || item.isReleasingToday;
 
     return GestureDetector(
-      onTap: () {
+      onTap: canPlay ? () {
         if (widget.onItemTap != null) {
           final videoInfo = VideoInfo(
             id: item.id,
@@ -392,7 +440,7 @@ class _UpcomingSectionState extends State<UpcomingSection> {
           );
           widget.onItemTap!(videoInfo);
         }
-      },
+      } : null,
       onLongPress: () {
         if (widget.onGlobalMenuAction != null) {
           final videoInfo = VideoInfo(
@@ -439,17 +487,7 @@ class _UpcomingSectionState extends State<UpcomingSection> {
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(12),
-                    child: item.cover != null && item.cover!.isNotEmpty
-                        ? Image.network(
-                            item.cover!,
-                            fit: BoxFit.cover,
-                            width: double.infinity,
-                            height: double.infinity,
-                            errorBuilder: (context, error, stackTrace) {
-                              return _buildPlaceholder(themeService);
-                            },
-                          )
-                        : _buildPlaceholder(themeService),
+                    child: _buildCoverImage(item, themeService),
                   ),
                 ),
                 // 类型标签（左上角）
@@ -494,6 +532,33 @@ class _UpcomingSectionState extends State<UpcomingSection> {
                     ),
                   ),
                 ),
+                // 未上映遮罩
+                if (!canPlay)
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.6),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '敬请期待',
+                            style: FontUtils.poppins(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
             const SizedBox(height: 8),
@@ -511,6 +576,43 @@ class _UpcomingSectionState extends State<UpcomingSection> {
           ],
         ),
       ),
+    );
+  }
+
+  /// 构建封面图片（处理图片加载）
+  Widget _buildCoverImage(ReleaseCalendarItem item, ThemeService themeService) {
+    // 发布日历的图片来源是 manmankan，可能需要特殊处理
+    if (item.cover == null || item.cover!.isEmpty) {
+      return _buildPlaceholder(themeService);
+    }
+
+    return Image.network(
+      item.cover!,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: double.infinity,
+      headers: const {
+        'Referer': 'https://g.manmankan.com/',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      },
+      errorBuilder: (context, error, stackTrace) {
+        return _buildPlaceholder(themeService);
+      },
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) return child;
+        return Container(
+          color: themeService.isDarkMode ? Colors.grey[800] : Colors.grey[200],
+          child: Center(
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFF97316)),
+              value: loadingProgress.expectedTotalBytes != null
+                  ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                  : null,
+            ),
+          ),
+        );
+      },
     );
   }
 
