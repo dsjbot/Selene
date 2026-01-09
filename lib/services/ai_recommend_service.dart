@@ -384,7 +384,9 @@ class AIRecommendService {
         }
 
         // 处理 SSE 流
-        await for (final chunk in (response.data as ResponseBody).stream.transform(utf8.decoder)) {
+        final stream = (response.data as ResponseBody).stream;
+        await for (final bytes in stream) {
+          final chunk = utf8.decode(bytes);
           buffer += chunk;
           
           // 按换行符分割，处理完整的行
