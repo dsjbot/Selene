@@ -127,7 +127,6 @@ class _HeroCarouselState extends State<HeroCarousel> with WidgetsBindingObserver
       }
     });
   }
-  }
 
   Future<void> _loadServerUrl() async {
     final url = await UserDataService.getServerUrl();
