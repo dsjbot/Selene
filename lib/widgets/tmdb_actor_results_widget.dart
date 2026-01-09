@@ -168,7 +168,7 @@ class _TMDBActorResultsWidgetState extends State<TMDBActorResultsWidget> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      _onlyRated ? LucideIcons.checkCircle2 : LucideIcons.circle,
+                      _onlyRated ? LucideIcons.check : LucideIcons.circle,
                       size: 14,
                       color: _onlyRated
                           ? const Color(0xFF8B5CF6)
