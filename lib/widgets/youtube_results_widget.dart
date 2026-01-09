@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
@@ -357,12 +358,19 @@ class _YouTubeVideoCard extends StatelessWidget {
                   child: AspectRatio(
                     aspectRatio: 16 / 9,
                     child: video.thumbnailUrl.isNotEmpty
-                        ? Image.network(
-                            video.thumbnailUrl,
+                        ? CachedNetworkImage(
+                            imageUrl: video.thumbnailUrl,
                             fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return _buildPlaceholder();
-                            },
+                            placeholder: (context, url) => Container(
+                              color: themeService.isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                              child: const Center(
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF0000)),
+                                ),
+                              ),
+                            ),
+                            errorWidget: (context, url, error) => _buildPlaceholder(),
                           )
                         : _buildPlaceholder(),
                   ),

@@ -34,7 +34,7 @@ class YouTubeVideo {
     final videoId = id is Map ? (id['videoId'] ?? '') : (json['videoId'] ?? id?.toString() ?? '');
     
     // 获取缩略图 URL，如果为空则根据 videoId 构建
-    String thumbnailUrl = thumbnail['url'] ?? '';
+    String thumbnailUrl = thumbnail['url']?.toString() ?? '';
     if (thumbnailUrl.isEmpty && videoId.isNotEmpty) {
       // YouTube 缩略图 URL 格式
       thumbnailUrl = 'https://i.ytimg.com/vi/$videoId/hqdefault.jpg';
