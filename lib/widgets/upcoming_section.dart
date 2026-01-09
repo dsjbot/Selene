@@ -107,141 +107,145 @@ class _UpcomingSectionState extends State<UpcomingSection> {
 
     return Consumer<ThemeService>(
       builder: (context, themeService, child) {
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 标题行
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        LucideIcons.calendar,
-                        size: 20,
-                        color: const Color(0xFFF97316), // orange-500
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '即将上映',
-                        style: FontUtils.poppins(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: themeService.isDarkMode
-                              ? Colors.white
-                              : const Color(0xFF2c3e50),
+        return Container(
+          margin: const EdgeInsets.only(bottom: 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 标题行
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          LucideIcons.calendar,
+                          size: 20,
+                          color: const Color(0xFFF97316), // orange-500
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '即将上映',
+                          style: FontUtils.poppins(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: themeService.isDarkMode
+                                ? Colors.white
+                                : const Color(0xFF2c3e50),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (widget.onMoreTap != null)
+                      GestureDetector(
+                        onTap: widget.onMoreTap,
+                        child: Row(
+                          children: [
+                            Text(
+                              '查看更多',
+                              style: FontUtils.poppins(
+                                fontSize: 13,
+                                color: themeService.isDarkMode
+                                    ? Colors.grey[400]
+                                    : Colors.grey[600],
+                              ),
+                            ),
+                            Icon(
+                              LucideIcons.chevronRight,
+                              size: 16,
+                              color: themeService.isDarkMode
+                                  ? Colors.grey[400]
+                                  : Colors.grey[600],
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const ReleaseCalendarScreen(),
+                            ),
+                          );
+                        },
+                        child: Row(
+                          children: [
+                            Text(
+                              '查看更多',
+                              style: FontUtils.poppins(
+                                fontSize: 13,
+                                color: themeService.isDarkMode
+                                    ? Colors.grey[400]
+                                    : Colors.grey[600],
+                              ),
+                            ),
+                            Icon(
+                              LucideIcons.chevronRight,
+                              size: 16,
+                              color: themeService.isDarkMode
+                                  ? Colors.grey[400]
+                                  : Colors.grey[600],
+                            ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
-                  if (widget.onMoreTap != null)
-                    GestureDetector(
-                      onTap: widget.onMoreTap,
-                      child: Row(
-                        children: [
-                          Text(
-                            '查看更多',
-                            style: FontUtils.poppins(
-                              fontSize: 13,
-                              color: themeService.isDarkMode
-                                  ? Colors.grey[400]
-                                  : Colors.grey[600],
-                            ),
-                          ),
-                          Icon(
-                            LucideIcons.chevronRight,
-                            size: 16,
-                            color: themeService.isDarkMode
-                                ? Colors.grey[400]
-                                : Colors.grey[600],
-                          ),
-                        ],
-                      ),
-                    )
-                  else
-                    GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const ReleaseCalendarScreen(),
-                          ),
-                        );
-                      },
-                      child: Row(
-                        children: [
-                          Text(
-                            '查看更多',
-                            style: FontUtils.poppins(
-                              fontSize: 13,
-                              color: themeService.isDarkMode
-                                  ? Colors.grey[400]
-                                  : Colors.grey[600],
-                            ),
-                          ),
-                          Icon(
-                            LucideIcons.chevronRight,
-                            size: 16,
-                            color: themeService.isDarkMode
-                                ? Colors.grey[400]
-                                : Colors.grey[600],
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            // 筛选标签
-            if (!_isLoading && _items.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: Row(
-                  children: [
-                    _buildFilterChip('全部', 'all', _items.length, themeService),
-                    const SizedBox(width: 8),
-                    _buildFilterChip(
-                      '电影',
-                      'movie',
-                      _items.where((i) => i.type == 'movie').length,
-                      themeService,
-                    ),
-                    const SizedBox(width: 8),
-                    _buildFilterChip(
-                      '电视剧',
-                      'tv',
-                      _items.where((i) => i.type == 'tv').length,
-                      themeService,
-                    ),
                   ],
                 ),
               ),
-            // 内容区域 - 使用 LayoutBuilder 动态计算高度
-            LayoutBuilder(
-              builder: (context, constraints) {
-                // 与 _buildItemsList 使用相同的计算逻辑
-                const double visibleCards = 2.75;
-                final double screenWidth = constraints.maxWidth;
-                const double padding = 32.0;
-                const double spacing = 12.0;
-                final double availableWidth = screenWidth - padding;
-                const double minCardWidth = 120.0;
-                final double calculatedCardWidth =
-                    (availableWidth - (spacing * (visibleCards - 1))) / visibleCards;
-                final double cardWidth = calculatedCardWidth > minCardWidth ? calculatedCardWidth : minCardWidth;
-                final double imageHeight = cardWidth * 1.5;
-                // 高度 = 图片高度 + 间距 + 标题高度（约40）
-                final double sectionHeight = imageHeight + 8 + 40;
+              const SizedBox(height: 12),
+              // 筛选标签
+              if (!_isLoading && _items.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: Row(
+                    children: [
+                      _buildFilterChip('全部', 'all', _items.length, themeService),
+                      const SizedBox(width: 8),
+                      _buildFilterChip(
+                        '电影',
+                        'movie',
+                        _items.where((i) => i.type == 'movie').length,
+                        themeService,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildFilterChip(
+                        '电视剧',
+                        'tv',
+                        _items.where((i) => i.type == 'tv').length,
+                        themeService,
+                      ),
+                    ],
+                  ),
+                ),
+              // 内容区域 - 使用 LayoutBuilder 动态计算高度
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  // 与 _buildItemsList 使用相同的计算逻辑
+                  const double visibleCards = 2.75;
+                  final double screenWidth = constraints.maxWidth;
+                  const double padding = 32.0;
+                  const double spacing = 12.0;
+                  final double availableWidth = screenWidth - padding;
+                  const double minCardWidth = 120.0;
+                  final double calculatedCardWidth =
+                      (availableWidth - (spacing * (visibleCards - 1))) / visibleCards;
+                  final double cardWidth = calculatedCardWidth > minCardWidth ? calculatedCardWidth : minCardWidth;
+                  final double imageHeight = cardWidth * 1.5;
+                  // 高度 = 图片高度 + 间距 + 标题高度（约40）
+                  final double sectionHeight = imageHeight + 8 + 40;
 
-                return SizedBox(
-                  height: sectionHeight,
-                  child: _buildContent(themeService),
-                );
-              },
-            ),
-          ],
+                  return SizedBox(
+                    height: sectionHeight,
+                    child: _buildContent(themeService),
+                  );
+                },
+              ),
+            ],
+          ),
         );
       },
     );
