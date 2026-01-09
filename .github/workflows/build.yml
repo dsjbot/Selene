@@ -46,6 +46,20 @@ jobs:
       - name: Clone repository
         uses: actions/checkout@v4
 
+      - name: Free disk space (Android)
+        if: matrix.name == 'android'
+        run: |
+          echo "Before cleanup:"
+          df -h
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+          echo "After cleanup:"
+          df -h
+        shell: bash
+
       - name: Get version from pubspec.yaml (Unix)
         if: runner.os != 'Windows'
         id: get_version_unix
