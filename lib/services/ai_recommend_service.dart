@@ -365,14 +365,19 @@ class AIRecommendService {
         List<YouTubeVideo> youtubeVideos = [];
         List<VideoLink> videoLinks = [];
 
+        debugPrint('[AIRecommendService] 开始流式响应处理...');
+
         await for (final chunk in streamedResponse.stream.transform(utf8.decoder)) {
+          debugPrint('[AIRecommendService] 收到chunk: ${chunk.length} 字节');
           final lines = chunk.split('\n').where((line) => line.trim().isNotEmpty);
 
           for (final line in lines) {
+            debugPrint('[AIRecommendService] 处理行: $line');
             if (line.startsWith('data: ')) {
               final data = line.substring(6);
 
               if (data == '[DONE]') {
+                debugPrint('[AIRecommendService] 流式响应完成');
                 break;
               }
 
@@ -381,8 +386,10 @@ class AIRecommendService {
 
                 // 处理文本流
                 if (json['text'] != null) {
-                  fullContent += json['text'];
-                  onStream(json['text']);
+                  final text = json['text'] as String;
+                  fullContent += text;
+                  debugPrint('[AIRecommendService] 流式文本: $text');
+                  onStream(text);
                 }
 
                 // 处理 YouTube 视频数据
@@ -390,6 +397,7 @@ class AIRecommendService {
                   youtubeVideos = (json['youtubeVideos'] as List)
                       .map((e) => YouTubeVideo.fromJson(e))
                       .toList();
+                  debugPrint('[AIRecommendService] 收到YouTube视频: ${youtubeVideos.length}');
                 }
 
                 // 处理视频链接数据
@@ -397,13 +405,16 @@ class AIRecommendService {
                   videoLinks = (json['videoLinks'] as List)
                       .map((e) => VideoLink.fromJson(e))
                       .toList();
+                  debugPrint('[AIRecommendService] 收到视频链接: ${videoLinks.length}');
                 }
               } catch (e) {
-                debugPrint('[AIRecommendService] 解析 SSE 数据失败: $e');
+                debugPrint('[AIRecommendService] 解析 SSE 数据失败: $e, 数据: $data');
               }
             }
           }
         }
+
+        debugPrint('[AIRecommendService] 流式响应处理完成，总内容长度: ${fullContent.length}');
 
         return AIChatResponse(
           id: 'stream-${DateTime.now().millisecondsSinceEpoch}',

@@ -333,6 +333,15 @@ class _AIRecommendModalState extends State<AIRecommendModal> {
   }
 
 
+  void _clearChat() {
+    setState(() {
+      _messages.clear();
+      _playingVideoId = null;
+      _error = null;
+    });
+    _initWelcomeMessage();
+  }
+
   Widget _buildHeader(bool isDark) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -382,6 +391,19 @@ class _AIRecommendModalState extends State<AIRecommendModal> {
               ],
             ),
           ),
+          // 清空按钮
+          if (_messages.length > 1)
+            IconButton(
+              onPressed: _isLoading ? null : _clearChat,
+              tooltip: '清空对话',
+              icon: Icon(
+                LucideIcons.trash2,
+                color: _isLoading 
+                    ? Colors.grey 
+                    : (isDark ? Colors.grey[400] : Colors.grey[600]),
+                size: 20,
+              ),
+            ),
           IconButton(
             onPressed: () => Navigator.pop(context),
             icon: Icon(
