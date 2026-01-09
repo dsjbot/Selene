@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 import '../services/youtube_service.dart';
 import '../services/theme_service.dart';
 import '../services/user_data_service.dart';
@@ -378,6 +379,34 @@ class _YouTubeVideoCardState extends State<_YouTubeVideoCard> {
   String get thumbnailUrl => widget.thumbnailUrl;
   Map<String, String> get httpHeaders => widget.httpHeaders;
   ThemeService get themeService => widget.themeService;
+  
+  bool _isPlaying = false;
+  WebViewController? _webViewController;
+
+  @override
+  void dispose() {
+    _webViewController = null;
+    super.dispose();
+  }
+
+  void _startPlaying() {
+    setState(() {
+      _isPlaying = true;
+    });
+    
+    // 初始化 WebView 控制器
+    _webViewController = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(Colors.black)
+      ..loadRequest(Uri.parse(video.embedUrl));
+  }
+
+  void _stopPlaying() {
+    setState(() {
+      _isPlaying = false;
+      _webViewController = null;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -397,131 +426,15 @@ class _YouTubeVideoCardState extends State<_YouTubeVideoCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 缩略图 - 点击播放
-            GestureDetector(
-              onTap: _openInBrowser,
-              child: Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                    child: AspectRatio(
-                      aspectRatio: 16 / 9,
-                      child: thumbnailUrl.isNotEmpty
-                          ? CachedNetworkImage(
-                              imageUrl: thumbnailUrl,
-                              httpHeaders: httpHeaders,
-                              fit: BoxFit.cover,
-                              placeholder: (context, url) => Container(
-                                color: themeService.isDarkMode ? Colors.grey[800] : Colors.grey[200],
-                                child: Center(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      const CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF0000)),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        '加载中...',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          color: themeService.isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              errorWidget: (context, url, error) {
-                                return Container(
-                                  color: themeService.isDarkMode ? Colors.grey[800] : Colors.grey[200],
-                                  child: Center(
-                                    child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.error_outline,
-                                          size: 32,
-                                          color: Colors.red[300],
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Padding(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                                          child: Text(
-                                            '图片加载失败\n$error',
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(
-                                              fontSize: 9,
-                                              color: themeService.isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              },
-                            )
-                          : _buildPlaceholder(),
-                    ),
-                  ),
-                  // YouTube 标识
-                  Positioned(
-                    bottom: 8,
-                    right: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFF0000),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(LucideIcons.youtube, size: 12, color: Colors.white),
-                          const SizedBox(width: 4),
-                          Text(
-                            'YouTube',
-                            style: FontUtils.poppins(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  // 播放按钮
-                  Positioned.fill(
-                    child: Center(
-                      child: Container(
-                        width: 56,
-                        height: 56,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFF0000).withOpacity(0.9),
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.3),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.play_arrow,
-                          color: Colors.white,
-                          size: 32,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+            // 视频区域
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+              child: AspectRatio(
+                aspectRatio: 16 / 9,
+                child: _isPlaying ? _buildPlayer() : _buildThumbnail(),
               ),
             ),
-            // 信息
+            // 信息和按钮
             Padding(
               padding: const EdgeInsets.all(12),
               child: Column(
@@ -566,11 +479,225 @@ class _YouTubeVideoCardState extends State<_YouTubeVideoCard> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 12),
+                  // 操作按钮
+                  Row(
+                    children: [
+                      // 播放/停止按钮
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: _isPlaying ? _stopPlaying : _startPlaying,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            decoration: BoxDecoration(
+                              color: _isPlaying 
+                                  ? Colors.grey[700]
+                                  : const Color(0xFFFF0000),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  _isPlaying ? Icons.stop : Icons.play_arrow,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  _isPlaying ? '停止播放' : '内嵌播放',
+                                  style: FontUtils.poppins(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // 跳转 YouTube 按钮
+                      GestureDetector(
+                        onTap: _openInYouTube,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: themeService.isDarkMode
+                                ? Colors.white.withOpacity(0.1)
+                                : Colors.grey[100],
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: themeService.isDarkMode
+                                  ? Colors.white.withOpacity(0.2)
+                                  : Colors.grey[300]!,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                LucideIcons.externalLink,
+                                color: Color(0xFFFF0000),
+                                size: 16,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'YouTube',
+                                style: FontUtils.poppins(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: const Color(0xFFFF0000),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
           ],
         ),
+    );
+  }
+
+  Widget _buildThumbnail() {
+    return Stack(
+      children: [
+        // 缩略图
+        thumbnailUrl.isNotEmpty
+            ? CachedNetworkImage(
+                imageUrl: thumbnailUrl,
+                httpHeaders: httpHeaders,
+                fit: BoxFit.cover,
+                width: double.infinity,
+                height: double.infinity,
+                placeholder: (context, url) => Container(
+                  color: themeService.isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                  child: const Center(
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF0000)),
+                    ),
+                  ),
+                ),
+                errorWidget: (context, url, error) {
+                  return Container(
+                    color: themeService.isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                    child: Center(
+                      child: Icon(
+                        LucideIcons.youtube,
+                        size: 48,
+                        color: themeService.isDarkMode ? Colors.grey[600] : Colors.grey[400],
+                      ),
+                    ),
+                  );
+                },
+              )
+            : _buildPlaceholder(),
+        // YouTube 标识
+        Positioned(
+          bottom: 8,
+          right: 8,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFF0000),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(LucideIcons.youtube, size: 12, color: Colors.white),
+                const SizedBox(width: 4),
+                Text(
+                  'YouTube',
+                  style: FontUtils.poppins(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        // 播放按钮覆盖层
+        Positioned.fill(
+          child: GestureDetector(
+            onTap: _startPlaying,
+            child: Container(
+              color: Colors.transparent,
+              child: Center(
+                child: Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFF0000).withOpacity(0.9),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.play_arrow,
+                    color: Colors.white,
+                    size: 32,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPlayer() {
+    if (_webViewController == null) {
+      return Container(
+        color: Colors.black,
+        child: const Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF0000)),
+          ),
+        ),
+      );
+    }
+    
+    return Stack(
+      children: [
+        WebViewWidget(controller: _webViewController!),
+        // 关闭按钮
+        Positioned(
+          top: 8,
+          right: 8,
+          child: GestureDetector(
+            onTap: _stopPlaying,
+            child: Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.7),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.close,
+                color: Colors.white,
+                size: 18,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -587,7 +714,7 @@ class _YouTubeVideoCardState extends State<_YouTubeVideoCard> {
     );
   }
 
-  Future<void> _openInBrowser() async {
+  Future<void> _openInYouTube() async {
     final uri = Uri.parse(video.videoUrl);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
