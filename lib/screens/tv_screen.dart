@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/theme_service.dart';
+import '../services/ai_recommend_service.dart';
 import '../widgets/capsule_tab_switcher.dart';
 import '../widgets/custom_refresh_indicator.dart';
 import '../widgets/douban_movies_grid.dart';
+import '../widgets/ai_recommend_modal.dart';
 import '../services/douban_service.dart';
 import '../models/douban_movie.dart';
 import '../models/video_info.dart';
@@ -477,6 +479,19 @@ class _TvScreenState extends State<TvScreen> {
         break;
       case VideoMenuAction.doubanDetail:
         _launchURL('https://movie.douban.com/subject/${videoInfo.id}/');
+        break;
+      case VideoMenuAction.aiChat:
+        // AI 问片
+        AIRecommendModal.show(
+          context,
+          videoContext: VideoContext(
+            title: videoInfo.title,
+            year: videoInfo.year,
+            type: 'tv',
+            doubanId: int.tryParse(videoInfo.id),
+          ),
+          welcomeMessage: '想了解《${videoInfo.title}》的更多信息吗？我可以帮你查询剧情、演员、评价等。',
+        );
         break;
       default:
         break;

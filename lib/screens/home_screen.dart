@@ -728,12 +728,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// 显示 AI 推荐模态框
   void _showAIRecommendModal(PlayRecord playRecord) {
+    // 根据 totalEpisodes 判断类型：1集或0集为电影，多集为剧集
+    final videoType = playRecord.totalEpisodes <= 1 ? 'movie' : 'tv';
+    
     AIRecommendModal.show(
       context,
       videoContext: VideoContext(
         title: playRecord.title,
         year: playRecord.year,
-        type: playRecord.source == 'movie' ? 'movie' : 'tv',
+        type: videoType,
+        doubanId: int.tryParse(playRecord.source == 'douban' ? playRecord.id : ''),
       ),
       welcomeMessage: '想了解《${playRecord.title}》的更多信息吗？我可以帮你查询剧情、演员、评价等。',
     );

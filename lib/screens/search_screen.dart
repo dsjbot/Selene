@@ -1412,11 +1412,15 @@ class _SearchScreenState extends State<SearchScreen>
         break;
       case VideoMenuAction.aiChat:
         // AI 问片
+        // 根据 totalEpisodes 判断类型：1集或0集为电影，多集为剧集
+        final videoType = videoInfo.totalEpisodes <= 1 ? 'movie' : 'tv';
         AIRecommendModal.show(
           context,
           videoContext: VideoContext(
             title: videoInfo.title,
             year: videoInfo.year,
+            type: videoType,
+            doubanId: videoInfo.doubanId != null ? int.tryParse(videoInfo.doubanId!) : null,
           ),
           welcomeMessage: '想了解《${videoInfo.title}》的更多信息吗？我可以帮你查询剧情、演员、评价等。',
         );
