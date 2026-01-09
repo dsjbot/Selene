@@ -11,6 +11,7 @@ import '../services/sse_search_service.dart';
 import '../services/netdisk_service.dart';
 import '../services/youtube_service.dart';
 import '../services/tmdb_actor_service.dart';
+import '../services/ai_recommend_service.dart';
 import '../models/search_result.dart';
 import '../models/video_info.dart';
 import '../widgets/video_menu_bottom_sheet.dart';
@@ -23,6 +24,7 @@ import '../widgets/filter_pill_hover.dart';
 import '../widgets/main_layout.dart';
 import '../widgets/youtube_results_widget.dart';
 import '../widgets/tmdb_actor_results_widget.dart';
+import '../widgets/ai_recommend_modal.dart';
 import '../utils/font_utils.dart';
 import '../utils/device_utils.dart';
 import 'player_screen.dart';
@@ -31,8 +33,11 @@ enum SortOrder { none, asc, desc }
 enum SearchType { video, netdisk, youtube, tmdbActor }
 
 class SearchScreen extends StatefulWidget {
+  final String? initialQuery;
+  
   const SearchScreen({
     super.key,
+    this.initialQuery,
   });
 
   @override
@@ -157,12 +162,24 @@ class _SearchScreenState extends State<SearchScreen>
       curve: Curves.easeInOut,
     ));
 
-    // 进入搜索页面时自动聚焦搜索框
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (mounted) {
-        _searchFocusNode.requestFocus();
-      }
-    });
+    // 如果有初始查询，设置并执行搜索
+    if (widget.initialQuery != null && widget.initialQuery!.isNotEmpty) {
+      _searchController.text = widget.initialQuery!;
+      _searchQuery = widget.initialQuery!;
+      // 延迟执行搜索，确保页面已完全初始化
+      Future.delayed(const Duration(milliseconds: 200), () {
+        if (mounted) {
+          _performSearch(widget.initialQuery!);
+        }
+      });
+    } else {
+      // 进入搜索页面时自动聚焦搜索框
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (mounted) {
+          _searchFocusNode.requestFocus();
+        }
+      });
+    }
   }
 
   @override
@@ -1391,6 +1408,17 @@ class _SearchScreenState extends State<SearchScreen>
             ),
             margin: const EdgeInsets.all(16),
           ),
+        );
+        break;
+      case VideoMenuAction.aiChat:
+        // AI 问片
+        AIRecommendModal.show(
+          context,
+          videoContext: VideoContext(
+            title: videoInfo.title,
+            year: videoInfo.year,
+          ),
+          welcomeMessage: '想了解《${videoInfo.title}》的更多信息吗？我可以帮你查询剧情、演员、评价等。',
         );
         break;
     }

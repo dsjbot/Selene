@@ -520,7 +520,7 @@ class _AIRecommendModalState extends State<AIRecommendModal> {
           fontSize: 14,
           color: isDark ? Colors.white70 : Colors.black54,
         ),
-        code: FontUtils.poppins(
+        code: TextStyle(
           fontSize: 13,
           color: const Color(0xFF8B5CF6),
           backgroundColor: isDark ? const Color(0xFF1F2937) : const Color(0xFFF3E8FF),
