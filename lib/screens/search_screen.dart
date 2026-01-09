@@ -9,6 +9,7 @@ import '../services/page_cache_service.dart';
 import '../services/theme_service.dart';
 import '../services/sse_search_service.dart';
 import '../services/netdisk_service.dart';
+import '../services/youtube_service.dart';
 import '../models/search_result.dart';
 import '../models/video_info.dart';
 import '../widgets/video_menu_bottom_sheet.dart';
@@ -19,12 +20,13 @@ import '../widgets/search_results_grid.dart';
 import '../widgets/filter_options_selector.dart';
 import '../widgets/filter_pill_hover.dart';
 import '../widgets/main_layout.dart';
+import '../widgets/youtube_results_widget.dart';
 import '../utils/font_utils.dart';
 import '../utils/device_utils.dart';
 import 'player_screen.dart';
 
 enum SortOrder { none, asc, desc }
-enum SearchType { video, netdisk }
+enum SearchType { video, netdisk, youtube }
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({
@@ -645,7 +647,9 @@ class _SearchScreenState extends State<SearchScreen>
                   Expanded(
                     child: _searchType == SearchType.netdisk
                         ? _buildNetdiskResults(themeService)
-                        : _buildSearchResults(themeService),
+                        : _searchType == SearchType.youtube
+                            ? _buildYouTubeResults(themeService)
+                            : _buildSearchResults(themeService),
                   ),
                 ],
               ],
@@ -1842,44 +1846,66 @@ class _SearchScreenState extends State<SearchScreen>
   Widget _buildSearchTypeSelector(ThemeService themeService) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        children: [
-          _buildSearchTypeButton(
-            label: '影视资源',
-            icon: LucideIcons.film,
-            isSelected: _searchType == SearchType.video,
-            onTap: () {
-              if (_searchType != SearchType.video) {
-                setState(() {
-                  _searchType = SearchType.video;
-                });
-                // 如果已有搜索词，重新搜索
-                if (_searchQuery.isNotEmpty && _hasSearched) {
-                  _performSearch(_searchQuery);
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            _buildSearchTypeButton(
+              label: '影视资源',
+              icon: LucideIcons.film,
+              isSelected: _searchType == SearchType.video,
+              onTap: () {
+                if (_searchType != SearchType.video) {
+                  setState(() {
+                    _searchType = SearchType.video;
+                  });
+                  // 如果已有搜索词，重新搜索
+                  if (_searchQuery.isNotEmpty && _hasSearched) {
+                    _performSearch(_searchQuery);
+                  }
                 }
-              }
-            },
-            themeService: themeService,
-          ),
-          const SizedBox(width: 12),
-          _buildSearchTypeButton(
-            label: '网盘资源',
-            icon: LucideIcons.hardDrive,
-            isSelected: _searchType == SearchType.netdisk,
-            onTap: () {
-              if (_searchType != SearchType.netdisk) {
-                setState(() {
-                  _searchType = SearchType.netdisk;
-                });
-                // 如果已有搜索词，重新搜索
-                if (_searchQuery.isNotEmpty && _hasSearched) {
-                  _performSearch(_searchQuery);
+              },
+              themeService: themeService,
+            ),
+            const SizedBox(width: 12),
+            _buildSearchTypeButton(
+              label: '网盘资源',
+              icon: LucideIcons.hardDrive,
+              isSelected: _searchType == SearchType.netdisk,
+              onTap: () {
+                if (_searchType != SearchType.netdisk) {
+                  setState(() {
+                    _searchType = SearchType.netdisk;
+                  });
+                  // 如果已有搜索词，重新搜索
+                  if (_searchQuery.isNotEmpty && _hasSearched) {
+                    _performSearch(_searchQuery);
+                  }
                 }
-              }
-            },
-            themeService: themeService,
-          ),
-        ],
+              },
+              themeService: themeService,
+            ),
+            const SizedBox(width: 12),
+            _buildSearchTypeButton(
+              label: 'YouTube',
+              icon: LucideIcons.youtube,
+              isSelected: _searchType == SearchType.youtube,
+              color: const Color(0xFFFF0000),
+              onTap: () {
+                if (_searchType != SearchType.youtube) {
+                  setState(() {
+                    _searchType = SearchType.youtube;
+                  });
+                  // 如果已有搜索词，重新搜索
+                  if (_searchQuery.isNotEmpty && _hasSearched) {
+                    _performSearch(_searchQuery);
+                  }
+                }
+              },
+              themeService: themeService,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1891,14 +1917,16 @@ class _SearchScreenState extends State<SearchScreen>
     required bool isSelected,
     required VoidCallback onTap,
     required ThemeService themeService,
+    Color? color,
   }) {
+    final selectedColor = color ?? const Color(0xFF27AE60);
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected
-              ? const Color(0xFF27AE60)
+              ? selectedColor
               : themeService.isDarkMode
                   ? Colors.white.withOpacity(0.1)
                   : Colors.grey.withOpacity(0.1),
@@ -1940,6 +1968,28 @@ class _SearchScreenState extends State<SearchScreen>
         ),
       ),
     );
+  }
+
+  /// 构建 YouTube 搜索结果
+  Widget _buildYouTubeResults(ThemeService themeService) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: YouTubeResultsWidget(
+        query: _searchQuery,
+        onVideoTap: (video) {
+          // 点击视频时打开浏览器播放
+          _openYouTubeVideo(video.videoUrl);
+        },
+      ),
+    );
+  }
+
+  /// 打开 YouTube 视频
+  Future<void> _openYouTubeVideo(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
   }
 
   /// 构建网盘搜索结果
