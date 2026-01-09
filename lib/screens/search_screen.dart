@@ -10,6 +10,7 @@ import '../services/theme_service.dart';
 import '../services/sse_search_service.dart';
 import '../services/netdisk_service.dart';
 import '../services/youtube_service.dart';
+import '../services/tmdb_actor_service.dart';
 import '../models/search_result.dart';
 import '../models/video_info.dart';
 import '../widgets/video_menu_bottom_sheet.dart';
@@ -21,12 +22,13 @@ import '../widgets/filter_options_selector.dart';
 import '../widgets/filter_pill_hover.dart';
 import '../widgets/main_layout.dart';
 import '../widgets/youtube_results_widget.dart';
+import '../widgets/tmdb_actor_results_widget.dart';
 import '../utils/font_utils.dart';
 import '../utils/device_utils.dart';
 import 'player_screen.dart';
 
 enum SortOrder { none, asc, desc }
-enum SearchType { video, netdisk, youtube }
+enum SearchType { video, netdisk, youtube, tmdbActor }
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({
@@ -649,7 +651,9 @@ class _SearchScreenState extends State<SearchScreen>
                         ? _buildNetdiskResults(themeService)
                         : _searchType == SearchType.youtube
                             ? _buildYouTubeResults(themeService)
-                            : _buildSearchResults(themeService),
+                            : _searchType == SearchType.tmdbActor
+                                ? _buildTMDBActorResults(themeService)
+                                : _buildSearchResults(themeService),
                   ),
                 ],
               ],
@@ -1904,6 +1908,25 @@ class _SearchScreenState extends State<SearchScreen>
               },
               themeService: themeService,
             ),
+            const SizedBox(width: 12),
+            _buildSearchTypeButton(
+              label: '演员搜索',
+              icon: LucideIcons.user,
+              isSelected: _searchType == SearchType.tmdbActor,
+              color: const Color(0xFF8B5CF6),
+              onTap: () {
+                if (_searchType != SearchType.tmdbActor) {
+                  setState(() {
+                    _searchType = SearchType.tmdbActor;
+                  });
+                  // 如果已有搜索词，重新搜索
+                  if (_searchQuery.isNotEmpty && _hasSearched) {
+                    _performSearch(_searchQuery);
+                  }
+                }
+              },
+              themeService: themeService,
+            ),
           ],
         ),
       ),
@@ -1990,6 +2013,28 @@ class _SearchScreenState extends State<SearchScreen>
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
+  }
+
+  /// 构建 TMDB 演员搜索结果
+  Widget _buildTMDBActorResults(ThemeService themeService) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: TMDBActorResultsWidget(
+        query: _searchQuery,
+        onWorkTap: (work) {
+          // 点击作品时跳转到播放页面
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PlayerScreen(
+                title: work.title,
+                year: work.year,
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 
   /// 构建网盘搜索结果
