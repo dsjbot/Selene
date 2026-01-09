@@ -236,8 +236,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     _player = managed.player;
     _videoController = managed.controller;
     
-    // 不等待 stop 完成，直接设置监听器并加载新视频
-    // stop 和 open 会自动处理状态切换
+    // 设置监听器
     _setupPlayerListeners();
     
     setState(() {
