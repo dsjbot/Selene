@@ -352,8 +352,10 @@ class AIRecommendService {
             request.headers.set('Cookie', cookies);
           }
           
-          // 写入请求体
-          request.write(jsonEncode(requestBody));
+          // 写入请求体 - 需要编码为 UTF-8 字节
+          final bodyBytes = utf8.encode(jsonEncode(requestBody));
+          request.headers.set('Content-Length', bodyBytes.length.toString());
+          request.add(bodyBytes);
           
           // 发送请求并获取响应
           final response = await request.close();
