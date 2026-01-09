@@ -1,10 +1,10 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/youtube_service.dart';
 import '../services/theme_service.dart';
+import '../services/user_data_service.dart';
 import '../utils/font_utils.dart';
 
 /// YouTube 搜索结果组件
@@ -26,6 +26,7 @@ class _YouTubeResultsWidgetState extends State<YouTubeResultsWidget> {
   YouTubeSearchResult? _result;
   bool _isLoading = false;
   String? _error;
+  String? _serverUrl;
 
   YouTubeContentType _contentType = YouTubeContentType.all;
   YouTubeSortOrder _sortOrder = YouTubeSortOrder.relevance;
@@ -33,7 +34,24 @@ class _YouTubeResultsWidgetState extends State<YouTubeResultsWidget> {
   @override
   void initState() {
     super.initState();
+    _loadServerUrl();
     _search();
+  }
+  
+  Future<void> _loadServerUrl() async {
+    final url = await UserDataService.getServerUrl();
+    if (mounted) {
+      setState(() {
+        _serverUrl = url;
+      });
+    }
+  }
+  
+  /// 获取代理后的图片URL
+  String _getProxiedImageUrl(String originalUrl) {
+    if (originalUrl.isEmpty || _serverUrl == null) return originalUrl;
+    // 通过后端代理加载图片
+    return '$_serverUrl/api/image-proxy?url=${Uri.encodeComponent(originalUrl)}';
   }
 
   @override
@@ -312,6 +330,7 @@ class _YouTubeResultsWidgetState extends State<YouTubeResultsWidget> {
         // 第一个item显示调试信息
         if (index == 0) {
           final firstVideo = _result!.videos.isNotEmpty ? _result!.videos[0] : null;
+          final proxiedUrl = firstVideo != null ? _getProxiedImageUrl(firstVideo.thumbnailUrl) : '';
           return Container(
             margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.all(12),
@@ -330,7 +349,8 @@ class _YouTubeResultsWidgetState extends State<YouTubeResultsWidget> {
                 const SizedBox(height: 4),
                 if (firstVideo != null) ...[
                   Text('videoId: ${firstVideo.videoId}', style: const TextStyle(fontSize: 11)),
-                  Text('thumbnailUrl: ${firstVideo.thumbnailUrl}', style: const TextStyle(fontSize: 11)),
+                  Text('原始URL: ${firstVideo.thumbnailUrl}', style: const TextStyle(fontSize: 11)),
+                  Text('代理URL: $proxiedUrl', style: const TextStyle(fontSize: 11)),
                   Text('title: ${firstVideo.title}', style: const TextStyle(fontSize: 11)),
                 ],
               ],
@@ -341,6 +361,7 @@ class _YouTubeResultsWidgetState extends State<YouTubeResultsWidget> {
         final video = _result!.videos[index - 1];
         return _YouTubeVideoCard(
           video: video,
+          thumbnailUrl: _getProxiedImageUrl(video.thumbnailUrl),
           themeService: themeService,
           onTap: () => widget.onVideoTap?.call(video),
         );
@@ -352,11 +373,13 @@ class _YouTubeResultsWidgetState extends State<YouTubeResultsWidget> {
 /// YouTube 视频卡片
 class _YouTubeVideoCard extends StatefulWidget {
   final YouTubeVideo video;
+  final String thumbnailUrl;
   final ThemeService themeService;
   final VoidCallback? onTap;
 
   const _YouTubeVideoCard({
     required this.video,
+    required this.thumbnailUrl,
     required this.themeService,
     this.onTap,
   });
@@ -367,6 +390,7 @@ class _YouTubeVideoCard extends StatefulWidget {
 
 class _YouTubeVideoCardState extends State<_YouTubeVideoCard> {
   YouTubeVideo get video => widget.video;
+  String get thumbnailUrl => widget.thumbnailUrl;
   ThemeService get themeService => widget.themeService;
 
   @override
@@ -396,20 +420,64 @@ class _YouTubeVideoCardState extends State<_YouTubeVideoCard> {
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
                     child: AspectRatio(
                       aspectRatio: 16 / 9,
-                      child: video.thumbnailUrl.isNotEmpty
-                          ? CachedNetworkImage(
-                              imageUrl: video.thumbnailUrl,
+                      child: thumbnailUrl.isNotEmpty
+                          ? Image.network(
+                              thumbnailUrl,
                               fit: BoxFit.cover,
-                              placeholder: (context, url) => Container(
-                                color: themeService.isDarkMode ? Colors.grey[800] : Colors.grey[200],
-                                child: const Center(
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF0000)),
+                              loadingBuilder: (context, child, loadingProgress) {
+                                if (loadingProgress == null) return child;
+                                return Container(
+                                  color: themeService.isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                                  child: Center(
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        const CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF0000)),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          '加载中...',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            color: themeService.isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                              ),
-                              errorWidget: (context, url, error) => _buildPlaceholder(),
+                                );
+                              },
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  color: themeService.isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                                  child: Center(
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.error_outline,
+                                          size: 32,
+                                          color: Colors.red[300],
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                                          child: Text(
+                                            '图片加载失败\n$error',
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              fontSize: 9,
+                                              color: themeService.isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
                             )
                           : _buildPlaceholder(),
                     ),

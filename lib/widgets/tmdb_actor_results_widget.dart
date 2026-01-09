@@ -1,9 +1,9 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import '../services/tmdb_actor_service.dart';
 import '../services/theme_service.dart';
+import '../services/user_data_service.dart';
 import '../utils/font_utils.dart';
 import '../screens/player_screen.dart';
 
@@ -26,6 +26,7 @@ class _TMDBActorResultsWidgetState extends State<TMDBActorResultsWidget> {
   TMDBActorSearchResult? _result;
   bool _isLoading = false;
   String? _error;
+  String? _serverUrl;
 
   TMDBContentType _contentType = TMDBContentType.movie;
   TMDBSortBy _sortBy = TMDBSortBy.popularity;
@@ -35,7 +36,24 @@ class _TMDBActorResultsWidgetState extends State<TMDBActorResultsWidget> {
   @override
   void initState() {
     super.initState();
+    _loadServerUrl();
     _search();
+  }
+  
+  Future<void> _loadServerUrl() async {
+    final url = await UserDataService.getServerUrl();
+    if (mounted) {
+      setState(() {
+        _serverUrl = url;
+      });
+    }
+  }
+  
+  /// 获取代理后的图片URL
+  String _getProxiedImageUrl(String originalUrl) {
+    if (originalUrl.isEmpty || _serverUrl == null) return originalUrl;
+    // 通过后端代理加载图片
+    return '$_serverUrl/api/image-proxy?url=${Uri.encodeComponent(originalUrl)}';
   }
 
   @override
@@ -350,6 +368,7 @@ class _TMDBActorResultsWidgetState extends State<TMDBActorResultsWidget> {
 
     // 调试信息
     final firstWork = _result!.list.isNotEmpty ? _result!.list[0] : null;
+    final proxiedPoster = firstWork != null ? _getProxiedImageUrl(firstWork.poster) : '';
     
     return Column(
       children: [
@@ -373,7 +392,8 @@ class _TMDBActorResultsWidgetState extends State<TMDBActorResultsWidget> {
               if (firstWork != null) ...[
                 Text('id: ${firstWork.id}', style: const TextStyle(fontSize: 11)),
                 Text('title: ${firstWork.title}', style: const TextStyle(fontSize: 11)),
-                Text('poster: ${firstWork.poster}', style: const TextStyle(fontSize: 11)),
+                Text('原始poster: ${firstWork.poster}', style: const TextStyle(fontSize: 11)),
+                Text('代理poster: $proxiedPoster', style: const TextStyle(fontSize: 11)),
               ],
             ],
           ),
@@ -393,6 +413,7 @@ class _TMDBActorResultsWidgetState extends State<TMDBActorResultsWidget> {
               final work = _result!.list[index];
               return _TMDBWorkCard(
                 work: work,
+                posterUrl: _getProxiedImageUrl(work.poster),
                 contentType: _contentType,
                 themeService: themeService,
                 onTap: () {
@@ -427,12 +448,14 @@ class _TMDBActorResultsWidgetState extends State<TMDBActorResultsWidget> {
 /// TMDB 作品卡片
 class _TMDBWorkCard extends StatelessWidget {
   final TMDBActorWork work;
+  final String posterUrl;
   final TMDBContentType contentType;
   final ThemeService themeService;
   final VoidCallback? onTap;
 
   const _TMDBWorkCard({
     required this.work,
+    required this.posterUrl,
     required this.contentType,
     required this.themeService,
     this.onTap,
@@ -458,22 +481,49 @@ class _TMDBWorkCard extends StatelessWidget {
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: work.poster.isNotEmpty
-                        ? CachedNetworkImage(
-                            imageUrl: work.poster,
+                    child: posterUrl.isNotEmpty
+                        ? Image.network(
+                            posterUrl,
                             fit: BoxFit.cover,
                             width: double.infinity,
                             height: double.infinity,
-                            placeholder: (context, url) => Container(
-                              color: themeService.isDarkMode ? Colors.grey[800] : Colors.grey[200],
-                              child: const Center(
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B5CF6)),
+                            loadingBuilder: (context, child, loadingProgress) {
+                              if (loadingProgress == null) return child;
+                              return Container(
+                                color: themeService.isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                                child: const Center(
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B5CF6)),
+                                  ),
                                 ),
-                              ),
-                            ),
-                            errorWidget: (context, url, error) => _buildPlaceholder(),
+                              );
+                            },
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                color: themeService.isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                                child: Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.error_outline,
+                                        size: 20,
+                                        color: Colors.red[300],
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        '加载失败',
+                                        style: TextStyle(
+                                          fontSize: 8,
+                                          color: themeService.isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
                           )
                         : _buildPlaceholder(),
                   ),
