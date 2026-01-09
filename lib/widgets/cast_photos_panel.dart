@@ -4,6 +4,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../services/tmdb_cast_service.dart';
 import '../services/user_data_service.dart';
 import '../utils/font_utils.dart';
+import '../models/video_info.dart';
 import 'video_card.dart';
 
 /// 演员照片和作品面板
@@ -469,17 +470,30 @@ class _CastPhotosPanelState extends State<CastPhotosPanel> {
   }
 
   Widget _buildWorkItem(TMDBActorWork work) {
+    // 创建 VideoInfo 对象
+    final videoInfo = VideoInfo(
+      id: work.id,
+      source: 'douban',
+      title: work.title,
+      sourceName: '豆瓣',
+      year: work.year,
+      cover: work.poster,
+      index: 1,
+      totalEpisodes: 1,
+      playTime: 0,
+      totalTime: 0,
+      saveTime: DateTime.now().millisecondsSinceEpoch,
+      searchTitle: work.title,
+      doubanId: work.id,
+      rate: work.rate,
+    );
+
     return Container(
       width: 120,
       margin: const EdgeInsets.only(right: 12),
       child: VideoCard(
-        id: work.id,
-        source: 'douban',
-        title: work.title,
-        poster: work.poster,
-        year: work.year,
-        rate: work.rate,
-        type: _worksType,
+        videoInfo: videoInfo,
+        from: 'douban',
       ),
     );
   }
