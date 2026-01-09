@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../models/search_result.dart';
 import '../models/douban_movie.dart';
 import '../utils/image_url.dart';
+import 'cast_photos_panel.dart';
 
 class PlayerDetailsPanel extends StatelessWidget {
   final ThemeData theme;
@@ -257,6 +258,13 @@ class PlayerDetailsPanel extends StatelessWidget {
                 _buildProductionInfo(directors, writers, actors, isDarkMode),
               ],
             ),
+          // 演员照片和作品面板
+          if (actors.isNotEmpty)
+            CastPhotosPanel(
+              actorNames: actors,
+              doubanId: doubanDetails!.id,
+              isDarkMode: isDarkMode,
+            ),
           const SizedBox(height: 16),
           // 简介
           Column(
@@ -279,6 +287,7 @@ class PlayerDetailsPanel extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 16),
         ],
       ),
     );
