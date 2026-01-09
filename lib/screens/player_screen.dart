@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../widgets/video_player_surface.dart';
 import '../widgets/video_player_widget.dart';
 import '../widgets/video_card.dart';
+import '../widgets/netdisk_modal.dart';
 import '../services/api_service.dart';
 import '../services/m3u8_service.dart';
 import '../services/douban_service.dart';
@@ -1236,6 +1237,38 @@ class _PlayerScreenState extends State<PlayerScreen>
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // 网盘按钮
+                  GestureDetector(
+                    onTap: () {
+                      showNetDiskModal(context, videoTitle);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF3498DB).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: const Color(0xFF3498DB).withOpacity(0.3),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('📁', style: TextStyle(fontSize: 16)),
+                          const SizedBox(width: 4),
+                          Text(
+                            '网盘',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDarkMode ? Colors.white70 : const Color(0xFF3498DB),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
