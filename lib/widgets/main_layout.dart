@@ -884,12 +884,12 @@ class _MainLayoutState extends State<MainLayout> {
   Widget _buildBottomNavBar(ThemeService themeService) {
     final List<Map<String, dynamic>> navItems = [
       {'icon': LucideIcons.house, 'label': '首页'},
+      {'icon': LucideIcons.database, 'label': '源'},
       {'icon': LucideIcons.video, 'label': '电影'},
       {'icon': LucideIcons.tv, 'label': '剧集'},
       {'icon': LucideIcons.cat, 'label': '动漫'},
       {'icon': LucideIcons.clover, 'label': '综艺'},
       {'icon': LucideIcons.radio, 'label': '直播'},
-      {'icon': LucideIcons.database, 'label': '源'},
     ];
 
     final isTablet = DeviceUtils.isTablet(context);
