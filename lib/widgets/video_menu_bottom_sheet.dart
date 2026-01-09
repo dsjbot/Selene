@@ -1314,7 +1314,7 @@ class _VideoMenuBottomSheetState extends State<VideoMenuBottomSheet>
 
   /// 构建菜单选项
   Widget _buildMenuOptions(BuildContext context, ThemeService themeService) {
-    // 如果是豆瓣来源，只显示播放和豆瓣详情
+    // 如果是豆瓣来源，显示播放、AI问片和豆瓣详情
     if (widget.videoInfo.source == 'douban') {
       return Column(
         children: [
@@ -1328,6 +1328,21 @@ class _VideoMenuBottomSheetState extends State<VideoMenuBottomSheet>
             onTap: () {
               widget.onClose();
               widget.onActionSelected(VideoMenuAction.play);
+            },
+          ),
+          
+          _buildDivider(themeService),
+          
+          // AI 问片
+          _buildMenuItem(
+            context,
+            themeService,
+            icon: Icons.auto_awesome,
+            iconColor: const Color(0xFF8B5CF6),
+            title: 'AI 问片',
+            onTap: () {
+              widget.onClose();
+              widget.onActionSelected(VideoMenuAction.aiChat);
             },
           ),
           
@@ -1352,7 +1367,7 @@ class _VideoMenuBottomSheetState extends State<VideoMenuBottomSheet>
       );
     }
     
-    // 如果是Bangumi来源，只显示播放和Bangumi详情
+    // 如果是Bangumi来源，显示播放、AI问片和Bangumi详情
     if (widget.videoInfo.source == 'bangumi') {
       return Column(
         children: [
@@ -1366,6 +1381,21 @@ class _VideoMenuBottomSheetState extends State<VideoMenuBottomSheet>
             onTap: () {
               widget.onClose();
               widget.onActionSelected(VideoMenuAction.play);
+            },
+          ),
+          
+          _buildDivider(themeService),
+          
+          // AI 问片
+          _buildMenuItem(
+            context,
+            themeService,
+            icon: Icons.auto_awesome,
+            iconColor: const Color(0xFF8B5CF6),
+            title: 'AI 问片',
+            onTap: () {
+              widget.onClose();
+              widget.onActionSelected(VideoMenuAction.aiChat);
             },
           ),
           

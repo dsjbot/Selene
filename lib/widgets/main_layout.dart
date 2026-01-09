@@ -416,72 +416,131 @@ class _MainLayoutState extends State<MainLayout> {
       height: 40, // 固定高度，与搜索框高度一致
       child: Stack(
         children: [
-          // 左侧搜索图标
+          // 左侧按钮组（搜索 + AI）
           Positioned(
             left: 0,
             top: 4,
-            child: MouseRegion(
-              cursor: DeviceUtils.isPC()
-                  ? SystemMouseCursors.click
-                  : MouseCursor.defer,
-              onEnter: DeviceUtils.isPC()
-                  ? (_) {
-                      setState(() {
-                        _isSearchButtonHovered = true;
-                      });
-                    }
-                  : null,
-              onExit: DeviceUtils.isPC()
-                  ? (_) {
-                      setState(() {
-                        _isSearchButtonHovered = false;
-                      });
-                    }
-                  : null,
-              child: GestureDetector(
-                onTap: () {
-                  // 防止重复点击
-                  if (_isSearchButtonPressed) return;
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 搜索按钮
+                MouseRegion(
+                  cursor: DeviceUtils.isPC()
+                      ? SystemMouseCursors.click
+                      : MouseCursor.defer,
+                  onEnter: DeviceUtils.isPC()
+                      ? (_) {
+                          setState(() {
+                            _isSearchButtonHovered = true;
+                          });
+                        }
+                      : null,
+                  onExit: DeviceUtils.isPC()
+                      ? (_) {
+                          setState(() {
+                            _isSearchButtonHovered = false;
+                          });
+                        }
+                      : null,
+                  child: GestureDetector(
+                    onTap: () {
+                      // 防止重复点击
+                      if (_isSearchButtonPressed) return;
 
-                  setState(() {
-                    _isSearchButtonPressed = true;
-                  });
-
-                  widget.onSearchTap?.call();
-
-                  // 延迟重置按钮状态，防止快速重复点击
-                  Future.delayed(const Duration(milliseconds: 300), () {
-                    if (mounted) {
                       setState(() {
-                        _isSearchButtonPressed = false;
+                        _isSearchButtonPressed = true;
                       });
-                    }
-                  });
-                },
-                behavior: HitTestBehavior.opaque,
-                child: Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: DeviceUtils.isPC() && _isSearchButtonHovered
-                        ? (themeService.isDarkMode
-                            ? const Color(0xFF333333)
-                            : const Color(0xFFe0e0e0))
-                        : Colors.transparent,
-                  ),
-                  child: Center(
-                    child: Icon(
-                      LucideIcons.search,
-                      color: themeService.isDarkMode
-                          ? const Color(0xFFffffff)
-                          : const Color(0xFF2c3e50),
-                      size: 24,
-                      weight: 1.0,
+
+                      widget.onSearchTap?.call();
+
+                      // 延迟重置按钮状态，防止快速重复点击
+                      Future.delayed(const Duration(milliseconds: 300), () {
+                        if (mounted) {
+                          setState(() {
+                            _isSearchButtonPressed = false;
+                          });
+                        }
+                      });
+                    },
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: DeviceUtils.isPC() && _isSearchButtonHovered
+                            ? (themeService.isDarkMode
+                                ? const Color(0xFF333333)
+                                : const Color(0xFFe0e0e0))
+                            : Colors.transparent,
+                      ),
+                      child: Center(
+                        child: Icon(
+                          LucideIcons.search,
+                          color: themeService.isDarkMode
+                              ? const Color(0xFFffffff)
+                              : const Color(0xFF2c3e50),
+                          size: 24,
+                          weight: 1.0,
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
+                // AI 推荐按钮（仅在功能可用时显示）
+                if (_isAIEnabled) ...[
+                  const SizedBox(width: 8),
+                  MouseRegion(
+                    cursor: DeviceUtils.isPC()
+                        ? SystemMouseCursors.click
+                        : MouseCursor.defer,
+                    onEnter: DeviceUtils.isPC()
+                        ? (_) {
+                            setState(() {
+                              _isAIButtonHovered = true;
+                            });
+                          }
+                        : null,
+                    onExit: DeviceUtils.isPC()
+                        ? (_) {
+                            setState(() {
+                              _isAIButtonHovered = false;
+                            });
+                          }
+                        : null,
+                    child: GestureDetector(
+                      onTap: () {
+                        AIRecommendModal.show(context);
+                      },
+                      behavior: HitTestBehavior.opaque,
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: DeviceUtils.isPC() && _isAIButtonHovered
+                              ? (themeService.isDarkMode
+                                  ? const Color(0xFF333333)
+                                  : const Color(0xFFe0e0e0))
+                              : Colors.transparent,
+                        ),
+                        child: Center(
+                          child: Icon(
+                            LucideIcons.sparkles,
+                            color: _isAIButtonHovered
+                                ? const Color(0xFF8B5CF6)
+                                : themeService.isDarkMode
+                                    ? const Color(0xFFffffff)
+                                    : const Color(0xFF2c3e50),
+                            size: 22,
+                            weight: 1.0,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
           // 完全居中的 Logo
@@ -793,57 +852,6 @@ class _MainLayoutState extends State<MainLayout> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // AI 推荐按钮（仅在功能可用时显示）
-        if (_isAIEnabled)
-          MouseRegion(
-            cursor:
-                DeviceUtils.isPC() ? SystemMouseCursors.click : MouseCursor.defer,
-            onEnter: DeviceUtils.isPC()
-                ? (_) {
-                    setState(() {
-                      _isAIButtonHovered = true;
-                    });
-                  }
-                : null,
-            onExit: DeviceUtils.isPC()
-                ? (_) {
-                    setState(() {
-                      _isAIButtonHovered = false;
-                    });
-                  }
-                : null,
-            child: GestureDetector(
-              onTap: () {
-                AIRecommendModal.show(context);
-              },
-              behavior: HitTestBehavior.opaque,
-              child: Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: DeviceUtils.isPC() && _isAIButtonHovered
-                      ? (themeService.isDarkMode
-                          ? const Color(0xFF333333)
-                          : const Color(0xFFe0e0e0))
-                      : Colors.transparent,
-                ),
-                child: Center(
-                  child: Icon(
-                    LucideIcons.sparkles,
-                    color: _isAIButtonHovered
-                        ? const Color(0xFF8B5CF6)
-                        : themeService.isDarkMode
-                            ? const Color(0xFFffffff)
-                            : const Color(0xFF2c3e50),
-                    size: 22,
-                    weight: 1.0,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        if (_isAIEnabled) const SizedBox(width: 12),
         // 深浅模式切换按钮
         MouseRegion(
           cursor:
