@@ -338,6 +338,7 @@ class AIRecommendService {
 
         final httpClient = HttpClient();
         httpClient.connectionTimeout = const Duration(seconds: 30);
+        httpClient.autoUncompress = false; // 禁用自动解压，避免缓冲
         
         try {
           final uri = Uri.parse('$serverUrl/api/ai-recommend');
@@ -345,6 +346,8 @@ class AIRecommendService {
           
           // 设置请求头
           request.headers.set('Content-Type', 'application/json');
+          request.headers.set('Accept', 'text/event-stream');
+          request.headers.set('Cache-Control', 'no-cache');
           if (cookies != null && cookies.isNotEmpty) {
             request.headers.set('Cookie', cookies);
           }
@@ -356,6 +359,7 @@ class AIRecommendService {
           final response = await request.close();
           
           debugPrint('[AIRecommendService] 响应状态码: ${response.statusCode}');
+          debugPrint('[AIRecommendService] 响应头: ${response.headers}');
 
           if (response.statusCode == 401) {
             httpClient.close();
