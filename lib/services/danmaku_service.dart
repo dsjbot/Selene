@@ -26,15 +26,16 @@ class DanmakuService {
 
       final cookies = await UserDataService.getCookies();
 
-      // 构建查询参数
+      // 构建查询参数 - 参数名与后端API一致
       final queryParams = <String, String>{
         'title': title,
       };
       if (episode != null && episode.isNotEmpty) {
         queryParams['episode'] = episode;
       }
+      // 后端使用 douban_id 而不是 doubanId
       if (doubanId != null && doubanId.isNotEmpty) {
-        queryParams['doubanId'] = doubanId;
+        queryParams['douban_id'] = doubanId;
       }
 
       final uri = Uri.parse('$baseUrl/api/danmu-external')

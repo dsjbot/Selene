@@ -11,6 +11,7 @@ import '../widgets/top_tab_switcher.dart';
 import '../widgets/favorites_grid.dart';
 import '../widgets/history_grid.dart';
 import '../widgets/hero_carousel.dart';
+import '../services/player_manager.dart';
 import 'search_screen.dart';
 import '../widgets/video_menu_bottom_sheet.dart';
 import '../widgets/custom_refresh_indicator.dart';
@@ -753,6 +754,9 @@ class _HomeScreenState extends State<HomeScreen> {
   /// 跳转到播放页的通用方法
   Future<void> _navigateToPlayer(Widget playerScreen) async {
     if (!mounted) return;
+    
+    // 进入播放页面前，停止轮播图的预告片播放，避免两个声音同时播放
+    PlayerManager().stopPlayer(PlayerManager.carouselPlayerId);
     
     await Navigator.push(
       context,

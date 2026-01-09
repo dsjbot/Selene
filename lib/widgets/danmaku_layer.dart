@@ -114,7 +114,10 @@ class _TrackInfo {
   /// [currentTime] 当前时间
   /// [screenWidth] 屏幕宽度
   /// [newDanmakuWidth] 新弹幕宽度
-  /// [newDanmakuSpeed] 新弹幕速度
+  /// [newDanmakuSpeed] 新弹幕速度（像素/秒）
+  /// 
+  /// 由于弹幕速度根据文字长度不同而变化（短弹幕慢，长弹幕快），
+  /// 需要精确计算是否会发生追尾碰撞
   bool canAccept(double currentTime, double screenWidth, double newDanmakuWidth, double newDanmakuSpeed) {
     // 如果轨道从未使用过，直接可用
     if (lastDanmakuStartTime < 0) return true;
@@ -132,20 +135,23 @@ class _TrackInfo {
     }
     
     // 条件2：新弹幕不会追上上一条弹幕（防追尾）
-    // 由于所有弹幕速度相同，只要尾部进入屏幕就不会追尾
-    // 但为了安全，我们额外检查：新弹幕到达屏幕左边缘时，上一条弹幕是否已经离开
-    // 新弹幕完全穿过屏幕的时间 = (screenWidth + newDanmakuWidth) / newDanmakuSpeed
-    // 上一条弹幕完全离开屏幕的时间 = (screenWidth + lastDanmakuWidth) / lastDanmakuSpeed - elapsed
-    
-    final newDanmakuTotalTime = (screenWidth + newDanmakuWidth) / newDanmakuSpeed;
-    final lastDanmakuRemainingTime = (screenWidth + lastDanmakuWidth) / lastDanmakuSpeed - elapsed;
-    
-    // 如果新弹幕完成时间 > 上一条弹幕剩余时间，说明可能追尾
-    // 但由于速度相同，这种情况不会发生，除非速度不同
-    // 这里保留检查以防万一
-    if (newDanmakuTotalTime > lastDanmakuRemainingTime + 0.5) {
-      // 速度相同时不会追尾，但如果速度不同需要检查
-      if (newDanmakuSpeed > lastDanmakuSpeed * 1.1) {
+    // 由于弹幕速度不同（短弹幕慢，长弹幕快），需要检查是否会追尾
+    // 
+    // 计算：新弹幕到达上一条弹幕当前尾部位置的时间
+    // 如果新弹幕速度更快，可能会追上上一条弹幕
+    if (newDanmakuSpeed > lastDanmakuSpeed) {
+      // 新弹幕更快，需要检查是否会追尾
+      // 相对速度 = 新弹幕速度 - 上一条弹幕速度
+      final relativeSpeed = newDanmakuSpeed - lastDanmakuSpeed;
+      // 当前距离 = 上一条弹幕尾部到屏幕右边缘的距离
+      final currentGap = screenWidth - lastDanmakuTailPos;
+      // 追上所需时间 = 距离 / 相对速度
+      final catchUpTime = currentGap / relativeSpeed;
+      // 上一条弹幕完全离开屏幕所需时间
+      final lastDanmakuExitTime = (lastDanmakuTailPos + lastDanmakuWidth) / lastDanmakuSpeed;
+      
+      // 如果追上时间 < 上一条弹幕离开时间，说明会追尾
+      if (catchUpTime < lastDanmakuExitTime) {
         return false;
       }
     }
@@ -217,9 +223,38 @@ class _DanmakuLayerState extends State<DanmakuLayer> {
   int _keyCounter = 0;
   double _screenWidth = 0;
 
-  // 基础速度：像素/秒（所有弹幕使用相同速度，避免追尾）
-  static const double _baseSpeed = 150.0;
+  // 基础穿越时间（秒）- 弹幕从右边进入到左边完全消失的基准时间
+  // 参考后端 artplayer-plugin-danmuku 的 speed 参数（默认5秒）
+  static const double _baseDuration = 8.0;
   static const double _trackHeight = 32.0;
+  
+  /// 根据弹幕文字宽度计算穿越时间
+  /// 短弹幕慢一些，长弹幕快一些，模拟后端的自然效果
+  double _calculateDuration(double textWidth) {
+    // 基准宽度（约10个中文字符）
+    const double baseWidth = 200.0;
+    
+    // 根据文字宽度调整时间
+    // 短弹幕（<100px）：时间 * 1.2（慢20%）
+    // 中等弹幕（100-300px）：正常时间
+    // 长弹幕（>300px）：时间 * 0.85（快15%）
+    double durationMultiplier;
+    if (textWidth < 100) {
+      // 短弹幕慢一些，让用户有时间阅读
+      durationMultiplier = 1.2;
+    } else if (textWidth > 300) {
+      // 长弹幕快一些，避免占用轨道太久
+      durationMultiplier = 0.85;
+    } else {
+      // 中等长度弹幕，根据宽度线性插值
+      // 100px -> 1.1, 200px -> 1.0, 300px -> 0.9
+      durationMultiplier = 1.1 - (textWidth - 100) / 200 * 0.2;
+    }
+    
+    // 最终时间 = 基础时间 * 宽度系数 / 用户速度设置
+    // 用户速度设置越大，时间越短（弹幕越快）
+    return _baseDuration * durationMultiplier / widget.speed;
+  }
 
   @override
   void didUpdateWidget(DanmakuLayer oldWidget) {
@@ -330,12 +365,12 @@ class _DanmakuLayerState extends State<DanmakuLayer> {
     // 估算弹幕宽度
     final textWidth = _estimateTextWidth(item.text);
     
-    // 实际速度 = 基础速度 * 用户设置的速度倍率
-    final actualSpeed = _baseSpeed * widget.speed;
+    // 根据文字宽度计算穿越时间（短弹幕慢，长弹幕快）
+    final duration = _calculateDuration(textWidth);
     
-    // 弹幕从出现到完全消失的时间 = 总移动距离 / 速度
+    // 计算实际速度（像素/秒）= 总移动距离 / 时间
     final totalDistance = _screenWidth + textWidth;
-    final duration = totalDistance / actualSpeed;
+    final actualSpeed = totalDistance / duration;
 
     int? track;
     for (int i = 0; i < _tracks.length; i++) {
