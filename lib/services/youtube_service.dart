@@ -27,13 +27,24 @@ class YouTubeVideo {
     final id = json['id'];
     final snippet = json['snippet'] ?? {};
     final thumbnails = snippet['thumbnails'] ?? {};
-    final medium = thumbnails['medium'] ?? thumbnails['default'] ?? {};
+    // 优先使用 high > medium > default
+    final thumbnail = thumbnails['high'] ?? thumbnails['medium'] ?? thumbnails['default'] ?? {};
+    
+    // 解析 videoId
+    final videoId = id is Map ? (id['videoId'] ?? '') : (json['videoId'] ?? id?.toString() ?? '');
+    
+    // 获取缩略图 URL，如果为空则根据 videoId 构建
+    String thumbnailUrl = thumbnail['url'] ?? '';
+    if (thumbnailUrl.isEmpty && videoId.isNotEmpty) {
+      // YouTube 缩略图 URL 格式
+      thumbnailUrl = 'https://i.ytimg.com/vi/$videoId/hqdefault.jpg';
+    }
 
     return YouTubeVideo(
-      videoId: id is Map ? (id['videoId'] ?? '') : (json['videoId'] ?? ''),
+      videoId: videoId,
       title: snippet['title'] ?? '',
       description: snippet['description'] ?? '',
-      thumbnailUrl: medium['url'] ?? '',
+      thumbnailUrl: thumbnailUrl,
       channelTitle: snippet['channelTitle'] ?? '',
       channelId: snippet['channelId'] ?? '',
       publishedAt: snippet['publishedAt'] ?? '',

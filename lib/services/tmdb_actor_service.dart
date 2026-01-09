@@ -32,10 +32,17 @@ class TMDBActorWork {
   });
 
   factory TMDBActorWork.fromJson(Map<String, dynamic> json) {
+    // 处理 poster URL - 后端应该返回完整 URL，但如果只是路径则添加前缀
+    String posterUrl = json['poster']?.toString() ?? '';
+    if (posterUrl.isNotEmpty && !posterUrl.startsWith('http')) {
+      // 如果是相对路径，添加 TMDB 图片基础 URL
+      posterUrl = 'https://image.tmdb.org/t/p/w500$posterUrl';
+    }
+    
     return TMDBActorWork(
       id: json['id']?.toString() ?? '',
       title: json['title'] ?? '',
-      poster: json['poster'] ?? '',
+      poster: posterUrl,
       rate: json['rate']?.toString() ?? '0',
       year: json['year']?.toString() ?? '',
       popularity: (json['popularity'] as num?)?.toDouble(),

@@ -333,9 +333,7 @@ class _YouTubeVideoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap ?? () => _openInBrowser(),
-      child: Container(
+    return Container(
         margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
           color: themeService.isDarkMode
@@ -462,34 +460,18 @@ class _YouTubeVideoCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  // 操作按钮
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildActionButton(
-                          icon: Icons.play_arrow,
-                          label: '播放',
-                          color: const Color(0xFFFF0000),
-                          onTap: () => _openInBrowser(),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _buildActionButton(
-                          icon: Icons.open_in_new,
-                          label: '新窗口',
-                          color: Colors.grey[600]!,
-                          onTap: () => _openInBrowser(),
-                        ),
-                      ),
-                    ],
+                  // 操作按钮 - 只有新窗口按钮会跳转到YouTube
+                  _buildActionButton(
+                    icon: Icons.open_in_new,
+                    label: '在 YouTube 中打开',
+                    color: const Color(0xFFFF0000),
+                    onTap: () => _openInBrowser(),
                   ),
                 ],
               ),
             ),
           ],
         ),
-      ),
     );
   }
 
