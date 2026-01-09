@@ -763,7 +763,18 @@ class _HomeScreenState extends State<HomeScreen> {
       MaterialPageRoute(builder: (context) => playerScreen),
     );
     
+    // 退出播放页面后，恢复轮播图预告片播放
+    _resumeCarouselVideo();
+    
     _refreshOnResume();
+  }
+  
+  /// 恢复轮播图预告片播放
+  void _resumeCarouselVideo() {
+    final carouselPlayer = PlayerManager().getExistingPlayer(PlayerManager.carouselPlayerId);
+    if (carouselPlayer != null) {
+      carouselPlayer.player.play();
+    }
   }
 
   /// 从播放页返回时刷新播放记录
