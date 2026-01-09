@@ -348,30 +348,65 @@ class _TMDBActorResultsWidgetState extends State<TMDBActorResultsWidget> {
       );
     }
 
-    return GridView.builder(
-      padding: const EdgeInsets.only(bottom: 16),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        childAspectRatio: 0.55,
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 12,
-      ),
-      itemCount: _result!.list.length,
-      itemBuilder: (context, index) {
-        final work = _result!.list[index];
-        return _TMDBWorkCard(
-          work: work,
-          contentType: _contentType,
-          themeService: themeService,
-          onTap: () {
-            if (widget.onWorkTap != null) {
-              widget.onWorkTap!(work);
-            } else {
-              _navigateToPlayer(work);
-            }
-          },
-        );
-      },
+    // 调试信息
+    final firstWork = _result!.list.isNotEmpty ? _result!.list[0] : null;
+    
+    return Column(
+      children: [
+        // 调试信息区域
+        Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.purple.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.purple.withOpacity(0.3)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '🔍 调试信息 (共 ${_result!.list.length} 个结果)',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+              ),
+              const SizedBox(height: 4),
+              if (firstWork != null) ...[
+                Text('id: ${firstWork.id}', style: const TextStyle(fontSize: 11)),
+                Text('title: ${firstWork.title}', style: const TextStyle(fontSize: 11)),
+                Text('poster: ${firstWork.poster}', style: const TextStyle(fontSize: 11)),
+              ],
+            ],
+          ),
+        ),
+        // GridView
+        Expanded(
+          child: GridView.builder(
+            padding: const EdgeInsets.only(bottom: 16),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              childAspectRatio: 0.55,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 12,
+            ),
+            itemCount: _result!.list.length,
+            itemBuilder: (context, index) {
+              final work = _result!.list[index];
+              return _TMDBWorkCard(
+                work: work,
+                contentType: _contentType,
+                themeService: themeService,
+                onTap: () {
+                  if (widget.onWorkTap != null) {
+                    widget.onWorkTap!(work);
+                  } else {
+                    _navigateToPlayer(work);
+                  }
+                },
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 

@@ -30,24 +30,37 @@ class YouTubeVideo {
     // 优先使用 high > medium > default
     final thumbnail = thumbnails['high'] ?? thumbnails['medium'] ?? thumbnails['default'] ?? {};
     
-    // 解析 videoId
-    final videoId = id is Map ? (id['videoId'] ?? '') : (json['videoId'] ?? id?.toString() ?? '');
+    // 解析 videoId - 支持两种格式：{id: {videoId: 'xxx'}} 或 {id: 'xxx'}
+    String videoId = '';
+    if (id is Map) {
+      videoId = id['videoId']?.toString() ?? '';
+    } else if (id is String) {
+      videoId = id;
+    } else if (json['videoId'] != null) {
+      videoId = json['videoId'].toString();
+    }
     
-    // 获取缩略图 URL，如果为空则根据 videoId 构建
-    String thumbnailUrl = thumbnail['url']?.toString() ?? '';
+    // 获取缩略图 URL
+    String thumbnailUrl = '';
+    if (thumbnail is Map && thumbnail['url'] != null) {
+      thumbnailUrl = thumbnail['url'].toString();
+    }
+    
+    // 如果缩略图为空但有 videoId，则构建默认 URL
     if (thumbnailUrl.isEmpty && videoId.isNotEmpty) {
-      // YouTube 缩略图 URL 格式
       thumbnailUrl = 'https://i.ytimg.com/vi/$videoId/hqdefault.jpg';
     }
+    
+    debugPrint('[YouTubeVideo.fromJson] videoId=$videoId, thumbnailUrl=$thumbnailUrl, title=${snippet['title']}');
 
     return YouTubeVideo(
       videoId: videoId,
-      title: snippet['title'] ?? '',
-      description: snippet['description'] ?? '',
+      title: snippet['title']?.toString() ?? '',
+      description: snippet['description']?.toString() ?? '',
       thumbnailUrl: thumbnailUrl,
-      channelTitle: snippet['channelTitle'] ?? '',
-      channelId: snippet['channelId'] ?? '',
-      publishedAt: snippet['publishedAt'] ?? '',
+      channelTitle: snippet['channelTitle']?.toString() ?? '',
+      channelId: snippet['channelId']?.toString() ?? '',
+      publishedAt: snippet['publishedAt']?.toString() ?? '',
     );
   }
 
@@ -280,12 +293,22 @@ class YouTubeService {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
+        debugPrint('[YouTube] 响应数据: $data');
 
         if (data['success'] == true) {
-          final videos = (data['videos'] as List<dynamic>?)
-                  ?.map((v) => YouTubeVideo.fromJson(v as Map<String, dynamic>))
-                  .toList() ??
-              [];
+          final videosRaw = data['videos'] as List<dynamic>? ?? [];
+          debugPrint('[YouTube] videos 数量: ${videosRaw.length}');
+          if (videosRaw.isNotEmpty) {
+            debugPrint('[YouTube] 第一个 video 原始数据: ${videosRaw[0]}');
+          }
+          
+          final videos = videosRaw
+                  .map((v) => YouTubeVideo.fromJson(v as Map<String, dynamic>))
+                  .toList();
+          
+          if (videos.isNotEmpty) {
+            debugPrint('[YouTube] 第一个解析后: videoId=${videos[0].videoId}, thumbnailUrl=${videos[0].thumbnailUrl}');
+          }
 
           final result = YouTubeSearchResult(
             success: true,

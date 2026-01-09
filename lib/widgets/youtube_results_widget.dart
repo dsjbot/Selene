@@ -307,9 +307,38 @@ class _YouTubeResultsWidgetState extends State<YouTubeResultsWidget> {
 
     return ListView.builder(
       padding: const EdgeInsets.only(bottom: 16),
-      itemCount: _result!.videos.length,
+      itemCount: _result!.videos.length + 1, // +1 for debug info
       itemBuilder: (context, index) {
-        final video = _result!.videos[index];
+        // 第一个item显示调试信息
+        if (index == 0) {
+          final firstVideo = _result!.videos.isNotEmpty ? _result!.videos[0] : null;
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.blue.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.blue.withOpacity(0.3)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '🔍 调试信息 (共 ${_result!.videos.length} 个结果)',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                ),
+                const SizedBox(height: 4),
+                if (firstVideo != null) ...[
+                  Text('videoId: ${firstVideo.videoId}', style: const TextStyle(fontSize: 11)),
+                  Text('thumbnailUrl: ${firstVideo.thumbnailUrl}', style: const TextStyle(fontSize: 11)),
+                  Text('title: ${firstVideo.title}', style: const TextStyle(fontSize: 11)),
+                ],
+              ],
+            ),
+          );
+        }
+        
+        final video = _result!.videos[index - 1];
         return _YouTubeVideoCard(
           video: video,
           themeService: themeService,
@@ -321,7 +350,7 @@ class _YouTubeResultsWidgetState extends State<YouTubeResultsWidget> {
 }
 
 /// YouTube 视频卡片
-class _YouTubeVideoCard extends StatelessWidget {
+class _YouTubeVideoCard extends StatefulWidget {
   final YouTubeVideo video;
   final ThemeService themeService;
   final VoidCallback? onTap;
@@ -331,6 +360,14 @@ class _YouTubeVideoCard extends StatelessWidget {
     required this.themeService,
     this.onTap,
   });
+
+  @override
+  State<_YouTubeVideoCard> createState() => _YouTubeVideoCardState();
+}
+
+class _YouTubeVideoCardState extends State<_YouTubeVideoCard> {
+  YouTubeVideo get video => widget.video;
+  ThemeService get themeService => widget.themeService;
 
   @override
   Widget build(BuildContext context) {
@@ -350,77 +387,87 @@ class _YouTubeVideoCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 缩略图
-            Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                  child: AspectRatio(
-                    aspectRatio: 16 / 9,
-                    child: video.thumbnailUrl.isNotEmpty
-                        ? CachedNetworkImage(
-                            imageUrl: video.thumbnailUrl,
-                            fit: BoxFit.cover,
-                            placeholder: (context, url) => Container(
-                              color: themeService.isDarkMode ? Colors.grey[800] : Colors.grey[200],
-                              child: const Center(
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF0000)),
+            // 缩略图 - 点击播放
+            GestureDetector(
+              onTap: _openInBrowser,
+              child: Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                    child: AspectRatio(
+                      aspectRatio: 16 / 9,
+                      child: video.thumbnailUrl.isNotEmpty
+                          ? CachedNetworkImage(
+                              imageUrl: video.thumbnailUrl,
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => Container(
+                                color: themeService.isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                                child: const Center(
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF0000)),
+                                  ),
                                 ),
                               ),
-                            ),
-                            errorWidget: (context, url, error) => _buildPlaceholder(),
-                          )
-                        : _buildPlaceholder(),
-                  ),
-                ),
-                // YouTube 标识
-                Positioned(
-                  bottom: 8,
-                  right: 8,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFF0000),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(LucideIcons.youtube, size: 12, color: Colors.white),
-                        const SizedBox(width: 4),
-                        Text(
-                          'YouTube',
-                          style: FontUtils.poppins(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
+                              errorWidget: (context, url, error) => _buildPlaceholder(),
+                            )
+                          : _buildPlaceholder(),
                     ),
                   ),
-                ),
-                // 播放按钮
-                Positioned.fill(
-                  child: Center(
+                  // YouTube 标识
+                  Positioned(
+                    bottom: 8,
+                    right: 8,
                     child: Container(
-                      width: 48,
-                      height: 48,
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFF0000).withOpacity(0.9),
-                        shape: BoxShape.circle,
+                        color: const Color(0xFFFF0000),
+                        borderRadius: BorderRadius.circular(4),
                       ),
-                      child: const Icon(
-                        Icons.play_arrow,
-                        color: Colors.white,
-                        size: 28,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(LucideIcons.youtube, size: 12, color: Colors.white),
+                          const SizedBox(width: 4),
+                          Text(
+                            'YouTube',
+                            style: FontUtils.poppins(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                ),
-              ],
+                  // 播放按钮
+                  Positioned.fill(
+                    child: Center(
+                      child: Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFF0000).withOpacity(0.9),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.play_arrow,
+                          color: Colors.white,
+                          size: 32,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
             // 信息
             Padding(
@@ -467,14 +514,6 @@ class _YouTubeVideoCard extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  // 操作按钮 - 只有新窗口按钮会跳转到YouTube
-                  _buildActionButton(
-                    icon: Icons.open_in_new,
-                    label: '在 YouTube 中打开',
-                    color: const Color(0xFFFF0000),
-                    onTap: () => _openInBrowser(),
-                  ),
                 ],
               ),
             ),
@@ -491,39 +530,6 @@ class _YouTubeVideoCard extends StatelessWidget {
           LucideIcons.youtube,
           size: 48,
           color: themeService.isDarkMode ? Colors.grey[600] : Colors.grey[400],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildActionButton({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 14, color: Colors.white),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: FontUtils.poppins(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: Colors.white,
-              ),
-            ),
-          ],
         ),
       ),
     );

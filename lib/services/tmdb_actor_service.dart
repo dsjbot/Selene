@@ -39,18 +39,20 @@ class TMDBActorWork {
       posterUrl = 'https://image.tmdb.org/t/p/w500$posterUrl';
     }
     
+    debugPrint('[TMDBActorWork.fromJson] id=${json['id']}, title=${json['title']}, poster=$posterUrl');
+    
     return TMDBActorWork(
       id: json['id']?.toString() ?? '',
-      title: json['title'] ?? '',
+      title: json['title']?.toString() ?? '',
       poster: posterUrl,
       rate: json['rate']?.toString() ?? '0',
       year: json['year']?.toString() ?? '',
       popularity: (json['popularity'] as num?)?.toDouble(),
       voteCount: json['vote_count'] as int?,
       genreIds: (json['genre_ids'] as List<dynamic>?)?.map((e) => e as int).toList(),
-      character: json['character'] as String?,
+      character: json['character']?.toString(),
       episodeCount: json['episode_count'] as int?,
-      originalLanguage: json['original_language'] as String?,
+      originalLanguage: json['original_language']?.toString(),
     );
   }
 
@@ -344,12 +346,22 @@ class TMDBActorService {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
+        debugPrint('[TMDB演员] 响应数据: $data');
 
         if (data['code'] == 200) {
-          final list = (data['list'] as List<dynamic>?)
-                  ?.map((v) => TMDBActorWork.fromJson(v as Map<String, dynamic>))
-                  .toList() ??
-              [];
+          final listRaw = data['list'] as List<dynamic>? ?? [];
+          debugPrint('[TMDB演员] list 数量: ${listRaw.length}');
+          if (listRaw.isNotEmpty) {
+            debugPrint('[TMDB演员] 第一个 item 原始数据: ${listRaw[0]}');
+          }
+          
+          final list = listRaw
+                  .map((v) => TMDBActorWork.fromJson(v as Map<String, dynamic>))
+                  .toList();
+          
+          if (list.isNotEmpty) {
+            debugPrint('[TMDB演员] 第一个解析后: id=${list[0].id}, title=${list[0].title}, poster=${list[0].poster}');
+          }
 
           final result = TMDBActorSearchResult(
             success: true,
