@@ -41,6 +41,10 @@ class MobilePlayerControls extends StatefulWidget {
   final String? videoId;
   final EpisodeSkipConfig? skipConfig;
   final ValueChanged<EpisodeSkipConfig?> onSkipConfigChanged;
+  // 选集换源相关
+  final VoidCallback? onShowEpisodesPanel;
+  final VoidCallback? onShowSourcesPanel;
+  final int? sourcesCount;
 
   const MobilePlayerControls({
     super.key,
@@ -72,6 +76,9 @@ class MobilePlayerControls extends StatefulWidget {
     this.videoId,
     this.skipConfig,
     required this.onSkipConfigChanged,
+    this.onShowEpisodesPanel,
+    this.onShowSourcesPanel,
+    this.sourcesCount,
   });
 
   @override
@@ -1200,6 +1207,66 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
                         Icons.picture_in_picture_alt,
                         color: Colors.white,
                         size: _isFullscreen ? 22 : 20,
+                      ),
+                    ),
+                  ),
+                // 选集按钮（仅全屏且有多集时显示）
+                if (_isFullscreen && widget.onShowEpisodesPanel != null && (widget.totalEpisodes ?? 0) > 1)
+                  GestureDetector(
+                    onTap: () {
+                      _onUserInteraction();
+                      widget.onShowEpisodesPanel?.call();
+                    },
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.list,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 2),
+                          Text(
+                            '选集',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                // 换源按钮（仅全屏且有多源时显示）
+                if (_isFullscreen && widget.onShowSourcesPanel != null && (widget.sourcesCount ?? 0) > 1)
+                  GestureDetector(
+                    onTap: () {
+                      _onUserInteraction();
+                      widget.onShowSourcesPanel?.call();
+                    },
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.swap_horiz,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 2),
+                          Text(
+                            '换源',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),

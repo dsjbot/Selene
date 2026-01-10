@@ -40,6 +40,10 @@ class VideoPlayerWidget extends StatefulWidget {
   final String? doubanId; // 豆瓣ID，用于获取弹幕
   final String? videoSource; // 视频源标识，用于跳过配置
   final String? videoId; // 视频ID，用于跳过配置
+  // 选集换源相关
+  final VoidCallback? onShowEpisodesPanel;
+  final VoidCallback? onShowSourcesPanel;
+  final int? sourcesCount;
 
   const VideoPlayerWidget({
     super.key,
@@ -65,6 +69,9 @@ class VideoPlayerWidget extends StatefulWidget {
     this.videoSource,
     this.videoId,
     this.doubanId,
+    this.onShowEpisodesPanel,
+    this.onShowSourcesPanel,
+    this.sourcesCount,
   });
 
   @override
@@ -943,6 +950,9 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
                                 videoId: widget.videoId,
                                 skipConfig: _skipConfig,
                                 onSkipConfigChanged: _updateSkipConfig,
+                                onShowEpisodesPanel: widget.onShowEpisodesPanel,
+                                onShowSourcesPanel: widget.onShowSourcesPanel,
+                                sourcesCount: widget.sourcesCount,
                               ),
                         // 片头跳过提示
                         if (_showIntroPrompt && !_isPipMode)

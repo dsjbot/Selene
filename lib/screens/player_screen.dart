@@ -1062,6 +1062,9 @@ class _PlayerScreenState extends State<PlayerScreen>
             doubanId: videoDoubanID > 0 ? videoDoubanID.toString() : null,
             videoSource: currentSource.isNotEmpty ? currentSource : null,
             videoId: currentID.isNotEmpty ? currentID : null,
+            onShowEpisodesPanel: _showFullscreenEpisodesPanel,
+            onShowSourcesPanel: _showFullscreenSourcesPanel,
+            sourcesCount: allSources.length,
           ),
         if (_isCasting && _dlnaDevice != null)
           DLNAPlayer(
@@ -1741,6 +1744,136 @@ class _PlayerScreenState extends State<PlayerScreen>
         ),
       ],
     );
+  }
+
+  /// 全屏模式下显示选集面板（从右侧滑出）
+  void _showFullscreenEpisodesPanel() {
+    if (currentDetail == null) return;
+    
+    final theme = Theme.of(context);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final panelWidth = screenWidth * 0.35;
+
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: '',
+      barrierColor: Colors.black.withOpacity(0.3),
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return Align(
+          alignment: Alignment.centerRight,
+          child: Material(
+            color: Colors.transparent,
+            child: SizedBox(
+              width: panelWidth,
+              height: screenHeight,
+              child: SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(1, 0),
+                  end: Offset.zero,
+                ).animate(CurvedAnimation(
+                  parent: animation,
+                  curve: Curves.easeInOut,
+                )),
+                child: StatefulBuilder(
+                  builder: (BuildContext context, StateSetter setState) {
+                    return PlayerEpisodesPanel(
+                      theme: theme,
+                      episodes: currentDetail!.episodes,
+                      episodesTitles: currentDetail!.episodesTitles,
+                      currentEpisodeIndex: currentEpisodeIndex,
+                      isReversed: _isEpisodesReversed,
+                      crossAxisCount: 2,
+                      onEpisodeTap: (index) {
+                        Navigator.pop(context);
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          this.setState(() {
+                            _showSwitchLoadingOverlay = true;
+                            _switchLoadingMessage = '切换选集...';
+                          });
+                        });
+                        _saveProgress(force: true, scene: '全屏选集面板点击');
+                        startPlay(index, 0);
+                      },
+                      onToggleOrder: () {
+                        setState(() {
+                          _isEpisodesReversed = !_isEpisodesReversed;
+                        });
+                      },
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// 全屏模式下显示换源面板（从右侧滑出）
+  void _showFullscreenSourcesPanel() {
+    if (allSources.isEmpty) return;
+    
+    final theme = Theme.of(context);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final panelWidth = screenWidth * 0.35;
+
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: '',
+      barrierColor: Colors.black.withOpacity(0.3),
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return Align(
+          alignment: Alignment.centerRight,
+          child: Material(
+            color: Colors.transparent,
+            child: SizedBox(
+              width: panelWidth,
+              height: screenHeight,
+              child: SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(1, 0),
+                  end: Offset.zero,
+                ).animate(CurvedAnimation(
+                  parent: animation,
+                  curve: Curves.easeInOut,
+                )),
+                child: StatefulBuilder(
+                  builder: (BuildContext context, StateSetter setState) {
+                    return PlayerSourcesPanel(
+                      theme: theme,
+                      sources: allSources,
+                      currentSource: currentSource,
+                      currentId: currentID,
+                      sourcesSpeed: allSourcesSpeed,
+                      onSourceTap: (source) {
+                        this.setState(() {
+                          _switchSource(source);
+                        });
+                        Navigator.pop(context);
+                      },
+                      onRefresh: () async {
+                        await _refreshSourcesSpeed(setState);
+                      },
+                      videoCover: videoCover,
+                      videoTitle: videoTitle,
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    ).then((_) {
+      setState(() {});
+    });
   }
 
   /// 构建选集底部滑出面板
