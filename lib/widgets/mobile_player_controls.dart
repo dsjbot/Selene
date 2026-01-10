@@ -504,6 +504,8 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
 
   Future<void> _showDanmakuDialog() async {
     final screenHeight = MediaQuery.of(context).size.height;
+    // 复制一份设置用于弹窗内部状态
+    var localSettings = widget.danmakuSettings.copyWith();
     
     await showModalBottomSheet<void>(
       context: context,
@@ -535,12 +537,13 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
                               ),
                             ),
                             Switch(
-                              value: widget.danmakuSettings.enabled,
+                              value: localSettings.enabled,
                               onChanged: (value) {
-                                final newSettings = widget.danmakuSettings.copyWith(enabled: value);
-                                widget.onDanmakuSettingsChanged(newSettings);
-                                newSettings.save();
-                                setModalState(() {});
+                                setModalState(() {
+                                  localSettings = localSettings.copyWith(enabled: value);
+                                });
+                                widget.onDanmakuSettingsChanged(localSettings);
+                                localSettings.save();
                               },
                               activeColor: Colors.blue,
                             ),
@@ -550,64 +553,68 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
                         // 透明度
                         _buildDanmakuSlider(
                           label: '透明度',
-                          value: widget.danmakuSettings.opacity,
+                          value: localSettings.opacity,
                           min: 0.1,
                           max: 1.0,
-                          displayValue: '${(widget.danmakuSettings.opacity * 100).round()}%',
-                          enabled: widget.danmakuSettings.enabled,
+                          displayValue: '${(localSettings.opacity * 100).round()}%',
+                          enabled: localSettings.enabled,
                           onChanged: (value) {
-                            final newSettings = widget.danmakuSettings.copyWith(opacity: value);
-                            widget.onDanmakuSettingsChanged(newSettings);
-                            newSettings.save();
-                            setModalState(() {});
+                            setModalState(() {
+                              localSettings = localSettings.copyWith(opacity: value);
+                            });
+                            widget.onDanmakuSettingsChanged(localSettings);
+                            localSettings.save();
                           },
                         ),
                         // 字体大小
                         _buildDanmakuSlider(
                           label: '字体大小',
-                          value: widget.danmakuSettings.fontSize,
+                          value: localSettings.fontSize,
                           min: 12.0,
                           max: 32.0,
-                          displayValue: '${widget.danmakuSettings.fontSize.round()}',
-                          enabled: widget.danmakuSettings.enabled,
+                          displayValue: '${localSettings.fontSize.round()}',
+                          enabled: localSettings.enabled,
                           onChanged: (value) {
-                            final newSettings = widget.danmakuSettings.copyWith(fontSize: value);
-                            widget.onDanmakuSettingsChanged(newSettings);
-                            newSettings.save();
-                            setModalState(() {});
+                            setModalState(() {
+                              localSettings = localSettings.copyWith(fontSize: value);
+                            });
+                            widget.onDanmakuSettingsChanged(localSettings);
+                            localSettings.save();
                           },
                         ),
                         // 弹幕速度
                         _buildDanmakuSlider(
                           label: '弹幕速度',
-                          value: widget.danmakuSettings.speed,
+                          value: localSettings.speed,
                           min: 0.5,
                           max: 2.0,
-                          displayValue: '${widget.danmakuSettings.speed.toStringAsFixed(1)}x',
-                          enabled: widget.danmakuSettings.enabled,
+                          displayValue: '${localSettings.speed.toStringAsFixed(1)}x',
+                          enabled: localSettings.enabled,
                           onChanged: (value) {
-                            final newSettings = widget.danmakuSettings.copyWith(speed: value);
-                            widget.onDanmakuSettingsChanged(newSettings);
-                            newSettings.save();
-                            setModalState(() {});
+                            setModalState(() {
+                              localSettings = localSettings.copyWith(speed: value);
+                            });
+                            widget.onDanmakuSettingsChanged(localSettings);
+                            localSettings.save();
                           },
                         ),
                         // 显示区域
                         _buildDanmakuSlider(
                           label: '显示区域',
-                          value: widget.danmakuSettings.areaHeight,
+                          value: localSettings.areaHeight,
                           min: 0.25,
                           max: 1.0,
-                          displayValue: '${(widget.danmakuSettings.areaHeight * 100).round()}%',
-                          enabled: widget.danmakuSettings.enabled,
+                          displayValue: '${(localSettings.areaHeight * 100).round()}%',
+                          enabled: localSettings.enabled,
                           onChanged: (value) {
-                            final newSettings = widget.danmakuSettings.copyWith(areaHeight: value);
-                            widget.onDanmakuSettingsChanged(newSettings);
-                            newSettings.save();
-                            setModalState(() {});
+                            setModalState(() {
+                              localSettings = localSettings.copyWith(areaHeight: value);
+                            });
+                            widget.onDanmakuSettingsChanged(localSettings);
+                            localSettings.save();
                           },
                         ),
-                        SizedBox(height: isLandscape ? 4 : 8),
+                        const SizedBox(height: 8),
                       ],
                     ),
                   ),
@@ -618,6 +625,7 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
         );
       },
     );
+  }
   }
 
   Widget _buildDanmakuSlider({
