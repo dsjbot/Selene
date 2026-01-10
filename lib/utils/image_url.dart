@@ -64,6 +64,16 @@ Map<String, String>? getImageRequestHeaders(String imageUrl, String? source) {
     };
   }
   
+  // 即将上映来源（manmankan.com）需要特殊 headers
+  final bool isUpcomingSource = (source == 'upcoming_release') ||
+      imageUrl.contains('manmankan.com');
+  if (isUpcomingSource) {
+    return <String, String>{
+      'Referer': 'https://g.manmankan.com/',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    };
+  }
+  
   // 检查是否是通过后端代理的图片（需要 Cookie 认证）
   final bool isProxiedImage = imageUrl.contains('/api/image-proxy');
   if (isProxiedImage && _cachedCookies != null && _cachedCookies!.isNotEmpty) {

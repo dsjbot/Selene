@@ -216,11 +216,19 @@ class _SkipSettingsPanelState extends State<SkipSettingsPanel> {
     final textColor = isDark ? Colors.white : Colors.black87;
     final subTextColor = isDark ? Colors.white70 : Colors.black54;
     final screenHeight = MediaQuery.of(context).size.height;
+    final orientation = MediaQuery.of(context).orientation;
+    final isLandscape = orientation == Orientation.landscape;
+    
+    // 横屏时使用更紧凑的高度限制
+    final maxHeight = isLandscape ? screenHeight * 0.85 : screenHeight * 0.7;
+    final contentPadding = isLandscape ? 12.0 : 16.0;
+    final titleSize = isLandscape ? 16.0 : 18.0;
+    final sectionTitleSize = isLandscape ? 14.0 : 16.0;
 
     return ConstrainedBox(
-      constraints: BoxConstraints(maxHeight: screenHeight * 0.7),
+      constraints: BoxConstraints(maxHeight: maxHeight),
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(contentPadding),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -229,14 +237,16 @@ class _SkipSettingsPanelState extends State<SkipSettingsPanel> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('跳过设置', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
+                Text('跳过设置', style: TextStyle(fontSize: titleSize, fontWeight: FontWeight.bold, color: textColor)),
                 IconButton(
-                  icon: Icon(Icons.close, color: subTextColor),
+                  icon: Icon(Icons.close, color: subTextColor, size: isLandscape ? 20 : 24),
                   onPressed: () => Navigator.of(context).pop(),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: isLandscape ? 8 : 16),
 
             // 可滚动内容区域
             Flexible(
@@ -246,50 +256,52 @@ class _SkipSettingsPanelState extends State<SkipSettingsPanel> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // 片头设置
-                    _buildSectionTitle('片头跳过', _introEnabled, (v) => setState(() => _introEnabled = v), textColor),
+                    _buildSectionTitle('片头跳过', _introEnabled, (v) => setState(() => _introEnabled = v), textColor, fontSize: sectionTitleSize),
                     if (_introEnabled) ...[
-                      const SizedBox(height: 8),
+                      SizedBox(height: isLandscape ? 4 : 8),
                       Row(
                         children: [
-                          Expanded(child: _buildTimeField('开始', _introStartController, subTextColor)),
-                          const SizedBox(width: 16),
-                          Expanded(child: _buildTimeField('结束', _introEndController, subTextColor)),
+                          Expanded(child: _buildTimeField('开始', _introStartController, subTextColor, compact: isLandscape)),
+                          SizedBox(width: isLandscape ? 8 : 16),
+                          Expanded(child: _buildTimeField('结束', _introEndController, subTextColor, compact: isLandscape)),
                         ],
                       ),
-                      const SizedBox(height: 8),
-                      _buildSwitch('自动跳过', _autoSkipIntro, (v) => setState(() => _autoSkipIntro = v), subTextColor),
+                      SizedBox(height: isLandscape ? 4 : 8),
+                      _buildSwitch('自动跳过', _autoSkipIntro, (v) => setState(() => _autoSkipIntro = v), subTextColor, compact: isLandscape),
                     ],
 
-                    const SizedBox(height: 16),
+                    SizedBox(height: isLandscape ? 8 : 16),
                     Divider(color: subTextColor.withOpacity(0.3)),
-                    const SizedBox(height: 16),
+                    SizedBox(height: isLandscape ? 8 : 16),
 
                     // 片尾设置
-                    _buildSectionTitle('片尾跳过', _outroEnabled, (v) => setState(() => _outroEnabled = v), textColor),
+                    _buildSectionTitle('片尾跳过', _outroEnabled, (v) => setState(() => _outroEnabled = v), textColor, fontSize: sectionTitleSize),
                     if (_outroEnabled) ...[
-                      const SizedBox(height: 8),
+                      SizedBox(height: isLandscape ? 4 : 8),
                       _buildSwitch(
                         '剩余时间模式',
                         _outroRemainingMode,
                         (v) => setState(() => _outroRemainingMode = v),
                         subTextColor,
                         subtitle: _outroRemainingMode ? '视频结束前触发' : '从指定时间点触发',
+                        compact: isLandscape,
                       ),
-                      const SizedBox(height: 8),
+                      SizedBox(height: isLandscape ? 4 : 8),
                       _buildTimeField(
                         _outroRemainingMode ? '剩余时间' : '开始时间',
                         _outroTimeController,
                         subTextColor,
+                        compact: isLandscape,
                       ),
-                      const SizedBox(height: 8),
-                      _buildSwitch('自动下一集', _autoNextEpisode, (v) => setState(() => _autoNextEpisode = v), subTextColor),
+                      SizedBox(height: isLandscape ? 4 : 8),
+                      _buildSwitch('自动下一集', _autoNextEpisode, (v) => setState(() => _autoNextEpisode = v), subTextColor, compact: isLandscape),
                     ],
                   ],
                 ),
               ),
             ),
 
-            const SizedBox(height: 16),
+            SizedBox(height: isLandscape ? 8 : 16),
 
             // 按钮（固定在底部）
             Row(
@@ -297,19 +309,28 @@ class _SkipSettingsPanelState extends State<SkipSettingsPanel> {
                 if (widget.currentConfig != null)
                   TextButton(
                     onPressed: _deleteConfig,
-                    child: const Text('删除配置', style: TextStyle(color: Colors.red)),
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.symmetric(horizontal: isLandscape ? 8 : 16, vertical: isLandscape ? 4 : 8),
+                    ),
+                    child: Text('删除配置', style: TextStyle(color: Colors.red, fontSize: isLandscape ? 13 : 14)),
                   ),
                 const Spacer(),
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: Text('取消', style: TextStyle(color: subTextColor)),
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.symmetric(horizontal: isLandscape ? 8 : 16, vertical: isLandscape ? 4 : 8),
+                  ),
+                  child: Text('取消', style: TextStyle(color: subTextColor, fontSize: isLandscape ? 13 : 14)),
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: isLandscape ? 4 : 8),
                 ElevatedButton(
                   onPressed: _isSaving ? null : _saveConfig,
+                  style: ElevatedButton.styleFrom(
+                    padding: EdgeInsets.symmetric(horizontal: isLandscape ? 12 : 16, vertical: isLandscape ? 4 : 8),
+                  ),
                   child: _isSaving
-                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Text('保存'),
+                      ? SizedBox(width: isLandscape ? 14 : 16, height: isLandscape ? 14 : 16, child: const CircularProgressIndicator(strokeWidth: 2))
+                      : Text('保存', style: TextStyle(fontSize: isLandscape ? 13 : 14)),
                 ),
               ],
             ),
@@ -318,45 +339,54 @@ class _SkipSettingsPanelState extends State<SkipSettingsPanel> {
       ),
     );
   }
-  Widget _buildSectionTitle(String title, bool enabled, ValueChanged<bool> onChanged, Color textColor) {
+  Widget _buildSectionTitle(String title, bool enabled, ValueChanged<bool> onChanged, Color textColor, {double fontSize = 16}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: textColor)),
-        Switch(value: enabled, onChanged: onChanged, activeColor: Colors.blue),
+        Text(title, style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.w500, color: textColor)),
+        Transform.scale(
+          scale: fontSize < 16 ? 0.85 : 1.0,
+          child: Switch(value: enabled, onChanged: onChanged, activeColor: Colors.blue),
+        ),
       ],
     );
   }
 
-  Widget _buildTimeField(String label, TextEditingController controller, Color textColor) {
+  Widget _buildTimeField(String label, TextEditingController controller, Color textColor, {bool compact = false}) {
     return TextField(
       controller: controller,
-      style: TextStyle(color: textColor),
+      style: TextStyle(color: textColor, fontSize: compact ? 13 : 14),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: TextStyle(color: textColor.withOpacity(0.7)),
+        labelStyle: TextStyle(color: textColor.withOpacity(0.7), fontSize: compact ? 12 : 14),
         hintText: '分:秒 或 秒数',
-        hintStyle: TextStyle(color: textColor.withOpacity(0.5)),
+        hintStyle: TextStyle(color: textColor.withOpacity(0.5), fontSize: compact ? 12 : 14),
         border: const OutlineInputBorder(),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        contentPadding: EdgeInsets.symmetric(horizontal: compact ? 8 : 12, vertical: compact ? 6 : 8),
+        isDense: compact,
       ),
       keyboardType: TextInputType.text,
     );
   }
 
-  Widget _buildSwitch(String label, bool value, ValueChanged<bool> onChanged, Color textColor, {String? subtitle}) {
+  Widget _buildSwitch(String label, bool value, ValueChanged<bool> onChanged, Color textColor, {String? subtitle, bool compact = false}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: TextStyle(color: textColor)),
-            if (subtitle != null)
-              Text(subtitle, style: TextStyle(color: textColor.withOpacity(0.6), fontSize: 12)),
-          ],
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: TextStyle(color: textColor, fontSize: compact ? 13 : 14)),
+              if (subtitle != null)
+                Text(subtitle, style: TextStyle(color: textColor.withOpacity(0.6), fontSize: compact ? 11 : 12)),
+            ],
+          ),
         ),
-        Switch(value: value, onChanged: onChanged, activeColor: Colors.blue),
+        Transform.scale(
+          scale: compact ? 0.85 : 1.0,
+          child: Switch(value: value, onChanged: onChanged, activeColor: Colors.blue),
+        ),
       ],
     );
   }

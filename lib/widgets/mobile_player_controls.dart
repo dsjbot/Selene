@@ -98,6 +98,9 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
   Timer? _brightnessHideTimer;
   Timer? _timeUpdateTimer;
   String _currentTime = '';
+  // 双击暂停相关
+  Timer? _doubleTapTimer;
+  int _tapCount = 0;
 
   @override
   void initState() {
@@ -175,6 +178,7 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
     _volumeHideTimer?.cancel();
     _brightnessHideTimer?.cancel();
     _timeUpdateTimer?.cancel();
+    _doubleTapTimer?.cancel();
     VolumeController.instance.showSystemUI = true;
     super.dispose();
   }
@@ -230,6 +234,27 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
       _startHideTimer();
     } else {
       _hideTimer?.cancel();
+    }
+  }
+
+  /// 处理点击事件，支持双击暂停
+  void _handleTap() {
+    _tapCount++;
+    if (_tapCount == 1) {
+      // 第一次点击，启动计时器等待第二次点击
+      _doubleTapTimer?.cancel();
+      _doubleTapTimer = Timer(const Duration(milliseconds: 250), () {
+        // 超时，执行单击操作
+        if (_tapCount == 1) {
+          _toggleControlsVisibility();
+        }
+        _tapCount = 0;
+      });
+    } else if (_tapCount == 2) {
+      // 双击，执行暂停/播放
+      _doubleTapTimer?.cancel();
+      _tapCount = 0;
+      _togglePlayPause();
     }
   }
 
@@ -436,6 +461,9 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
     final speeds = [0.5, 0.75, 1.0, 1.5, 2.0];
     final currentSpeed = widget.playbackSpeedListenable.value;
     final screenHeight = MediaQuery.of(context).size.height;
+    final orientation = MediaQuery.of(context).orientation;
+    final isLandscape = orientation == Orientation.landscape;
+    
     final result = await showModalBottomSheet<double>(
       context: context,
       builder: (context) {
@@ -443,7 +471,7 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
         return SafeArea(
           child: ConstrainedBox(
             constraints: BoxConstraints(
-              maxHeight: screenHeight * 0.75,
+              maxHeight: isLandscape ? screenHeight * 0.9 : screenHeight * 0.75,
             ),
             child: SingleChildScrollView(
               child: Column(
@@ -451,6 +479,8 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
                 children: speeds.map((speed) {
                   final selected = (speed - currentSpeed).abs() < 0.01;
                   return ListTile(
+                    dense: isLandscape,
+                    visualDensity: isLandscape ? VisualDensity.compact : null,
                     title: Text(
                       '${speed}x',
                       style: TextStyle(
@@ -459,6 +489,7 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
                             : (isDark ? Colors.white : Colors.black87),
                         fontWeight:
                             selected ? FontWeight.bold : FontWeight.normal,
+                        fontSize: isLandscape ? 14 : 16,
                       ),
                     ),
                     onTap: () => Navigator.of(context).pop(speed),
@@ -477,6 +508,9 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
 
   Future<void> _showDanmakuDialog() async {
     final screenHeight = MediaQuery.of(context).size.height;
+    final orientation = MediaQuery.of(context).orientation;
+    final isLandscape = orientation == Orientation.landscape;
+    
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -484,14 +518,17 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
         return StatefulBuilder(
           builder: (context, setModalState) {
             final isDark = Theme.of(context).brightness == Brightness.dark;
+            final contentPadding = isLandscape ? 12.0 : 16.0;
+            final titleSize = isLandscape ? 16.0 : 18.0;
+            
             return SafeArea(
               child: ConstrainedBox(
                 constraints: BoxConstraints(
-                  maxHeight: screenHeight * 0.6,
+                  maxHeight: isLandscape ? screenHeight * 0.85 : screenHeight * 0.6,
                 ),
                 child: SingleChildScrollView(
                   child: Padding(
-                    padding: const EdgeInsets.all(16.0),
+                    padding: EdgeInsets.all(contentPadding),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -503,24 +540,27 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
                             Text(
                               '弹幕设置',
                               style: TextStyle(
-                                fontSize: 18,
+                                fontSize: titleSize,
                                 fontWeight: FontWeight.bold,
                                 color: isDark ? Colors.white : Colors.black87,
                               ),
                             ),
-                            Switch(
-                              value: widget.danmakuSettings.enabled,
-                              onChanged: (value) {
-                                widget.onDanmakuSettingsChanged(
-                                  widget.danmakuSettings.copyWith(enabled: value),
-                                );
-                                setModalState(() {});
-                              },
-                              activeColor: Colors.blue,
+                            Transform.scale(
+                              scale: isLandscape ? 0.85 : 1.0,
+                              child: Switch(
+                                value: widget.danmakuSettings.enabled,
+                                onChanged: (value) {
+                                  final newSettings = widget.danmakuSettings.copyWith(enabled: value);
+                                  widget.onDanmakuSettingsChanged(newSettings);
+                                  newSettings.save(); // 保存设置
+                                  setModalState(() {});
+                                },
+                                activeColor: Colors.blue,
+                              ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 16),
+                        SizedBox(height: isLandscape ? 8 : 16),
                         // 透明度
                         _buildDanmakuSlider(
                           label: '透明度',
@@ -530,10 +570,11 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
                           displayValue: '${(widget.danmakuSettings.opacity * 100).round()}%',
                           enabled: widget.danmakuSettings.enabled,
                           isDark: isDark,
+                          compact: isLandscape,
                           onChanged: (value) {
-                            widget.onDanmakuSettingsChanged(
-                              widget.danmakuSettings.copyWith(opacity: value),
-                            );
+                            final newSettings = widget.danmakuSettings.copyWith(opacity: value);
+                            widget.onDanmakuSettingsChanged(newSettings);
+                            newSettings.save(); // 保存设置
                             setModalState(() {});
                           },
                         ),
@@ -546,10 +587,11 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
                           displayValue: '${widget.danmakuSettings.fontSize.round()}',
                           enabled: widget.danmakuSettings.enabled,
                           isDark: isDark,
+                          compact: isLandscape,
                           onChanged: (value) {
-                            widget.onDanmakuSettingsChanged(
-                              widget.danmakuSettings.copyWith(fontSize: value),
-                            );
+                            final newSettings = widget.danmakuSettings.copyWith(fontSize: value);
+                            widget.onDanmakuSettingsChanged(newSettings);
+                            newSettings.save(); // 保存设置
                             setModalState(() {});
                           },
                         ),
@@ -562,10 +604,11 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
                           displayValue: '${widget.danmakuSettings.speed.toStringAsFixed(1)}x',
                           enabled: widget.danmakuSettings.enabled,
                           isDark: isDark,
+                          compact: isLandscape,
                           onChanged: (value) {
-                            widget.onDanmakuSettingsChanged(
-                              widget.danmakuSettings.copyWith(speed: value),
-                            );
+                            final newSettings = widget.danmakuSettings.copyWith(speed: value);
+                            widget.onDanmakuSettingsChanged(newSettings);
+                            newSettings.save(); // 保存设置
                             setModalState(() {});
                           },
                         ),
@@ -578,14 +621,15 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
                           displayValue: '${(widget.danmakuSettings.areaHeight * 100).round()}%',
                           enabled: widget.danmakuSettings.enabled,
                           isDark: isDark,
+                          compact: isLandscape,
                           onChanged: (value) {
-                            widget.onDanmakuSettingsChanged(
-                              widget.danmakuSettings.copyWith(areaHeight: value),
-                            );
+                            final newSettings = widget.danmakuSettings.copyWith(areaHeight: value);
+                            widget.onDanmakuSettingsChanged(newSettings);
+                            newSettings.save(); // 保存设置
                             setModalState(() {});
                           },
                         ),
-                        const SizedBox(height: 8),
+                        SizedBox(height: isLandscape ? 4 : 8),
                       ],
                     ),
                   ),
@@ -607,9 +651,10 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
     required bool enabled,
     required bool isDark,
     required ValueChanged<double> onChanged,
+    bool compact = false,
   }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      padding: EdgeInsets.symmetric(vertical: compact ? 4.0 : 8.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -622,7 +667,7 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
                   color: enabled
                       ? (isDark ? Colors.white : Colors.black87)
                       : (isDark ? Colors.white38 : Colors.black38),
-                  fontSize: 14,
+                  fontSize: compact ? 13 : 14,
                 ),
               ),
               Text(
@@ -631,18 +676,21 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
                   color: enabled
                       ? (isDark ? Colors.white70 : Colors.black54)
                       : (isDark ? Colors.white24 : Colors.black26),
-                  fontSize: 14,
+                  fontSize: compact ? 13 : 14,
                 ),
               ),
             ],
           ),
-          Slider(
-            value: value,
-            min: min,
-            max: max,
-            onChanged: enabled ? onChanged : null,
-            activeColor: Colors.blue,
-            inactiveColor: isDark ? Colors.white24 : Colors.black12,
+          SizedBox(
+            height: compact ? 28 : 36,
+            child: Slider(
+              value: value,
+              min: min,
+              max: max,
+              onChanged: enabled ? onChanged : null,
+              activeColor: Colors.blue,
+              inactiveColor: isDark ? Colors.white24 : Colors.black12,
+            ),
           ),
         ],
       ),
@@ -745,7 +793,7 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
             Expanded(
               flex: 1,
               child: GestureDetector(
-                onTap: _toggleControlsVisibility,
+                onTap: _handleTap,
                 onLongPressStart: _onLongPressStart,
                 onLongPressEnd: _onLongPressEnd,
                 onLongPressCancel: () {
@@ -765,7 +813,7 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
           Expanded(
             flex: _isFullscreen ? 2 : 1,
             child: GestureDetector(
-              onTap: _toggleControlsVisibility,
+              onTap: _handleTap,
               onLongPressStart: _onLongPressStart,
               onLongPressEnd: _onLongPressEnd,
               onLongPressCancel: () {
@@ -783,7 +831,7 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
             Expanded(
               flex: 1,
               child: GestureDetector(
-                onTap: _toggleControlsVisibility,
+                onTap: _handleTap,
                 onLongPressStart: _onLongPressStart,
                 onLongPressEnd: _onLongPressEnd,
                 onLongPressCancel: () {

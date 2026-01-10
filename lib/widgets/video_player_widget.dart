@@ -182,7 +182,8 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     _setupPip();
     _registerPipObserver();
     widget.onControllerCreated?.call(VideoPlayerWidgetController._(this));
-    // 加载弹幕和跳过配置
+    // 加载弹幕设置、弹幕数据和跳过配置
+    _loadDanmakuSettings();
     if (!widget.live) {
       _loadDanmaku();
       _loadSkipConfig();
@@ -483,6 +484,16 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     _exitWebFullscreenCallback?.call();
   }
 
+  /// 加载弹幕设置
+  Future<void> _loadDanmakuSettings() async {
+    final settings = await DanmakuSettings.load();
+    if (mounted) {
+      setState(() {
+        _danmakuSettings = settings;
+      });
+    }
+  }
+
   /// 加载弹幕数据
   Future<void> _loadDanmaku() async {
     debugPrint('[弹幕] _loadDanmaku 被调用');
@@ -542,6 +553,8 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     setState(() {
       _danmakuSettings = settings;
     });
+    // 保存设置到本地存储
+    settings.save();
   }
 
   /// 加载跳过配置

@@ -1610,6 +1610,56 @@ class _VideoMenuBottomSheetState extends State<VideoMenuBottomSheet>
       return Column(children: menuItems);
     }
     
+    // 如果是即将上映场景，显示播放、收藏/取消收藏和AI问片（不显示删除记录）
+    if (widget.from == 'upcoming') {
+      return Column(
+        children: [
+          _buildMenuItem(
+            context,
+            themeService,
+            icon: Icons.play_circle_fill,
+            iconColor: const Color(0xFF27AE60),
+            title: '播放',
+            subtitle: _getEpisodeSubtitle(),
+            onTap: () {
+              widget.onClose();
+              widget.onActionSelected(VideoMenuAction.play);
+            },
+          ),
+          
+          _buildDivider(themeService),
+          
+          // 根据收藏状态动态显示收藏或取消收藏
+          _buildMenuItem(
+            context,
+            themeService,
+            icon: widget.isFavorited ? Icons.favorite : Icons.favorite_border,
+            iconColor: const Color(0xFFE74C3C),
+            title: widget.isFavorited ? '取消收藏' : '收藏',
+            onTap: () {
+              widget.onClose();
+              widget.onActionSelected(widget.isFavorited ? VideoMenuAction.unfavorite : VideoMenuAction.favorite);
+            },
+          ),
+          
+          _buildDivider(themeService),
+          
+          // AI 问片
+          _buildMenuItem(
+            context,
+            themeService,
+            icon: Icons.auto_awesome,
+            iconColor: const Color(0xFF8B5CF6),
+            title: 'AI 问片',
+            onTap: () {
+              widget.onClose();
+              widget.onActionSelected(VideoMenuAction.aiChat);
+            },
+          ),
+        ],
+      );
+    }
+    
     // 其他来源显示完整菜单
     return Column(
       children: [

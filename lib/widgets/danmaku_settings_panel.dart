@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// 弹幕设置数据
 class DanmakuSettings {
@@ -31,6 +32,28 @@ class DanmakuSettings {
       areaHeight: areaHeight ?? this.areaHeight,
     );
   }
+
+  /// 从 SharedPreferences 加载设置
+  static Future<DanmakuSettings> load() async {
+    final prefs = await SharedPreferences.getInstance();
+    return DanmakuSettings(
+      enabled: prefs.getBool('danmaku_enabled') ?? true,
+      opacity: prefs.getDouble('danmaku_opacity') ?? 0.8,
+      fontSize: prefs.getDouble('danmaku_fontSize') ?? 18.0,
+      speed: prefs.getDouble('danmaku_speed') ?? 1.0,
+      areaHeight: prefs.getDouble('danmaku_areaHeight') ?? 0.5,
+    );
+  }
+
+  /// 保存设置到 SharedPreferences
+  Future<void> save() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('danmaku_enabled', enabled);
+    await prefs.setDouble('danmaku_opacity', opacity);
+    await prefs.setDouble('danmaku_fontSize', fontSize);
+    await prefs.setDouble('danmaku_speed', speed);
+    await prefs.setDouble('danmaku_areaHeight', areaHeight);
+  }
 }
 
 /// 弹幕设置面板
@@ -48,10 +71,15 @@ class DanmakuSettingsPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final panelWidth = isFullscreen ? 280.0 : 240.0;
-    final itemPadding = isFullscreen ? 16.0 : 12.0;
-    final titleSize = isFullscreen ? 14.0 : 12.0;
-    final labelSize = isFullscreen ? 13.0 : 11.0;
+    final orientation = MediaQuery.of(context).orientation;
+    final isLandscape = orientation == Orientation.landscape;
+    
+    // 横屏时使用更紧凑的尺寸
+    final panelWidth = isLandscape ? 220.0 : (isFullscreen ? 280.0 : 240.0);
+    final itemPadding = isLandscape ? 10.0 : (isFullscreen ? 16.0 : 12.0);
+    final titleSize = isLandscape ? 12.0 : (isFullscreen ? 14.0 : 12.0);
+    final labelSize = isLandscape ? 11.0 : (isFullscreen ? 13.0 : 11.0);
+    final sliderHeight = isLandscape ? 24.0 : 32.0;
 
     return Material(
       color: Colors.transparent,
@@ -111,6 +139,7 @@ class DanmakuSettingsPanel extends StatelessWidget {
                   : null,
               padding: itemPadding,
               labelSize: labelSize,
+              compact: isLandscape,
             ),
             // 字体大小
             _buildSliderItem(
@@ -126,6 +155,7 @@ class DanmakuSettingsPanel extends StatelessWidget {
                   : null,
               padding: itemPadding,
               labelSize: labelSize,
+              compact: isLandscape,
             ),
             // 弹幕速度
             _buildSliderItem(
@@ -141,6 +171,7 @@ class DanmakuSettingsPanel extends StatelessWidget {
                   : null,
               padding: itemPadding,
               labelSize: labelSize,
+              compact: isLandscape,
             ),
             // 显示区域
             _buildSliderItem(
@@ -156,6 +187,7 @@ class DanmakuSettingsPanel extends StatelessWidget {
                   : null,
               padding: itemPadding,
               labelSize: labelSize,
+              compact: isLandscape,
             ),
             SizedBox(height: itemPadding / 2),
           ],
@@ -205,11 +237,12 @@ class DanmakuSettingsPanel extends StatelessWidget {
     required ValueChanged<double>? onChanged,
     required double padding,
     required double labelSize,
+    bool compact = false,
   }) {
     final isEnabled = onChanged != null;
 
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: padding, vertical: padding / 2),
+      padding: EdgeInsets.symmetric(horizontal: padding, vertical: compact ? padding / 3 : padding / 2),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -236,23 +269,26 @@ class DanmakuSettingsPanel extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 4),
-          SliderTheme(
-            data: SliderThemeData(
-              trackHeight: 3,
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-              overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
-              activeTrackColor:
-                  isEnabled ? Colors.blue : Colors.grey.withValues(alpha: 0.3),
-              inactiveTrackColor: Colors.white.withValues(alpha: 0.2),
-              thumbColor: isEnabled ? Colors.white : Colors.grey,
-              overlayColor: Colors.blue.withValues(alpha: 0.2),
-            ),
-            child: Slider(
-              value: value,
-              min: min,
-              max: max,
-              onChanged: onChanged,
+          SizedBox(height: compact ? 2 : 4),
+          SizedBox(
+            height: compact ? 24 : 32,
+            child: SliderTheme(
+              data: SliderThemeData(
+                trackHeight: compact ? 2 : 3,
+                thumbShape: RoundSliderThumbShape(enabledThumbRadius: compact ? 5 : 6),
+                overlayShape: RoundSliderOverlayShape(overlayRadius: compact ? 10 : 12),
+                activeTrackColor:
+                    isEnabled ? Colors.blue : Colors.grey.withValues(alpha: 0.3),
+                inactiveTrackColor: Colors.white.withValues(alpha: 0.2),
+                thumbColor: isEnabled ? Colors.white : Colors.grey,
+                overlayColor: Colors.blue.withValues(alpha: 0.2),
+              ),
+              child: Slider(
+                value: value,
+                min: min,
+                max: max,
+                onChanged: onChanged,
+              ),
             ),
           ),
         ],
