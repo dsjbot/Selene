@@ -20,35 +20,184 @@ class CarouselService {
   /// 获取轮播图数据（带缓存）
   /// 从热门电影、剧集、综艺、动漫中获取数据，并获取详情（背景图、简介、预告片）
   static Future<List<CarouselItem>> getCarouselItems(BuildContext context, {bool forceRefresh = false}) async {
-    // 1. 如果不强制刷新，先尝试从内存缓存获取
-    if (!forceRefresh && _memoryCache != null && _memoryCacheTime != null) {
-      if (DateTime.now().difference(_memoryCacheTime!) < _cacheDuration) {
-        debugPrint('[CarouselService] 使用内存缓存，共 ${_memoryCache!.length} 项');
-        return _memoryCache!;
+    // 1. 优先从内存缓存获取（即使强制刷新也先返回缓存，后台更新）
+    if (_memoryCache != null && _memoryCache!.isNotEmpty) {
+      debugPrint('[CarouselService] 使用内存缓存，共 ${_memoryCache!.length} 项');
+      // 如果需要刷新，后台异步更新
+      if (forceRefresh || _memoryCacheTime == null || DateTime.now().difference(_memoryCacheTime!) > _cacheDuration) {
+        _refreshInBackground(context);
       }
+      return _memoryCache!;
     }
     
-    // 2. 如果不强制刷新，尝试从本地存储获取缓存
-    if (!forceRefresh) {
-      final cachedItems = await _loadFromCache();
-      if (cachedItems != null && cachedItems.isNotEmpty) {
-        debugPrint('[CarouselService] 使用本地缓存，共 ${cachedItems.length} 项');
-        _memoryCache = cachedItems;
-        _memoryCacheTime = DateTime.now();
-        return cachedItems;
-      }
+    // 2. 尝试从本地存储获取缓存
+    final cachedItems = await _loadFromCache();
+    if (cachedItems != null && cachedItems.isNotEmpty) {
+      debugPrint('[CarouselService] 使用本地缓存，共 ${cachedItems.length} 项');
+      _memoryCache = cachedItems;
+      _memoryCacheTime = DateTime.now();
+      // 后台刷新
+      _refreshInBackground(context);
+      return cachedItems;
     }
     
-    // 3. 从网络获取数据
-    final items = await _fetchFromNetwork(context);
+    // 3. 没有缓存，从网络获取（快速版本，不获取详情）
+    final items = await _fetchFromNetworkFast(context);
     
     // 4. 保存到缓存
     if (items.isNotEmpty) {
       _memoryCache = items;
       _memoryCacheTime = DateTime.now();
       await _saveToCache(items);
+      // 后台获取详情并更新
+      _fetchDetailsInBackground(context, items);
     }
     
+    return items;
+  }
+  
+  /// 后台刷新标记
+  static bool _isRefreshing = false;
+  
+  /// 后台刷新数据
+  static Future<void> _refreshInBackground(BuildContext context) async {
+    if (_isRefreshing) return;
+    _isRefreshing = true;
+    
+    try {
+      debugPrint('[CarouselService] 后台刷新数据...');
+      final items = await _fetchFromNetwork(context);
+      if (items.isNotEmpty) {
+        _memoryCache = items;
+        _memoryCacheTime = DateTime.now();
+        await _saveToCache(items);
+        debugPrint('[CarouselService] 后台刷新完成，共 ${items.length} 项');
+      }
+    } catch (e) {
+      debugPrint('[CarouselService] 后台刷新失败: $e');
+    } finally {
+      _isRefreshing = false;
+    }
+  }
+  
+  /// 后台获取详情并更新缓存
+  static Future<void> _fetchDetailsInBackground(BuildContext context, List<CarouselItem> items) async {
+    try {
+      debugPrint('[CarouselService] 后台获取详情...');
+      final updatedItems = <CarouselItem>[];
+      
+      // 并行获取所有详情
+      final detailsFutures = items.map((item) => _getDoubanDetails(context, item.id));
+      final detailsList = await Future.wait(detailsFutures);
+      
+      for (int i = 0; i < items.length; i++) {
+        final item = items[i];
+        final details = detailsList[i];
+        updatedItems.add(CarouselItem(
+          id: item.id,
+          title: item.title,
+          poster: item.poster,
+          backdrop: details?['backdrop'] ?? item.backdrop,
+          description: details?['plot_summary'] ?? item.description,
+          trailerUrl: details?['trailerUrl'] ?? item.trailerUrl,
+          year: item.year,
+          rate: item.rate,
+          type: item.type,
+        ));
+      }
+      
+      if (updatedItems.isNotEmpty) {
+        _memoryCache = updatedItems;
+        _memoryCacheTime = DateTime.now();
+        await _saveToCache(updatedItems);
+        debugPrint('[CarouselService] 详情更新完成');
+      }
+    } catch (e) {
+      debugPrint('[CarouselService] 后台获取详情失败: $e');
+    }
+  }
+  
+  /// 快速从网络获取数据（不获取详情，用于首次加载）
+  static Future<List<CarouselItem>> _fetchFromNetworkFast(BuildContext context) async {
+    final List<CarouselItem> items = [];
+
+    try {
+      // 并行获取热门电影、剧集、综艺、动漫数据
+      final results = await Future.wait([
+        DoubanService.getCategoryData(context, kind: 'movie', category: '热门', type: '全部', pageLimit: 5),
+        DoubanService.getCategoryData(context, kind: 'tv', category: 'tv', type: 'tv', pageLimit: 5),
+        DoubanService.getCategoryData(context, kind: 'tv', category: 'show', type: 'show', pageLimit: 3),
+        DoubanService.getCategoryData(context, kind: 'tv', category: 'tv', type: 'tv_animation', pageLimit: 3),
+      ]);
+
+      final moviesResult = results[0];
+      final tvShowsResult = results[1];
+      final showsResult = results[2];
+      final animeResult = results[3];
+
+      // 处理电影数据（取前3个）
+      if (moviesResult.success && moviesResult.data != null) {
+        for (final movie in moviesResult.data!.take(3)) {
+          items.add(CarouselItem(
+            id: movie.id,
+            title: movie.title,
+            poster: movie.poster,
+            backdrop: _getHDPoster(movie.poster),
+            year: movie.year,
+            rate: movie.rate,
+            type: 'movie',
+          ));
+        }
+      }
+
+      // 处理剧集数据（取前3个）
+      if (tvShowsResult.success && tvShowsResult.data != null) {
+        for (final show in tvShowsResult.data!.take(3)) {
+          items.add(CarouselItem(
+            id: show.id,
+            title: show.title,
+            poster: show.poster,
+            backdrop: _getHDPoster(show.poster),
+            year: show.year,
+            rate: show.rate,
+            type: 'tv',
+          ));
+        }
+      }
+
+      // 处理综艺数据（取前2个）
+      if (showsResult.success && showsResult.data != null) {
+        for (final show in showsResult.data!.take(2)) {
+          items.add(CarouselItem(
+            id: show.id,
+            title: show.title,
+            poster: show.poster,
+            backdrop: _getHDPoster(show.poster),
+            year: show.year,
+            rate: show.rate,
+            type: 'variety',
+          ));
+        }
+      }
+
+      // 处理动漫数据（取前2个）
+      if (animeResult.success && animeResult.data != null) {
+        for (final anime in animeResult.data!.take(2)) {
+          items.add(CarouselItem(
+            id: anime.id,
+            title: anime.title,
+            poster: anime.poster,
+            backdrop: _getHDPoster(anime.poster),
+            year: anime.year,
+            rate: anime.rate,
+            type: 'anime',
+          ));
+        }
+      }
+    } catch (e) {
+      debugPrint('[CarouselService] 快速获取轮播图数据失败: $e');
+    }
+
     return items;
   }
   
