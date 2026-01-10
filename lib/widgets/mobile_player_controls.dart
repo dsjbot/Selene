@@ -239,6 +239,12 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
 
   /// 处理点击事件，支持双击暂停
   void _handleTap() {
+    // 锁定状态下只允许单击切换控制栏显示
+    if (_isLocked) {
+      _toggleControlsVisibility();
+      return;
+    }
+    
     _tapCount++;
     if (_tapCount == 1) {
       // 第一次点击，启动计时器等待第二次点击
@@ -461,35 +467,25 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
     final speeds = [0.5, 0.75, 1.0, 1.5, 2.0];
     final currentSpeed = widget.playbackSpeedListenable.value;
     final screenHeight = MediaQuery.of(context).size.height;
-    final orientation = MediaQuery.of(context).orientation;
-    final isLandscape = orientation == Orientation.landscape;
     
     final result = await showModalBottomSheet<double>(
       context: context,
+      backgroundColor: Colors.black.withOpacity(0.5),
       builder: (context) {
-        final isDark = Theme.of(context).brightness == Brightness.dark;
         return SafeArea(
           child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxHeight: isLandscape ? screenHeight * 0.9 : screenHeight * 0.75,
-            ),
+            constraints: BoxConstraints(maxHeight: screenHeight * 0.75),
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: speeds.map((speed) {
                   final selected = (speed - currentSpeed).abs() < 0.01;
                   return ListTile(
-                    dense: isLandscape,
-                    visualDensity: isLandscape ? VisualDensity.compact : null,
                     title: Text(
                       '${speed}x',
                       style: TextStyle(
-                        color: selected
-                            ? Colors.red
-                            : (isDark ? Colors.white : Colors.black87),
-                        fontWeight:
-                            selected ? FontWeight.bold : FontWeight.normal,
-                        fontSize: isLandscape ? 14 : 16,
+                        color: selected ? Colors.red : Colors.white,
+                        fontWeight: selected ? FontWeight.bold : FontWeight.normal,
                       ),
                     ),
                     onTap: () => Navigator.of(context).pop(speed),
@@ -508,27 +504,20 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
 
   Future<void> _showDanmakuDialog() async {
     final screenHeight = MediaQuery.of(context).size.height;
-    final orientation = MediaQuery.of(context).orientation;
-    final isLandscape = orientation == Orientation.landscape;
     
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Colors.black.withOpacity(0.5),
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
-            final isDark = Theme.of(context).brightness == Brightness.dark;
-            final contentPadding = isLandscape ? 12.0 : 16.0;
-            final titleSize = isLandscape ? 16.0 : 18.0;
-            
             return SafeArea(
               child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxHeight: isLandscape ? screenHeight * 0.85 : screenHeight * 0.6,
-                ),
+                constraints: BoxConstraints(maxHeight: screenHeight * 0.6),
                 child: SingleChildScrollView(
                   child: Padding(
-                    padding: EdgeInsets.all(contentPadding),
+                    padding: const EdgeInsets.all(16),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -537,30 +526,27 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
+                            const Text(
                               '弹幕设置',
                               style: TextStyle(
-                                fontSize: titleSize,
+                                fontSize: 18,
                                 fontWeight: FontWeight.bold,
-                                color: isDark ? Colors.white : Colors.black87,
+                                color: Colors.white,
                               ),
                             ),
-                            Transform.scale(
-                              scale: isLandscape ? 0.85 : 1.0,
-                              child: Switch(
-                                value: widget.danmakuSettings.enabled,
-                                onChanged: (value) {
-                                  final newSettings = widget.danmakuSettings.copyWith(enabled: value);
-                                  widget.onDanmakuSettingsChanged(newSettings);
-                                  newSettings.save(); // 保存设置
-                                  setModalState(() {});
-                                },
-                                activeColor: Colors.blue,
-                              ),
+                            Switch(
+                              value: widget.danmakuSettings.enabled,
+                              onChanged: (value) {
+                                final newSettings = widget.danmakuSettings.copyWith(enabled: value);
+                                widget.onDanmakuSettingsChanged(newSettings);
+                                newSettings.save();
+                                setModalState(() {});
+                              },
+                              activeColor: Colors.blue,
                             ),
                           ],
                         ),
-                        SizedBox(height: isLandscape ? 8 : 16),
+                        const SizedBox(height: 16),
                         // 透明度
                         _buildDanmakuSlider(
                           label: '透明度',
@@ -569,12 +555,10 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
                           max: 1.0,
                           displayValue: '${(widget.danmakuSettings.opacity * 100).round()}%',
                           enabled: widget.danmakuSettings.enabled,
-                          isDark: isDark,
-                          compact: isLandscape,
                           onChanged: (value) {
                             final newSettings = widget.danmakuSettings.copyWith(opacity: value);
                             widget.onDanmakuSettingsChanged(newSettings);
-                            newSettings.save(); // 保存设置
+                            newSettings.save();
                             setModalState(() {});
                           },
                         ),
@@ -586,12 +570,10 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
                           max: 32.0,
                           displayValue: '${widget.danmakuSettings.fontSize.round()}',
                           enabled: widget.danmakuSettings.enabled,
-                          isDark: isDark,
-                          compact: isLandscape,
                           onChanged: (value) {
                             final newSettings = widget.danmakuSettings.copyWith(fontSize: value);
                             widget.onDanmakuSettingsChanged(newSettings);
-                            newSettings.save(); // 保存设置
+                            newSettings.save();
                             setModalState(() {});
                           },
                         ),
@@ -603,12 +585,10 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
                           max: 2.0,
                           displayValue: '${widget.danmakuSettings.speed.toStringAsFixed(1)}x',
                           enabled: widget.danmakuSettings.enabled,
-                          isDark: isDark,
-                          compact: isLandscape,
                           onChanged: (value) {
                             final newSettings = widget.danmakuSettings.copyWith(speed: value);
                             widget.onDanmakuSettingsChanged(newSettings);
-                            newSettings.save(); // 保存设置
+                            newSettings.save();
                             setModalState(() {});
                           },
                         ),
@@ -620,12 +600,10 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
                           max: 1.0,
                           displayValue: '${(widget.danmakuSettings.areaHeight * 100).round()}%',
                           enabled: widget.danmakuSettings.enabled,
-                          isDark: isDark,
-                          compact: isLandscape,
                           onChanged: (value) {
                             final newSettings = widget.danmakuSettings.copyWith(areaHeight: value);
                             widget.onDanmakuSettingsChanged(newSettings);
-                            newSettings.save(); // 保存设置
+                            newSettings.save();
                             setModalState(() {});
                           },
                         ),
@@ -649,12 +627,10 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
     required double max,
     required String displayValue,
     required bool enabled,
-    required bool isDark,
     required ValueChanged<double> onChanged,
-    bool compact = false,
   }) {
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: compact ? 4.0 : 8.0),
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -664,33 +640,26 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
               Text(
                 label,
                 style: TextStyle(
-                  color: enabled
-                      ? (isDark ? Colors.white : Colors.black87)
-                      : (isDark ? Colors.white38 : Colors.black38),
-                  fontSize: compact ? 13 : 14,
+                  color: enabled ? Colors.white : Colors.white38,
+                  fontSize: 14,
                 ),
               ),
               Text(
                 displayValue,
                 style: TextStyle(
-                  color: enabled
-                      ? (isDark ? Colors.white70 : Colors.black54)
-                      : (isDark ? Colors.white24 : Colors.black26),
-                  fontSize: compact ? 13 : 14,
+                  color: enabled ? Colors.white70 : Colors.white24,
+                  fontSize: 14,
                 ),
               ),
             ],
           ),
-          SizedBox(
-            height: compact ? 28 : 36,
-            child: Slider(
-              value: value,
-              min: min,
-              max: max,
-              onChanged: enabled ? onChanged : null,
-              activeColor: Colors.blue,
-              inactiveColor: isDark ? Colors.white24 : Colors.black12,
-            ),
+          Slider(
+            value: value,
+            min: min,
+            max: max,
+            onChanged: enabled ? onChanged : null,
+            activeColor: Colors.blue,
+            inactiveColor: Colors.white24,
           ),
         ],
       ),

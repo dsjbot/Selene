@@ -212,9 +212,9 @@ class _SkipSettingsPanelState extends State<SkipSettingsPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor = isDark ? Colors.white : Colors.black87;
-    final subTextColor = isDark ? Colors.white70 : Colors.black54;
+    // 使用白色文字，因为背景是半透明黑色
+    const textColor = Colors.white;
+    final subTextColor = Colors.white70;
     final screenHeight = MediaQuery.of(context).size.height;
     final orientation = MediaQuery.of(context).orientation;
     final isLandscape = orientation == Orientation.landscape;
@@ -404,7 +404,7 @@ Future<void> showSkipSettingsDialog({
   await showModalBottomSheet(
     context: context,
     isScrollControlled: true,
-    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+    backgroundColor: Colors.black.withOpacity(0.5),
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
