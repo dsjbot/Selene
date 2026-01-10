@@ -626,7 +626,6 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
       },
     );
   }
-  }
 
   Widget _buildDanmakuSlider({
     required String label,
