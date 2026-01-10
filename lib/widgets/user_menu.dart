@@ -820,18 +820,6 @@ class _UserMenuState extends State<UserMenu> {
                           ? const Color(0xFF374151)
                           : const Color(0xFFe5e7eb),
                     ),
-                    // 去广告选项
-                    _buildToggleOption(
-                      title: '去广告',
-                      value: _adFilterEnabled,
-                      onChanged: (value) async {
-                        await AdFilterService.setEnabled(value);
-                        setState(() {
-                          _adFilterEnabled = value;
-                        });
-                      },
-                      icon: LucideIcons.shieldOff,
-                    ),
                     // 本地搜索选项（本地模式下不显示）
                     if (!_isLocalMode) ...[
                       // 分割线
