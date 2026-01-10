@@ -1,4 +1,4 @@
-package org.moontechlab.selene
+package top.dsjbot.selene
 
 import io.flutter.embedding.android.FlutterActivity
 
